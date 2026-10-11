@@ -1,0 +1,102 @@
+[
+  {
+    "symbol": "BTC",
+    "name": "Bitcoin",
+    "product": "BTC-USD",
+    "precision": 2,
+    "demoBase": 67450.0,
+    "icon": "assets/coins/btc.svg",
+    "enabled": true,
+    "sortOrder": 0
+  },
+  {
+    "symbol": "ETH",
+    "name": "Ethereum",
+    "product": "ETH-USD",
+    "precision": 2,
+    "demoBase": 2500.0,
+    "icon": "assets/coins/eth.svg",
+    "enabled": true,
+    "sortOrder": 1
+  },
+  {
+    "symbol": "SOL",
+    "name": "Solana",
+    "product": "SOL-USD",
+    "precision": 3,
+    "demoBase": 110.0,
+    "icon": "assets/coins/sol.svg",
+    "enabled": true,
+    "sortOrder": 2
+  },
+  {
+    "symbol": "XRP",
+    "name": "XRP",
+    "product": "XRP-USD",
+    "precision": 4,
+    "demoBase": 1.4,
+    "icon": "assets/coins/xrp.svg",
+    "enabled": true,
+    "sortOrder": 3
+  },
+  {
+    "symbol": "DOGE",
+    "name": "Dogecoin",
+    "product": "DOGE-USD",
+    "precision": 5,
+    "demoBase": 0.085,
+    "icon": "assets/coins/doge.svg",
+    "enabled": true,
+    "sortOrder": 4
+  },
+  {
+    "symbol": "ADA",
+    "name": "Cardano",
+    "product": "ADA-USD",
+    "precision": 5,
+    "demoBase": 0.27,
+    "icon": "assets/coins/ada.svg",
+    "enabled": true,
+    "sortOrder": 5
+  },
+  {
+    "symbol": "LINK",
+    "name": "Chainlink",
+    "product": "LINK-USD",
+    "precision": 3,
+    "demoBase": 13.4,
+    "icon": "assets/coins/link.svg",
+    "enabled": false,
+    "sortOrder": 6
+  },
+  {
+    "symbol": "TRUMP",
+    "name": "OFFICIAL TRUMP",
+    "product": "TRUMP-USD",
+    "precision": 3,
+    "demoBase": 4.5,
+    "icon": "assets/coins/trump.svg",
+    "enabled": false,
+    "sortOrder": 7
+  },
+  {
+    "symbol": "AVAX",
+    "name": "Avalanche",
+    "product": "AVAX-USD",
+    "precision": 3,
+    "demoBase": 10.8,
+    "icon": "assets/coins/avax.svg",
+    "enabled": false,
+    "sortOrder": 8
+  },
+  {
+    "symbol": "LTC",
+    "name": "Litecoin",
+    "product": "LTC-USD",
+    "precision": 3,
+    "demoBase": 64.65,
+    "icon": "assets/coins/ltc.svg",
+    "enabled": true,
+    "sortOrder": 6
+  }
+]
