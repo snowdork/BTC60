@@ -1,5 +1,6 @@
 import http.client
 import json
+import sqlite3
 import tempfile
 import threading
 import unittest
@@ -80,6 +81,11 @@ class AccountsTest(unittest.TestCase):
 
     def test_database_coin_catalog(self):
         with server.connect() as conn:
+            conn.execute("UPDATE coins SET enabled=1 WHERE symbol='AVAX'")
+            self.assertEqual(conn.execute('SELECT count(*) FROM coins WHERE enabled=1').fetchone()[0], 8)
+            with self.assertRaises(sqlite3.IntegrityError):
+                conn.execute("UPDATE coins SET enabled=1 WHERE symbol='TRUMP'")
+            conn.execute("UPDATE coins SET enabled=0 WHERE symbol='AVAX'")
             conn.execute("INSERT INTO coins VALUES('TEST','Test coin','CUSTOM-USD',4,1.5,'',1,99)")
         status, catalog, _ = self.request('GET', '/api/coins')
         self.assertEqual(status, 200)
@@ -106,10 +112,37 @@ class AccountsTest(unittest.TestCase):
             self.assertEqual(server.candle_close('TEST', 120), 1.5)
             self.assertIn('/products/CUSTOM-USD/candles?', request.call_args.args[0].full_url)
 
+    def test_win_loss_settlement_credits_once_and_is_user_scoped(self):
+        status, _, cookie = self.request('POST','/api/signup',{'name':'Settlement user','email':'settle@example.com','password':'strong-password-999'})
+        self.assertEqual(status,200)
+        _, account, _ = self.request('GET','/api/account',cookie=cookie)
+        user_id=account['user']['id'];csrf=account['csrf']
+        now=int(server.time.time());start=now//3600*3600
+        with patch('server.candle_close',return_value=100):
+            for side,cents in [('up',68),('down',32)]:
+                order={'coin':'BTC','marketId':'60-0','side':side,'budget':50,'requestId':'settlement-request-'+side,'startsAt':start*1000,'strike':100,'cents':cents}
+                status, account, _ = self.request('POST','/api/predictions',order,cookie,csrf)
+                self.assertEqual(status,201,account)
+        cost=sum(p['cost_cents'] for p in account['predictions'])
+        with patch('server.time.time',return_value=start+3606),patch('server.candle_close',return_value=100):
+            server.settle_due(user_id+1000)
+            self.assertTrue(all(p['settled_at'] is None for p in self.request('GET','/api/account',cookie=cookie)[1]['predictions']))
+            for _ in range(2):
+                self.assertEqual(self.request('POST','/api/settle',{},cookie,csrf)[0],200)
+        _, settled, _ = self.request('GET','/api/account',cookie=cookie)
+        up=next(p for p in settled['predictions'] if p['side']=='up')
+        down=next(p for p in settled['predictions'] if p['side']=='down')
+        self.assertEqual(up['payout_cents'],up['contracts']*100)
+        self.assertEqual(down['payout_cents'],0)
+        self.assertIsNotNone(down['settled_at'])
+        self.assertEqual(settled['user']['balance_cents'],1425000-cost+up['payout_cents'])
+        with server.connect() as conn:
+            self.assertEqual(conn.execute('SELECT count(*) FROM settlements s JOIN predictions p ON p.id=s.prediction_id WHERE p.user_id=?',(user_id,)).fetchone()[0],2)
+
     def test_private_files_not_served(self):
         for path in ['/data/btc60.sqlite3', '/server.py', '/.git/config', '/%2e%2e/server.py']:
             self.assertEqual(self.request('GET', path)[0], 404)
-        for path in ['/', '/login.html', '/signup.html', '/index.html']:
+        for path in ['/', '/login.html', '/signup.html', '/index.html', '/portfolio.html', '/portfolio.js', '/portfolio.css']:
             self.assertEqual(self.request('GET', path)[0], 200)
 
 

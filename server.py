@@ -1,5 +1,6 @@
 """Local BTC60 demo server: SQLite accounts, sessions, orders and settlements."""
 import argparse
+import fcntl
 import hashlib
 import json
 import math
@@ -42,6 +43,13 @@ def initialize():
           precision INTEGER NOT NULL CHECK(precision BETWEEN 0 AND 12),
           demo_base REAL NOT NULL CHECK(demo_base>0), icon TEXT NOT NULL DEFAULT '',
           enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)), sort_order INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS catalog_migrations (version INTEGER PRIMARY KEY);
+        CREATE TRIGGER IF NOT EXISTS max_enabled_coins_insert BEFORE INSERT ON coins
+        WHEN NEW.enabled=1 AND (SELECT count(*) FROM coins WHERE enabled=1)>=8
+        BEGIN SELECT RAISE(ABORT,'Maximum 8 enabled prediction coins'); END;
+        CREATE TRIGGER IF NOT EXISTS max_enabled_coins_update BEFORE UPDATE OF enabled ON coins
+        WHEN NEW.enabled=1 AND OLD.enabled=0 AND (SELECT count(*) FROM coins WHERE enabled=1)>=8
+        BEGIN SELECT RAISE(ABORT,'Maximum 8 enabled prediction coins'); END;
         CREATE TABLE IF NOT EXISTS users (
           id INTEGER PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL,
           password_hash TEXT NOT NULL, salt TEXT NOT NULL,
@@ -73,6 +81,21 @@ def initialize():
         if seed_coins:
             for coin in json.loads((ROOT / 'coins.seed.json').read_text()):
                 conn.execute('INSERT INTO coins VALUES(?,?,?,?,?,?,?,?)', (coin['symbol'],coin['name'],coin['product'],coin['precision'],coin['demoBase'],coin['icon'],int(coin['enabled']),coin['sortOrder']))
+        if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=1').fetchone():
+            # Add new catalog entries once, preserving administrator changes on restart.
+            for coin in json.loads((ROOT / 'coins.seed.json').read_text())[5:]:
+                if conn.execute('SELECT 1 FROM coins WHERE symbol=?', (coin['symbol'],)).fetchone():
+                    continue
+                room = conn.execute('SELECT count(*) FROM coins WHERE enabled=1').fetchone()[0] < 8
+                conn.execute('INSERT INTO coins VALUES(?,?,?,?,?,?,?,?)', (coin['symbol'],coin['name'],coin['product'],coin['precision'],coin['demoBase'],coin['icon'],int(coin['enabled'] and room),coin['sortOrder']))
+            conn.execute('INSERT INTO catalog_migrations VALUES(1)')
+        if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=2').fetchone():
+            conn.execute("UPDATE coins SET enabled=0 WHERE symbol='LINK'")
+            coin = next(c for c in json.loads((ROOT / 'coins.seed.json').read_text()) if c['symbol']=='LTC')
+            room = conn.execute('SELECT count(*) FROM coins WHERE enabled=1').fetchone()[0] < 8
+            conn.execute('INSERT OR IGNORE INTO coins VALUES(?,?,?,?,?,?,?,?)', (coin['symbol'],coin['name'],coin['product'],coin['precision'],coin['demoBase'],coin['icon'],int(room),coin['sortOrder']))
+            conn.execute('INSERT INTO catalog_migrations VALUES(2)')
+
     os.chmod(DB, 0o600)
 
 
@@ -94,9 +117,9 @@ def candle_close(coin, boundary):
     raise ValueError('Benchmark history is unavailable. Try again shortly.')
 
 
-def _settle_due():
+def _settle_due(user_id=None):
     with connect() as conn:
-        pending = conn.execute('SELECT p.* FROM predictions p LEFT JOIN settlements s ON s.prediction_id=p.id WHERE s.prediction_id IS NULL AND p.ends_at<=?', (int(time.time()) - 5,)).fetchall()
+        pending = conn.execute('SELECT p.* FROM predictions p LEFT JOIN settlements s ON s.prediction_id=p.id WHERE s.prediction_id IS NULL AND p.ends_at<=? AND (? IS NULL OR p.user_id=?)', (int(time.time()) - 5, user_id, user_id)).fetchall()
     prices = {}
     for p in pending:
         key = (p['coin'], p['ends_at'])
@@ -115,10 +138,10 @@ def _settle_due():
                 conn.execute('UPDATE users SET balance_cents=balance_cents+? WHERE id=?', (payout, p['user_id']))
 
 
-def settle_due():
+def settle_due(user_id=None):
     if SETTLE_LOCK.acquire(blocking=False):
         try:
-            _settle_due()
+            _settle_due(user_id)
         finally:
             SETTLE_LOCK.release()
 
@@ -185,11 +208,11 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith('/api/'):
             return self.reply(404, {'error': 'Unknown endpoint.'})
         # Serve only public application assets, never SQLite, source or dotfiles.
-        public = {'index.html', 'welcome.html', 'login.html', 'signup.html', 'styles.css', 'auth.css', 'auth.js', 'account.js', 'app.js', 'btc-chart.js', 'market-model.js', 'coins.js', 'bootstrap.js'}
+        public = {'index.html', 'welcome.html', 'login.html', 'signup.html', 'styles.css', 'auth.css', 'auth.js', 'account.js', 'app.js', 'btc-chart.js', 'market-model.js', 'coins.js', 'bootstrap.js', 'splash.js', 'portfolio.html', 'portfolio.js', 'portfolio-model.js', 'portfolio.css', 'theme.js', 'theme.css'}
         relative = urllib.parse.unquote(path).lstrip('/')
         if not relative:
             self.path = '/welcome.html'
-        elif relative not in public and not (re.fullmatch(r'assets/coins/[a-zA-Z0-9_-]+\.svg', relative)):
+        elif relative not in public and relative != 'assets/previews/prediction-playfield.png' and not (re.fullmatch(r'assets/coins/[a-zA-Z0-9_-]+\.svg', relative)):
             return self.reply(404, {'error': 'Not found.'})
         super().do_GET()
 
@@ -222,7 +245,7 @@ class Handler(SimpleHTTPRequestHandler):
                     conn.execute('DELETE FROM sessions WHERE token_hash=?', (session['token_hash'],))
                 return self.reply(200, {'ok': True}, 'btc60_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0')
             if path == '/api/settle':
-                settle_due()
+                settle_due(session['user_id'])
                 return self.reply(200, self.account(session))
             if path == '/api/predictions':
                 return self.predict(session, data)
@@ -320,7 +343,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, default=8000)
     args = parser.parse_args()
-    initialize()
-    threading.Thread(target=settlement_worker, daemon=True).start()
-    print(f'BTC60 local demo: http://127.0.0.1:{args.port}', flush=True)
-    ThreadingHTTPServer(('127.0.0.1', args.port), Handler).serve_forever()
+    DB = DB.expanduser().resolve()
+    DB.parent.mkdir(parents=True, exist_ok=True)
+    with open(str(DB) + '.lock', 'a') as database_lock:
+        os.chmod(database_lock.name, 0o600)
+        try:
+            fcntl.flock(database_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise SystemExit('Database is in use by a server or maintenance command. Stop it before starting another server.')
+        initialize()
+        threading.Thread(target=settlement_worker, daemon=True).start()
+        print(f'BTC60 local demo: http://127.0.0.1:{args.port}', flush=True)
+        ThreadingHTTPServer(('127.0.0.1', args.port), Handler).serve_forever()

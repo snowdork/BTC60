@@ -16,7 +16,7 @@ The demo uses binary settlement: final benchmark >= starting benchmark resolves 
 
 Run API/database checks with `python3 -m unittest server_test.py`. Run frontend checks with `node --test market-model.test.js coins.test.js` and `node --check app.js` and `node --check btc-chart.js`.
 
-Deployable copies live in `dist/`. After source edits, copy `index.html`, `styles.css`, `market-model.js`, `coins.js`, `btc-chart.js`, `app.js`, `bootstrap.js`, `account.js`, `auth.js`, `auth.css`, `welcome.html`, `login.html`, `signup.html`, and the `assets/` directory into `dist/`. `.openai/hosting.json` identifies the existing private Site. Keep development on the `Phase1` branch.
+Deployable copies live in `dist/`. After source edits, copy `index.html`, `styles.css`, `market-model.js`, `coins.js`, `btc-chart.js`, `app.js`, `bootstrap.js`, `account.js`, `auth.js`, `auth.css`, `welcome.html`, `splash.js`, `assets/previews/prediction-playfield.png`, `login.html`, `signup.html`, and the `assets/` directory into `dist/`. `.openai/hosting.json` identifies the existing private Site. Keep development on the `Phase1` branch.
 
 The coin-logo buttons offers Bitcoin (BTC), Ethereum (ETH), Solana (SOL), XRP, and Dogecoin (DOGE). Selection persists locally and switches the public USD ticker/history feed, graph, prices, labels, and order context. Local SVG coin logos appear beside the selector and current price. Small-priced coins retain extra decimal places. Saved positions keep their original coin; the demo balance is shared across all coins.
 
@@ -38,3 +38,23 @@ VALUES('AVAX','Avalanche','AVAX-USD',3,25,'',1,5);
 ```
 
 A blank icon displays a text button. For a local logo, place its SVG under `assets/coins/` and set `icon` to that path. Keep symbols stable once predictions reference them; disable coins instead of deleting them. New products must be supported by the configured Coinbase feeds. The terminal requires the local server to load its catalog; it does not fall back to a hardcoded list.
+
+The splash page includes a clickable demo screenshot of the prediction playfield. Decorative floating logos use enabled coins from `/api/coins`; reduced-motion preferences disable their animation.
+
+
+The catalog contains nine records with at most eight enabled for predictions. BTC, ETH, SOL, XRP, DOGE, ADA, and LTC are enabled; LINK, TRUMP, and AVAX are disabled. TRUMP is retained only to preserve any existing prediction history. A one-time migration adds the four new records without changing existing catalog edits. Database triggers reject enabling a ninth coin. To enable AVAX, disable another coin first, then enable AVAX in the same transaction. Refresh the terminal after catalog edits. New coin SVGs are local vector badges; the TRUMP badge is a custom lettermark.
+
+### Database maintenance
+
+See [scripts/README.md](scripts/README.md) for `init`, `status`, `backup`, and explicit `reset --confirm-reset` commands. Safe init preserves data; reset automatically backs up the previous database. Run script checks with `python3 -m unittest discover -s scripts -p "*_test.py"`.
+
+A second catalog migration replaces Chainlink selection with Litecoin (LTC-USD), retaining LINK for historical predictions and settlement lookup.
+
+
+### Portfolio and prediction tracking
+
+The portfolio icon in the terminal opens `portfolio.html`. History is restricted to the signed-in user's account and includes pending, awaiting settlement, won, and lost predictions. Filters and summary cards show win/loss counts, win rate among settled orders, available balance, pending committed funds, and realized profit/loss (returned funds minus settled-order costs). Unsettled order costs never count as realized losses. The trading pane shows only unsettled predictions, with live countdowns; completed predictions move into portfolio history.
+
+Visible account pages check settlements every 15 seconds and when focused. The background worker continues every 30 seconds. Missing price history leaves orders awaiting settlement. Server-side settlement inserts and winning balance credits remain atomic and idempotent. Refresh requests only process the signed-in user's orders; the worker processes all accounts. Run frontend checks with `node --test *.test.js` and account/settlement tests with `python3 -m unittest server_test.py`.
+
+The sun/moon icon in each page header toggles light and dark themes. The preference is saved locally and applied before page rendering, and synchronizes across tabs. Theme assets are `theme.js` and `theme.css`; include both in static copies.

@@ -81,13 +81,18 @@
     $('balance').textContent=money(balance());
   }
   function renderPositions() {
-    $('position-count').textContent=positions.length;
-    if(!positions.length){$('positions-list').textContent=account.user?'No predictions yet. Choose an open interval to make your first call.':'Log in to save your predictions and follow their settlements.';return;}
-    $('positions-list').replaceChildren(...positions.slice().reverse().map(p=>{
-      const m={...markets.find(m=>m.id===p.marketId),...(p.start?{start:p.start,end:p.end,minutes:p.minutes}:{})},row=document.createElement('div');row.className='position-row';if(p.settled_at)row.title=`Closed at ${window.RolrCoins.formatPrice(p.close_price,p.coin)} · ${p.source} · ${new Date(p.settled_at*1000).toISOString()}`;
+    const pending=positions.filter(p=>p.settled_at==null);
+    $('position-count').textContent=pending.length;
+    $('positions-list').classList.toggle('positions-list-empty',!pending.length);
+    if(!pending.length){$('positions-list').textContent=account.user?'No pending predictions. Settled results are in your portfolio.':'Log in to track pending predictions and results.';return;}
+    $('positions-list').replaceChildren(...pending.map(p=>{
+      const row=document.createElement('div');row.className='position-row';
       const detail=document.createElement('div'),title=document.createElement('strong'),time=document.createElement('small');
-      title.textContent=`${p.side==='up'?'↗ Up':'↘ Down'} · ${p.coin} · ${m.minutes} min`;title.style.color=p.side==='up'?'var(--green)':'var(--red)';time.textContent=`${m.start} – ${m.end} UTC · ${new Date(p.starts_at*1000).toISOString().slice(0,10)} · ${p.settled_at?(p.outcome===p.side?'Won':'Lost')+' · Settled':'Pending settlement'}`;detail.append(title,time);
-      const values=document.createElement('div'),cost=document.createElement('strong'),contracts=document.createElement('small');cost.textContent=money(p.cost);contracts.textContent=`${p.contracts} contracts · ${p.settled_at?money(p.payout_cents/100)+' returned':money(p.contracts)+' if correct'}`;values.append(cost,contracts);row.append(detail,values);return row;
+      title.textContent=`${p.side==='up'?'↗ Up':'↘ Down'} · ${p.coin} · ${p.minutes} min`;title.style.color=p.side==='up'?'var(--green)':'var(--red)';
+      const seconds=Math.max(0,Math.ceil(p.ends_at-Date.now()/1000));
+      const status=seconds?`${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s left`:'Awaiting settlement';
+      time.textContent=`${p.start}–${p.end} UTC · ${new Date(p.starts_at*1000).toISOString().slice(0,10)} · ${status}`;detail.append(title,time);
+      const values=document.createElement('div'),cost=document.createElement('strong'),contracts=document.createElement('small');cost.textContent=money(p.cost);contracts.textContent=`${p.contracts} contracts · ${money(p.contracts)} if correct`;values.append(cost,contracts);row.append(detail,values);return row;
     }));
   }
   document.querySelectorAll('[data-side]').forEach(button=>button.addEventListener('click',()=>{side=button.dataset.side;renderTicket();}));
@@ -117,7 +122,7 @@
     $('account-name').textContent=account.user?.name||'';
     $('account-name').hidden=!account.user;$('logout-button').hidden=!account.user;
     $('login-link').hidden=!!account.user;$('signup-link').hidden=!!account.user;
-    $('positions-storage').textContent=account.user?'Saved to your account · Demo settlements':'Log in to save predictions';
+    $('positions-storage').textContent=account.user?'Live orders only':'Log in to save predictions';
     renderPositions();renderTicket();
   }
   $('logout-button').addEventListener('click',()=>account.logout().catch(error=>notify(error.message)));
@@ -126,5 +131,6 @@
   window.addEventListener('btc-market-update',()=>{if(!initialMarketChosen){const active=markets.find(m=>m.minutes===15&&m.status==='open'&&Number.isFinite(m.strike));if(active){market=active;initialMarketChosen=true;}}review=null;$('review-dialog').close();renderMarkets();renderTicket();});
   window.addEventListener('btc-chances-update',renderChances);
   window.addEventListener('btc-price-update',()=>{renderChances();const delta=(window.RolrModel.isHistorical?market.close:window.RolrModel.spot)-market.strike; $('ticket-delta').textContent=Number.isFinite(market.strike)&&Number.isFinite(window.RolrModel.isHistorical?market.close:window.RolrModel.spot)?(delta>=0?'+':'−')+price(Math.abs(delta)):'—';$('ticket-delta').style.color=delta>=0?'var(--green)':'var(--red)';});
+  setInterval(renderPositions,1000);
   renderMarkets();renderAccount();
 })();
