@@ -54,14 +54,14 @@ class AccountsTest(unittest.TestCase):
             unchanged = self.request('GET', '/api/account', cookie=cookie)[1]
             self.assertEqual(unchanged['user']['balance_cents'], 1425000)
             self.assertEqual(unchanged['predictions'], [])
-        with patch('server.time.time', return_value=now), patch('server.candle_close', return_value=100), patch('server.fresh_spot',return_value=101), patch('server.market_up',return_value=69):
+        with patch('server.time.time', return_value=now), patch('server.candle_close', return_value=100), patch('server.fresh_spot',return_value=101), patch('server.market_up',return_value=68):
             status, account, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
             self.assertEqual(status, 201, account)
             self.assertEqual(account['user']['balance_cents'], 1425000 - 73 * 68)
             self.assertEqual(len(account['predictions']), 1)
             status, replay, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
             self.assertEqual(replay['user']['balance_cents'], account['user']['balance_cents'])
-            bad = dict(order, requestId='test-request-00000002', cents=1)
+            bad = dict(order, requestId='test-request-00000002', budget=0)
             self.assertEqual(self.request('POST', '/api/predictions', bad, cookie, csrf)[0], 400)
             bad = dict(order, requestId='test-request-00000003', startsAt=0)
             self.assertEqual(self.request('POST', '/api/predictions', bad, cookie, csrf)[0], 400)
@@ -83,6 +83,26 @@ class AccountsTest(unittest.TestCase):
             self.assertNotEqual(saved, 'strong-password-123')
         self.assertEqual(self.request('POST', '/api/logout', {}, cookie, csrf)[0], 200)
         self.assertEqual(self.request('GET', '/api/account', cookie=cookie)[0], 401)
+
+    def test_live_execution_accepts_updated_benchmark_and_quote_until_expiry(self):
+        _, _, cookie = self.request('POST', '/api/signup', {'name': 'Live', 'email': 'live@example.com', 'password': 'strong-password-123'})
+        csrf = self.request('GET', '/api/account', cookie=cookie)[1]['csrf']
+        start = int(server.time.time()) // 3600 * 3600
+        order = {'coin': 'BTC', 'marketId': '60-0', 'side': 'up', 'budget': 50, 'requestId': 'live-request-00000001', 'startsAt': start * 1000, 'strike': 99, 'cents': 10}
+        with patch('server.time.time', return_value=start + 3599), patch('server.candle_close', return_value=100), patch('server.fresh_spot', return_value=101), patch('server.market_up', return_value=70):
+            status, account, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
+            self.assertEqual(status, 201, account)
+            with server.connect() as conn:
+                saved = conn.execute('SELECT * FROM predictions WHERE request_id=?', (order['requestId'],)).fetchone()
+                self.assertEqual(saved['strike'], 100)
+                self.assertEqual(saved['cents'], 70)
+                self.assertEqual(saved['contracts'], 71)
+            balance = account['user']['balance_cents']
+        with patch('server.time.time', return_value=start + 3600):
+            order['requestId'] = 'live-request-00000002'
+            status, _, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
+            self.assertEqual(status, 400)
+            self.assertEqual(self.request('GET', '/api/account', cookie=cookie)[1]['user']['balance_cents'], balance)
 
     def test_database_coin_catalog(self):
         with server.connect() as conn:

@@ -39,7 +39,7 @@ VALUES('AVAX','Avalanche','AVAX-USD',3,25,'',1,5);
 
 A blank icon displays a text button. For a local logo, place its SVG under `assets/coins/` and set `icon` to that path. Keep symbols stable once predictions reference them; disable coins instead of deleting them. New products must be supported by the configured Coinbase feeds. The terminal requires the local server to load its catalog; it does not fall back to a hardcoded list.
 
-The splash page includes a clickable demo screenshot of the prediction playfield. Decorative floating logos use enabled coins from `/api/coins`; reduced-motion preferences disable their animation.
+The splash page includes a clickable demo screenshot of the prediction playfield. The preview uses the current terminal layout with illustrative demo data and a static presentation without floating coins or tilt effects.
 
 
 The catalog contains nine records with at most eight enabled for predictions. BTC, ETH, SOL, XRP, DOGE, ADA, and LTC are enabled; LINK, TRUMP, and AVAX are disabled. TRUMP is retained only to preserve any existing prediction history. A one-time migration adds the four new records without changing existing catalog edits. Database triggers reject enabling a ninth coin. To enable AVAX, disable another coin first, then enable AVAX in the same transaction. Refresh the terminal after catalog edits. New coin SVGs are local vector badges; the TRUMP badge is a custom lettermark.
@@ -82,3 +82,7 @@ Purchase prices now follow the displayed heuristic percentage: 70% Up prices an 
 Live review now updates contract price, quantity, return and profit until confirmation. Confirmation snapshots those terms. The demo server honors that reviewed price when its independent price differs by at most 2¢; larger moves reject without debiting funds and leave live review available to confirm again. Closed intervals and stale feeds remain blocked.
 
 The trading controller caches static controls and per-segment elements, uses a single delegated market-selection listener, and preserves the playfield DOM when selection changes. Live ticket and review quotes share one calculation path. Review totals only rebuild when price or contract count changes; currency formatting reuses a formatter.
+
+Minute volatility is cached until the candle array changes or a new minute closes. Prediction lookups use a per-account interval index; unchanged segment percentage text is left intact. Obsolete floating-coin and hour-navigation CSS has been removed.
+
+Live review stays open through benchmark/history refreshes and displays the current spot price and benchmark. Confirmation executes at the server’s current model price within the selected budget, accepting price and benchmark changes until the interval expires. Final contract count and return may differ from review; stale feeds, closed intervals, and insufficient balance remain blocked. This supersedes the previous 2¢ review allowance.

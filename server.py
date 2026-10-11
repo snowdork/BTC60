@@ -401,15 +401,10 @@ class Handler(SimpleHTTPRequestHandler):
             raise ValueError('This market is closed or changed. Review again.')
         strike = candle_close(coin, start)
         spot = fresh_spot(coin)
-        if data.get('strike') != strike:
-            raise ValueError('Benchmark changed. Refresh and review again.')
+        # Execute at the authoritative live quote, even if the browser's
+        # benchmark/history or displayed quote changed during confirmation.
         up = market_up(coin, strike, spot, now, start, end)
         cents = up if side == 'up' else 100 - up
-        reviewed = data.get('cents')
-        if isinstance(reviewed, bool) or not isinstance(reviewed, int) or not 1 <= reviewed <= 99 or abs(reviewed-cents)>2:
-            raise ValueError('Price moved more than 2¢. Live review has updated; confirm again.')
-        # Honor the reviewed price within the small demo execution allowance.
-        cents = reviewed
         if not start <= time.time() < end:
             raise ValueError('Too late to place. This interval has expired.')
         contracts = math.floor(round(budget * 100) / cents)

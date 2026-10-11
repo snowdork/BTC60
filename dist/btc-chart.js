@@ -16,8 +16,12 @@
   const currentTime=()=>mode==='demo'?demoStart+Date.now()-demoEpoch:Date.now();
   function status(text,tone='amber'){$('feed-status').textContent=text;$('feed-status').className=`badge ${tone}`;}
   function broadcast(name){window.dispatchEvent(new Event(name));}
+  let volatilityCandles=null,volatilityMinute=-1;
   function syncMarkets(now,force=false) {
-    const state=[];model.paused=paused;model.now=now;model.volatility=model.minuteVolatility(candles,now);
+    const state=[];model.paused=paused;model.now=now;const minute=Math.floor(now/60000);
+    if(candles!==volatilityCandles||minute!==volatilityMinute){
+      model.volatility=model.minuteVolatility(candles,now);volatilityCandles=candles;volatilityMinute=minute;
+    }
     model.hour=`${coin.symbol}:${mode}:${new Date(hour).toISOString()}`;
     model.markets.forEach(m=>{
       const index=Number(m.id.split('-')[1]),start=hour+index*m.minutes*60000,end=start+m.minutes*60000;
@@ -128,7 +132,7 @@
   function draw(now) {
     const displayTime=historical?hour+3600000:now;
     $('time-cursor').hidden=historical;
-    $('next-hour').hidden=!historical;$('current-hour').hidden=!historical;$('chart-pause').disabled=historical;
+    $('next-hour').disabled=!historical;$('current-hour').hidden=!historical;$('chart-pause').disabled=historical;
     $('hour-date').textContent=`${new Date(hour).toISOString().slice(0,10)} · UTC`;
     $('price-context').textContent=historical?'HOUR CLOSE':mode==='demo'?'SIMULATED SPOT':'LIVE SPOT';
     $('market-heading').textContent=historical?'Settlement history · demo results':'Choose your market';
