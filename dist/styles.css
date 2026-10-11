@@ -9,3 +9,4 @@
 .time-cursor{bottom:0}
 
 .timeline-stack{--chart-height:130px}.time-cursor>span{top:calc(var(--chart-height) + 18px)}@media(max-height:820px){.timeline-stack{--chart-height:105px}}
+.coin-picker{display:flex;align-items:center;gap:8px;padding:6px 9px;border:1px solid var(--border);border-radius:7px;background:#151a16}.coin-picker img{flex-shrink:0}.coin-picker select{font:500 11px Sora,Arial,sans-serif;cursor:pointer;min-width:135px;border:0;background:transparent;color:#d7e0d9;padding:3px 20px 3px 0}.coin-picker option{background:#151a16;color:#eee}.coin-picker select:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.spot{display:flex;align-items:center;gap:9px}.spot>#price-coin-icon{width:30px;height:30px;flex-shrink:0}.spot>#btc-change{margin-left:2px}.workspace-label{gap:10px}

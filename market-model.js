@@ -17,7 +17,7 @@
     return {cents,contracts,cost:costCents/100,payout:contracts,profit:(contracts*100-costCents)/100};
   }
   function outcome(start,close) { return close >= start ? 'up' : 'down'; }
-  const model={markets,quote,outcome,initialBalance:14250,spot:67528.50};
+  const model={markets,quote,outcome,initialBalance:14250,spot:67528.50,coin:typeof window!=='undefined'?window.RolrCoins.getCoin('BTC'):null};
   if (typeof module !== 'undefined' && module.exports) module.exports=model;
   else root.RolrModel=model;
 })(typeof globalThis!=='undefined'?globalThis:this);
