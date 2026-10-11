@@ -38,8 +38,26 @@
     const up=Math.max(1,Math.min(99,Math.round(100/(1+Math.exp(-1.7*z)))));
     return {up,down:100-up,label:'ESTIMATE'};
   }
+  function dataStatus(model,market,now=Date.now()) {
+    if(model.isHistorical)return {ready:false,reason:'Historical market',age:null};
+    if(model.feedMode==='demo')return {ready:false,reason:'Synthetic preview only',age:null};
+    const age=Number.isFinite(model.priceUpdatedAt)&&model.priceUpdatedAt>0?Math.max(0,Math.floor((now-model.priceUpdatedAt)/1000)):null;
+    if(model.paused)return {ready:false,reason:'Chart paused',age};
+    if(model.feedConnection!=='connected')return {ready:false,reason:'Price feed disconnected',age};
+    if(age===null||!Number.isFinite(model.spot)||model.spot<=0)return {ready:false,reason:'Waiting for live price',age};
+    if(now-model.priceUpdatedAt>15000||model.priceUpdatedAt>now+5000)return {ready:false,reason:'Price feed stale',age};
+    if(model.historyStatus==='error')return {ready:false,reason:'Benchmark history unavailable',age};
+    if(!Number.isFinite(market.strike)||market.strike<=0)return {ready:false,reason:'Opening benchmark unavailable',age};
+    if(!model.quoteReady||!Number.isInteger(market.up))return {ready:false,reason:'Purchase quote unavailable',age};
+    if(market.status!=='open'||!Number.isFinite(market.endsAt)||now>=market.endsAt)return {ready:false,reason:'Market closed',age};
+    return {ready:true,reason:'Ready',age};
+  }
+  function configure(config){
+    if(!config||!markets.every(m=>Number.isInteger(config.quotes?.[m.id])&&config.quotes[m.id]>0&&config.quotes[m.id]<100))throw Error('Invalid purchase quote configuration.');
+    markets.forEach(m=>{m.up=config.quotes[m.id];});model.quoteReady=true;model.settlement=config.settlement;
+  }
   function outcome(start,close) { return close >= start ? 'up' : 'down'; }
-  const model={markets,quote,outcome,estimateChances,minuteVolatility,initialBalance:14250,spot:67528.50,coin:typeof window!=='undefined'?window.RolrCoins.available[0]:null};
+  const model={markets,quote,outcome,estimateChances,minuteVolatility,dataStatus,configure,quoteReady:false,initialBalance:14250,spot:67528.50,coin:typeof window!=='undefined'?window.RolrCoins.available[0]:null};
   if (typeof module !== 'undefined' && module.exports) module.exports=model;
   else root.RolrModel=model;
 })(typeof globalThis!=='undefined'?globalThis:this);

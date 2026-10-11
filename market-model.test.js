@@ -19,3 +19,21 @@ test('queued baseline and completed outcomes are distinguished from estimates',(
 test('volatility uses only completed consecutive minute candles',()=>{const candles=[[0,0,0,0,100],[60,0,0,0,101],[120,0,0,0,1000]];const sigma=minuteVolatility(candles,120000);assert(Math.abs(sigma-Math.log(1.01))<1e-10);assert.equal(minuteVolatility([],120000),.0001);assert.equal(minuteVolatility([[0,0,0,0,100],[120,0,0,0,1000]],180000),.0001);});
 
 test('each interval opens at 50/50 then follows price movement',()=>{for(const minutes of [15,30,60]){const m={status:'open',strike:100,startsAt:60000,endsAt:60000+minutes*60000};for(const now of [60000,60250,60999])assert.deepEqual(estimateChances(m,101,now,.001),{up:50,down:50,label:'BASELINE'});assert(estimateChances(m,101,61000,.001).up>50);assert(estimateChances(m,99,61000,.001).down>50);}});
+
+const {dataStatus,configure}=require('./market-model.js');
+test('prediction gate requires fresh connected data, benchmark and server quote',()=>{
+ const now=100000,market={status:'open',strike:100,up:62,endsAt:200000},model={feedMode:'live',feedConnection:'connected',spot:101,priceUpdatedAt:now,historyStatus:'ready',quoteReady:true};
+ assert.equal(dataStatus(model,market,now).ready,true);
+ for(const override of [{feedConnection:'disconnected'},{priceUpdatedAt:now-15001},{priceUpdatedAt:now+5001},{priceUpdatedAt:0},{spot:NaN},{historyStatus:'error'},{quoteReady:false},{paused:true},{isHistorical:true},{feedMode:'demo'}])assert.equal(dataStatus({...model,...override},market,now).ready,false);
+ assert.equal(dataStatus(model,{...market,strike:null},now).ready,false);
+ assert.equal(dataStatus(model,{...market,endsAt:now},now).ready,false);
+ assert.equal(dataStatus(model,{...market,status:'queued'},now).ready,false);
+});
+test('purchase prices are configured by server, independently of model chances',()=>{
+ const model=require('./market-model.js'),quotes=Object.fromEntries(model.markets.map(m=>[m.id,55]));
+ configure({quotes,settlement:{version:'coinbase-minute-close-v1'}});
+ assert(model.markets.every(m=>m.up===55));assert.equal(model.quoteReady,true);
+ assert.equal(quote({...model.markets[0],status:'open',strike:100},'up',50,100).cents,55);
+ assert.equal(estimateChances({status:'open',strike:100,endsAt:100000},100,0).up,50);
+ assert.throws(()=>configure({quotes:{}}));
+});

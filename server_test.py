@@ -49,7 +49,12 @@ class AccountsTest(unittest.TestCase):
         now = int(server.time.time())
         start = now // 3600 * 3600
         order = {'coin': 'BTC', 'marketId': '60-0', 'side': 'up', 'budget': 50, 'requestId': 'test-request-00000001', 'startsAt': start * 1000, 'strike': 100, 'cents': 68}
-        with patch('server.time.time', return_value=now), patch('server.candle_close', return_value=100):
+        with patch('server.time.time', return_value=now), patch('server.candle_close', return_value=100), patch('server.fresh_spot', side_effect=ValueError('Price feed stale')):
+            self.assertEqual(self.request('POST', '/api/predictions', order, cookie, csrf)[0], 400)
+            unchanged = self.request('GET', '/api/account', cookie=cookie)[1]
+            self.assertEqual(unchanged['user']['balance_cents'], 1425000)
+            self.assertEqual(unchanged['predictions'], [])
+        with patch('server.time.time', return_value=now), patch('server.candle_close', return_value=100), patch('server.fresh_spot',return_value=101):
             status, account, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
             self.assertEqual(status, 201, account)
             self.assertEqual(account['user']['balance_cents'], 1425000 - 73 * 68)
@@ -64,7 +69,7 @@ class AccountsTest(unittest.TestCase):
             server.settle_due()
         with server.connect() as conn:
             self.assertEqual(conn.execute('SELECT count(*) FROM settlements').fetchone()[0], 0)
-        with patch('server.time.time', return_value=start + 3606), patch('server.candle_close', return_value=100):
+        with patch('server.time.time', return_value=start + 3606), patch('server.candle_close', return_value=100), patch('server.fresh_spot',return_value=101):
             server.settle_due()
             server.settle_due()
         _, settled, _ = self.request('GET', '/api/account', cookie=cookie)
@@ -118,13 +123,13 @@ class AccountsTest(unittest.TestCase):
         _, account, _ = self.request('GET','/api/account',cookie=cookie)
         user_id=account['user']['id'];csrf=account['csrf']
         now=int(server.time.time());start=now//3600*3600
-        with patch('server.candle_close',return_value=100):
+        with patch('server.candle_close',return_value=100),patch('server.fresh_spot',return_value=101):
             for side,cents in [('up',68),('down',32)]:
                 order={'coin':'BTC','marketId':'60-0','side':side,'budget':50,'requestId':'settlement-request-'+side,'startsAt':start*1000,'strike':100,'cents':cents}
                 status, account, _ = self.request('POST','/api/predictions',order,cookie,csrf)
                 self.assertEqual(status,201,account)
         cost=sum(p['cost_cents'] for p in account['predictions'])
-        with patch('server.time.time',return_value=start+3606),patch('server.candle_close',return_value=100):
+        with patch('server.time.time',return_value=start+3606),patch('server.candle_close',return_value=100),patch('server.fresh_spot',return_value=101):
             server.settle_due(user_id+1000)
             self.assertTrue(all(p['settled_at'] is None for p in self.request('GET','/api/account',cookie=cookie)[1]['predictions']))
             for _ in range(2):
@@ -138,6 +143,21 @@ class AccountsTest(unittest.TestCase):
         self.assertEqual(settled['user']['balance_cents'],1425000-cost+up['payout_cents'])
         with server.connect() as conn:
             self.assertEqual(conn.execute('SELECT count(*) FROM settlements s JOIN predictions p ON p.id=s.prediction_id WHERE p.user_id=?',(user_id,)).fetchone()[0],2)
+
+    def test_fresh_spot_rejects_stale_and_invalid_prices(self):
+        from datetime import datetime, timezone
+        now=int(server.time.time())
+        class Ticker:
+            def __init__(self,price,timestamp):
+                self.body=json.dumps({'price':price,'time':datetime.fromtimestamp(timestamp,timezone.utc).isoformat()}).encode()
+            def __enter__(self): return self
+            def __exit__(self,*args): pass
+            def read(self): return self.body
+        with patch('server.urllib.request.urlopen',return_value=Ticker('101',now)):
+            self.assertEqual(server.fresh_spot('BTC'),101)
+        for price,timestamp in [('101',now-16),('101',now+10),('NaN',now),('0',now)]:
+            with patch('server.urllib.request.urlopen',return_value=Ticker(price,timestamp)):
+                with self.assertRaises(ValueError):server.fresh_spot('BTC')
 
     def test_static_compression_revalidation_and_head(self):
         import gzip

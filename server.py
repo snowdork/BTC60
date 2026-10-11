@@ -119,6 +119,24 @@ def candle_close(coin, boundary):
     raise ValueError('Benchmark history is unavailable. Try again shortly.')
 
 
+def fresh_spot(coin):
+    with connect() as conn:
+        product = conn.execute('SELECT product FROM coins WHERE symbol=?', (coin,)).fetchone()['product']
+    request = urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/ticker', headers={'User-Agent':'BTC60-local-demo/1.0'})
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            ticker = json.load(response)
+        timestamp = datetime.fromisoformat(ticker['time'].replace('Z','+00:00')).timestamp()
+        price = float(ticker['price'])
+        if not math.isfinite(price) or price<=0 or not -5 <= time.time()-timestamp <= 15:
+            raise ValueError('Price feed stale. Wait for a fresh price before predicting.')
+        return price
+    except ValueError:
+        raise
+    except Exception:
+        raise ValueError('Live price unavailable. Reconnect before predicting.')
+
+
 def _settle_due(user_id=None):
     with connect() as conn:
         pending = conn.execute('SELECT p.* FROM predictions p LEFT JOIN settlements s ON s.prediction_id=p.id WHERE s.prediction_id IS NULL AND p.ends_at<=? AND (? IS NULL OR p.user_id=?)', (int(time.time()) - 5, user_id, user_id)).fetchall()
@@ -200,7 +218,7 @@ class Handler(SimpleHTTPRequestHandler):
         if path == '/api/coins':
             with connect() as conn:
                 records = [dict(row) for row in conn.execute('SELECT symbol,name,product,precision,demo_base AS demoBase,icon,enabled,sort_order AS sortOrder FROM coins ORDER BY sort_order,symbol')]
-            return self.reply(200, {'coins': records})
+            return self.reply(200, {'coins': records, 'marketConfig': {'quotes': QUOTES, 'settlement': {'source':'Coinbase Exchange', 'method':'Minute candle close immediately before interval boundaries', 'version':'coinbase-minute-close-v1', 'tie':'up'}}})
         if path == '/api/account':
             session = self.session()
             if not session:
@@ -353,6 +371,7 @@ class Handler(SimpleHTTPRequestHandler):
         if not start <= now < end or data.get('startsAt') != start * 1000:
             raise ValueError('This market is closed or changed. Review again.')
         strike = candle_close(coin, start)
+        fresh_spot(coin)
         if data.get('strike') != strike:
             raise ValueError('Benchmark changed. Refresh and review again.')
         cents = QUOTES[market_id] if side == 'up' else 100 - QUOTES[market_id]

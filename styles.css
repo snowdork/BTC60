@@ -99,3 +99,30 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .outcome.down>span,.outcome.down>strong{color:var(--red)}
 .chance-up,.chance-down{white-space:nowrap}
 @media(max-width:1150px){.chance-row{gap:6px;font-size:11px}}
+
+/* Phase2: data provenance, estimates and purchase prices have distinct labels. */
+.data-health{display:flex;align-items:center;flex-wrap:wrap;gap:5px 14px;margin:0 0 8px;color:var(--muted);font:8px 'JetBrains Mono',monospace}.data-health strong{font-weight:500;margin-left:auto}.chance-block{border-top:1px solid var(--border);padding-top:4px}.chance-block .chance-row{border:0;padding-top:2px}.chance-caption{display:block;font:7px 'JetBrains Mono',monospace;letter-spacing:.4px;color:var(--muted)}.card-distance{font:9px 'JetBrains Mono',monospace;line-height:1.4}.card-quote{font:8px 'JetBrains Mono',monospace;color:var(--muted);padding-top:2px}.settlement-details{margin-top:7px;font-size:9px;color:var(--muted)}.settlement-details summary{cursor:pointer;color:var(--cyan)}.settlement-details p{line-height:1.6}.benchmark .eyebrow{font-size:7px;letter-spacing:0}.market-card{gap:5px}.card-benchmark small{font-size:7px}@media(max-width:1150px){.card-distance{font-size:8px}.card-quote{font-size:7px}}@media(max-width:480px){.data-health strong{margin-left:0}}
+
+/* Keep the distance and countdown together to preserve laptop playfield space. */
+.card-context{display:flex;align-items:center;justify-content:space-between;gap:8px}.card-context .card-bottom{margin:0;white-space:nowrap}.card-distance{font-size:8px}.chance-block{padding-top:3px}.card-quote{padding-top:0}
+@media(min-width:901px) and (max-height:820px){.chart-plot{height:70px}.timeline-stack{--chart-height:70px}.market-card{padding:7px 9px!important;gap:2px!important}.card-benchmark small{margin-top:1px}.chance-block .chance-row{padding-top:1px}.tier{margin-bottom:6px}}
+
+/* Saved predictions sit beside their segment benchmark. */
+.segment-price{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px}.segment-predictions{display:inline-flex;flex-wrap:wrap;gap:4px}.segment-prediction{display:inline-flex;align-items:center;gap:4px;padding:2px 5px;border:1px solid currentColor;border-radius:4px;font:600 10px monospace;letter-spacing:0;white-space:nowrap}.segment-prediction.up{color:var(--green);background:#00e67610}.segment-prediction.down{color:var(--red);background:#ff174410}
+
+/* Completed intervals show their confirmed direction at the right edge. */
+.segment-result{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:700 30px monospace;line-height:1;pointer-events:none}.segment-result.up{color:var(--green)}.segment-result.down{color:var(--red)}.market-card.settled .card-benchmark,.market-card.settled .card-context{padding-right:28px}
+
+/* Review repeats the chosen direction in words, an arrow, and color. */
+.review-direction{display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:16px;border:1px solid currentColor;border-radius:8px;color:var(--green);background:#00e6760c}.review-direction.down{color:var(--red);background:#ff17440c}.review-direction>span{font:700 34px monospace;line-height:1}.review-direction>strong{font-size:17px}.review-direction~h2{font-size:18px}#confirm-prediction{justify-content:center;gap:8px}
+
+.segment-prediction.won{color:var(--green);background:#00e67610}.segment-prediction.lost{color:var(--red);background:#ff174410}
+
+.review-estimate{margin-left:auto;text-align:right}.review-estimate strong{display:block;font:700 21px monospace;white-space:nowrap}.review-estimate small{display:block;margin-top:4px;font:8px monospace;letter-spacing:.5px;color:var(--muted)}@media(max-width:480px){.review-direction{flex-wrap:wrap}.review-estimate strong{font-size:18px}}
+
+/* Finished segments use a quiet grey surface with accessible outcome colors. */
+.market-card.settled{background:#b8bfbc;color:#26342d;--muted:#58645e;--green:#007c40;--red:#c9153e;--border:#26342d25}.market-card.settled:hover{background:#c1c8c4}.market-card.settled .card-bottom{color:var(--muted)}.market-card.settled .neutral{color:var(--muted)}
+
+.market-card.settled{border-style:dashed}
+
+.outcome #up-chance,.outcome #down-chance{font-size:20px}.outcome .outcome-quote{opacity:1;margin-top:6px;color:var(--muted)}.outcome-quote b{font-weight:600}.outcome small:last-child{margin-top:4px}

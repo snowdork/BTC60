@@ -67,3 +67,12 @@ The terminal keeps the full timeline aligned at a readable minimum width. On pho
 Chart/time updates run once per second instead of four times per second. Streaming prices still update the model immediately; UI notifications are limited to once a second. Static chart time labels are built once per hour, sorted streaming data avoids repeated sorting, pending-order countdowns update existing elements, and unchanged account/history snapshots skip rebuilding rows. Hidden-tab rendering and polling are skipped. Native font fallbacks avoid external font requests.
 
 The local server gzip-compresses text assets and serves ETags for conditional revalidation. Browsers can reuse unchanged assets without downloading their bodies; changed files still refresh immediately. Account/API responses remain uncached. `responsive.css` is included on every page and must stay in the `dist/` copies.
+
+
+### Phase2 market clarity and data checks
+
+The server publishes the demo purchase prices with the coin catalog; both the order ticket and segment cards use those quotes. Up/Down model percentages are heuristic estimates, independent of purchase prices. Each open segment shows its distance from the starting settlement benchmark.
+
+The settlement details describe the actual Coinbase Exchange proxy: the minute candle close immediately before each interval boundary. This is not a 60-second average. Equal opening and closing benchmarks resolve Up; missing candles leave orders awaiting settlement.
+
+The status strip separates spot freshness, candle-history availability, and order readiness. Live orders require a connected, unpaused feed, a source timestamp within 15 seconds, valid history and benchmark, and a server-supplied quote. The server independently fetches a fresh Coinbase ticker before accepting a new order. Historical and synthetic previews cannot place orders.

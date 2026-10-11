@@ -17,7 +17,7 @@
   function status(text,tone='amber'){$('feed-status').textContent=text;$('feed-status').className=`badge ${tone}`;}
   function broadcast(name){window.dispatchEvent(new Event(name));}
   function syncMarkets(now,force=false) {
-    const state=[];model.now=now;model.volatility=model.minuteVolatility(candles,now);
+    const state=[];model.paused=paused;model.now=now;model.volatility=model.minuteVolatility(candles,now);
     model.hour=`${coin.symbol}:${mode}:${new Date(hour).toISOString()}`;
     model.markets.forEach(m=>{
       const index=Number(m.id.split('-')[1]),start=hour+index*m.minutes*60000,end=start+m.minutes*60000;
@@ -41,7 +41,7 @@
     if(last&&Math.floor(last.t/1000)*1000===bucket)last.price=price;
     else {points.push({t,price});if(last&&t<last.t)points.sort((a,b)=>a.t-b.t);}
     if(points.length>3662)points.splice(0,points.length-3662);
-    lastPrice=price;lastPriceAt=Date.now();model.priceUpdatedAt=lastPriceAt;model.spot=price;
+    lastPrice=price;lastPriceAt=Date.now();model.priceUpdatedAt=t;model.spot=price;
     if(Date.now()-lastPriceBroadcast>=1000){lastPriceBroadcast=Date.now();broadcast('btc-price-update');}
   }
   function demoPrice(minute,second=0){return coin.demoBase*(1+(minute*1.5+Math.sin(minute*.48)*19+Math.sin(minute*1.8)*4+Math.sin(second*.5)*1.4)/67450);}
@@ -59,7 +59,7 @@
   async function loadHistory() {
     if(mode!=='live'||stopped)return;
     if(fetchController)fetchController.abort();
-    historyFailed=false;
+    historyFailed=false;model.historyStatus='loading';
     const controller=new AbortController();fetchController=controller;
     const version=++historyVersion,requestedHour=hour,requestedCoin=coin.symbol;
     const timeout=setTimeout(()=>controller.abort(),10000);
@@ -74,11 +74,11 @@
       const history=candles.filter(c=>c[0]*1000>=hour&&c[0]*1000+60000<=Math.min(Date.now(),hour+3600000)).map(c=>({t:c[0]*1000+60000,price:c[4]}));
       // Keep streaming points received while history was loading.
       const cutoff=history.at(-1)?.t??hour;
-      points=[...history,...points.filter(p=>p.t>cutoff)];lastHistoryAt=Date.now();
+      points=[...history,...points.filter(p=>p.t>cutoff)];lastHistoryAt=Date.now();model.historyStatus='ready';model.historyUpdatedAt=lastHistoryAt;
       if(historical){lastPrice=candles.find(c=>c[0]*1000===hour+3600000-60000)?.[4]??null;model.spot=lastPrice??NaN;status('HISTORICAL','neutral');$('chart-source').textContent='Coinbase history · demo settlements';}
       syncMarkets(Date.now(),true);draw(Date.now());
     } catch(error) {
-      if(mode==='live'&&version===historyVersion){historyFailed=true;$('chart-source').textContent='History unavailable · reconnect or preview demo';}
+      if(mode==='live'&&version===historyVersion){historyFailed=true;model.historyStatus='error';broadcast('btc-chances-update');$('chart-source').textContent='History unavailable · reconnect or preview demo';}
     } finally {clearTimeout(timeout);if(fetchController===controller)fetchController=null;}
   }
   function disconnect() {
@@ -90,10 +90,10 @@
   function connect() {
     if(mode!=='live'||historical||stopped)return;
     status(lastPriceAt?'RECONNECTING':'CONNECTING');
-    connectionStartedAt=Date.now();
+    connectionStartedAt=Date.now();model.feedConnection='connecting';
     try {socket=new WebSocket('wss://ws-feed.exchange.coinbase.com');}catch{scheduleRetry();return;}
     const active=socket;
-    active.onopen=()=>{if(socket!==active)return;active.send(JSON.stringify({type:'subscribe',product_ids:[coin.product],channels:['ticker']}));};
+    active.onopen=()=>{if(socket!==active)return;model.feedConnection='connected';active.send(JSON.stringify({type:'subscribe',product_ids:[coin.product],channels:['ticker']}));};
     active.onmessage=event=>{
       if(socket!==active||mode!=='live'||historical)return;
       let data;try{data=JSON.parse(event.data);}catch{return;}
@@ -104,14 +104,14 @@
       appendPoint(t,price);backoff=1000;if(!paused)status('LIVE','green');
     };
     active.onerror=()=>{if(socket===active)active.close();};
-    active.onclose=()=>{if(socket!==active)return;socket=null;scheduleRetry();};
+    active.onclose=()=>{if(socket!==active)return;socket=null;model.feedConnection='disconnected';broadcast('btc-chances-update');scheduleRetry();};
   }
   function scheduleRetry() {
     if(mode!=='live'||historical||stopped)return;
-    status('DISCONNECTED');clearTimeout(retryTimer);retryTimer=setTimeout(connect,backoff);backoff=Math.min(30000,backoff*2);
+    model.feedConnection='disconnected';status('DISCONNECTED');clearTimeout(retryTimer);retryTimer=setTimeout(connect,backoff);backoff=Math.min(30000,backoff*2);
   }
   function resetHour(now,targetHour=hourOf(now)) {
-    hour=targetHour;historical=hour<hourOf(now);model.isHistorical=historical;model.feedMode=mode;model.priceUpdatedAt=0;historyFailed=false;points=[];candles=[];lastPrice=null;lastPriceAt=0;model.spot=NaN;
+    hour=targetHour;historical=hour<hourOf(now);model.isHistorical=historical;model.feedMode=mode;model.priceUpdatedAt=0;model.historyStatus='loading';model.feedConnection='disconnected';model.historyUpdatedAt=0;historyFailed=false;points=[];candles=[];lastPrice=null;lastPriceAt=0;model.spot=NaN;
     syncMarkets(now,true);if(mode==='demo'){demoHistory(historical?hour+3600000:now);if(historical){lastPrice=points.at(-1)?.price??null;model.spot=lastPrice??NaN;syncMarkets(now,true);}}else loadHistory();
   }
   function setMode(next,targetHour) {
@@ -130,7 +130,7 @@
     $('time-cursor').hidden=historical;
     $('next-hour').hidden=!historical;$('current-hour').hidden=!historical;$('chart-pause').disabled=historical;
     $('hour-date').textContent=`${new Date(hour).toISOString().slice(0,10)} · UTC`;
-    $('price-context').textContent=historical?'HOUR CLOSE':'LIVE SPOT';
+    $('price-context').textContent=historical?'HOUR CLOSE':mode==='demo'?'SIMULATED SPOT':'LIVE SPOT';
     $('market-heading').textContent=historical?'Settlement history · demo results':'Choose your market';
     const fraction=Math.max(0,Math.min(1,(now-hour)/3600000));
     const stack=$('timeline-stack'),chart=$('btc-chart'),bounds=chart.getBoundingClientRect(),stackBounds=stack.getBoundingClientRect();
@@ -185,7 +185,7 @@
   $('demo-preview').addEventListener('click',()=>setMode(mode==='live'?'demo':'live'));
   $('feed-retry').addEventListener('click',()=>setMode('live',mode==='live'&&historical?hour:undefined));
   $('chart-pause').addEventListener('click',()=>{
-    paused=!paused;$('chart-pause').textContent=paused?'Resume':'Pause';$('chart-pause').setAttribute('aria-pressed',String(paused));
+    paused=!paused;model.paused=paused;broadcast('btc-chances-update');$('chart-pause').textContent=paused?'Resume':'Pause';$('chart-pause').setAttribute('aria-pressed',String(paused));
     if(paused)status('PAUSED','neutral');else {status(mode==='demo'?'SIMULATED':Date.now()-lastPriceAt<15000?'LIVE':'STALE',mode==='demo'?'amber':Date.now()-lastPriceAt<15000?'green':'amber');syncMarkets(currentTime());draw(currentTime());}
   });
   document.addEventListener('visibilitychange',()=>{if(historical){if(!document.hidden){syncMarkets(currentTime());draw(currentTime());}return;}if(!document.hidden&&!paused){const now=currentTime();if(hourOf(now)!==hour)resetHour(now);syncMarkets(now,true);draw(now);if(mode==='live')loadHistory();}});
