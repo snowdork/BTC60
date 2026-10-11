@@ -1,6 +1,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {coins,getCoin,formatPrice}=require('./coins.js');
-test('five supported coins each have a USD feed and local icon',()=>{assert.deepEqual(coins.map(c=>c.symbol),['BTC','ETH','SOL','XRP','DOGE']);for(const coin of coins){assert.equal(coin.product,coin.symbol+'-USD');assert(require('node:fs').existsSync(coin.icon));}});
-test('small coin prices retain meaningful decimals',()=>{assert.equal(formatPrice(.08531,'DOGE'),'$0.08531');assert.equal(formatPrice(1.4063,'XRP'),'$1.4063');assert.equal(formatPrice(110.171,'SOL'),'$110.171');assert.equal(formatPrice(2508.12,'ETH'),'$2,508.12');assert.equal(formatPrice(83005.04,'BTC'),'$83,005.04');assert.equal(formatPrice(NaN,'DOGE'),'—');});
-test('unknown preferences fall back to Bitcoin',()=>{assert.equal(getCoin('INVALID').symbol,'BTC');});
+const {createCatalog}=require('./coins.js');
+const records=[{symbol:'TEST',name:'Test coin',product:'TEST-USD',precision:5,demoBase:.1,icon:'',enabled:1},{symbol:'OLD',name:'Old coin',product:'OLD-USD',precision:3,demoBase:100,icon:'',enabled:0}];
+test('catalog uses supplied database records without a fixed coin list',()=>{const catalog=createCatalog(records);assert.deepEqual(catalog.available.map(c=>c.symbol),['TEST']);assert.equal(catalog.getCoin('OLD').name,'Old coin');assert.equal(catalog.getCoin('unknown').symbol,'TEST');assert(Object.isFrozen(catalog.coins));});
+test('formatting uses each database precision',()=>{const catalog=createCatalog(records);assert.equal(catalog.formatPrice(.08531,'TEST'),'$0.08531');assert.equal(catalog.formatPrice(110.171,'OLD'),'$110.171');assert.equal(catalog.formatPrice(NaN,'TEST'),'—');});
+test('empty and invalid catalogs are handled',()=>{assert.equal(createCatalog([]).available.length,0);assert.throws(()=>createCatalog(null));assert.throws(()=>createCatalog([{...records[0],precision:100}]));});

@@ -1,14 +1,16 @@
 (function(root){
   'use strict';
-  const coins=Object.freeze([
-    {symbol:'BTC',name:'Bitcoin',product:'BTC-USD',precision:2,demoBase:67450,icon:'assets/coins/btc.svg'},
-    {symbol:'ETH',name:'Ethereum',product:'ETH-USD',precision:2,demoBase:2500,icon:'assets/coins/eth.svg'},
-    {symbol:'SOL',name:'Solana',product:'SOL-USD',precision:3,demoBase:110,icon:'assets/coins/sol.svg'},
-    {symbol:'XRP',name:'XRP',product:'XRP-USD',precision:4,demoBase:1.4,icon:'assets/coins/xrp.svg'},
-    {symbol:'DOGE',name:'Dogecoin',product:'DOGE-USD',precision:5,demoBase:.085,icon:'assets/coins/doge.svg'}
-  ].map(Object.freeze));
-  const getCoin=symbol=>coins.find(coin=>coin.symbol===symbol)||coins[0];
-  const formatPrice=(value,symbol='BTC')=>Number.isFinite(value)?value.toLocaleString('en-US',{style:'currency',currency:'USD',minimumFractionDigits:getCoin(symbol).precision,maximumFractionDigits:getCoin(symbol).precision}):'—';
-  const api={coins,getCoin,formatPrice};
-  if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.RolrCoins=api;
+  function createCatalog(records){
+    if(!Array.isArray(records))throw Error('Invalid coin catalog.');
+    const coins=Object.freeze(records.map(record=>{
+      if(!record||typeof record.symbol!=='string'||typeof record.name!=='string'||typeof record.product!=='string'||!Number.isInteger(record.precision)||record.precision<0||record.precision>12||!Number.isFinite(record.demoBase)||record.demoBase<=0)throw Error('Invalid coin catalog.');
+      return Object.freeze({...record,enabled:!!record.enabled});
+    }));
+    const available=Object.freeze(coins.filter(coin=>coin.enabled));
+    const getCoin=symbol=>coins.find(coin=>coin.symbol===symbol)||available[0]||coins[0];
+    const formatPrice=(value,symbol)=>Number.isFinite(value)?value.toLocaleString('en-US',{style:'currency',currency:'USD',minimumFractionDigits:getCoin(symbol)?.precision??2,maximumFractionDigits:getCoin(symbol)?.precision??2}):'—';
+    return {coins,available,getCoin,formatPrice};
+  }
+  if(typeof module!=='undefined'&&module.exports)module.exports={createCatalog};
+  else root.RolrCoinCatalog={createCatalog};
 })(typeof globalThis!=='undefined'?globalThis:this);

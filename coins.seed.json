@@ -1,0 +1,52 @@
+[
+  {
+    "symbol": "BTC",
+    "name": "Bitcoin",
+    "product": "BTC-USD",
+    "precision": 2,
+    "demoBase": 67450.0,
+    "icon": "assets/coins/btc.svg",
+    "enabled": true,
+    "sortOrder": 0
+  },
+  {
+    "symbol": "ETH",
+    "name": "Ethereum",
+    "product": "ETH-USD",
+    "precision": 2,
+    "demoBase": 2500.0,
+    "icon": "assets/coins/eth.svg",
+    "enabled": true,
+    "sortOrder": 1
+  },
+  {
+    "symbol": "SOL",
+    "name": "Solana",
+    "product": "SOL-USD",
+    "precision": 3,
+    "demoBase": 110.0,
+    "icon": "assets/coins/sol.svg",
+    "enabled": true,
+    "sortOrder": 2
+  },
+  {
+    "symbol": "XRP",
+    "name": "XRP",
+    "product": "XRP-USD",
+    "precision": 4,
+    "demoBase": 1.4,
+    "icon": "assets/coins/xrp.svg",
+    "enabled": true,
+    "sortOrder": 3
+  },
+  {
+    "symbol": "DOGE",
+    "name": "Dogecoin",
+    "product": "DOGE-USD",
+    "precision": 5,
+    "demoBase": 0.085,
+    "icon": "assets/coins/doge.svg",
+    "enabled": true,
+    "sortOrder": 4
+  }
+]

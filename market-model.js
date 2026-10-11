@@ -30,6 +30,8 @@
       const up=market.close>=market.strike?100:0;return {up,down:100-up,label:'RESULT'};
     }
     if(market.status==='queued')return {up:50,down:50,label:'BASELINE'};
+    // Give every newly opened interval a visible neutral starting point.
+    if(market.status==='open'&&Number.isFinite(now)&&Number.isFinite(market.startsAt)&&now>=market.startsAt&&now-market.startsAt<1000)return {up:50,down:50,label:'BASELINE'};
     if(market.status!=='open'||!Number.isFinite(market.strike)||market.strike<=0||!Number.isFinite(spot)||spot<=0||!Number.isFinite(now)||!Number.isFinite(market.endsAt)||market.endsAt<=now||!Number.isFinite(volatility)||volatility<=0)return null;
     const uncertainty=Math.max(.0001,volatility)*Math.sqrt(Math.max(1/60,(market.endsAt-now)/60000));
     const z=Math.log(spot/market.strike)/uncertainty;
@@ -37,7 +39,7 @@
     return {up,down:100-up,label:'ESTIMATE'};
   }
   function outcome(start,close) { return close >= start ? 'up' : 'down'; }
-  const model={markets,quote,outcome,estimateChances,minuteVolatility,initialBalance:14250,spot:67528.50,coin:typeof window!=='undefined'?window.RolrCoins.getCoin('BTC'):null};
+  const model={markets,quote,outcome,estimateChances,minuteVolatility,initialBalance:14250,spot:67528.50,coin:typeof window!=='undefined'?window.RolrCoins.available[0]:null};
   if (typeof module !== 'undefined' && module.exports) module.exports=model;
   else root.RolrModel=model;
 })(typeof globalThis!=='undefined'?globalThis:this);

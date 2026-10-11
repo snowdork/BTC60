@@ -193,7 +193,7 @@
   function selectCoin(symbol){
     coin=window.RolrCoins.getCoin(symbol);model.coin=coin;
     document.querySelectorAll('[data-coin]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.coin===coin.symbol)));
-    $('price-coin-icon').src=coin.icon;$('price-coin-icon').alt=`${coin.name} logo`;
+    $('price-coin-icon').hidden=!coin.icon;$('price-coin-icon').onerror=()=>{$('price-coin-icon').hidden=true;};if(coin.icon)$('price-coin-icon').src=coin.icon;$('price-coin-icon').alt=`${coin.name} logo`;
     $('coin-name').textContent=coin.name.toUpperCase();
     $('market-pair-label').textContent=`${coin.symbol} / USD · PREDICTION MARKETS`;
     $('chart-pair-label').textContent=`${coin.symbol} / USD · 1H`;
@@ -208,6 +208,6 @@
   $('next-hour').addEventListener('click',()=>navigateHour(hour+3600000));
   $('current-hour').addEventListener('click',()=>navigateHour(hourOf(currentTime())));
   document.querySelectorAll('[data-coin]').forEach(button=>button.addEventListener('click',()=>{if(button.dataset.coin!==coin.symbol)selectCoin(button.dataset.coin);}));
-  let savedCoin='BTC';try{savedCoin=localStorage.getItem('rolr_selected_coin')||'BTC';}catch{}
+  let savedCoin=window.RolrCoins.available[0].symbol;try{const preference=localStorage.getItem('rolr_selected_coin');if(window.RolrCoins.available.some(coin=>coin.symbol===preference))savedCoin=preference;}catch{}
   selectCoin(savedCoin);frameId=requestAnimationFrame(frame);
 })();

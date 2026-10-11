@@ -14,7 +14,7 @@
 
 /* Fixed quarter-hour boundaries share the chart's full-hour axis. */
 .interval-guides{position:absolute;left:calc(var(--tier-gutter) + 1px);right:1px;top:35px;bottom:0;z-index:2;pointer-events:none}
-.interval-guide{position:absolute;left:var(--boundary);top:0;bottom:0;border-left:1px dashed #ffb30099}
+.interval-guide{position:absolute;left:var(--boundary);top:0;bottom:0;border-left:2px dashed #ffd54f;filter:drop-shadow(0 0 3px #ffb30045)}
 @media(max-height:820px){.interval-guides{top:30px}}
 
 /* Direct coin selection with native keyboard-accessible buttons. */
@@ -37,3 +37,52 @@ main{padding-top:12px}
 .overview-top{gap:16px}
 .hour-window{flex-shrink:0}
 @media(max-width:1150px){.price-row{gap:7px 12px}.price-clock{padding-left:10px}.price-clock strong{font-size:11px}.spot>#btc-change{font-size:9px}}
+
+.chance-row[hidden]{display:none}
+
+/* A single compact status line keeps the selected bet and its clock in view. */
+body:not(.auth-page) main{padding:10px 20px 0}
+.workspace{gap:14px}
+.market-status-strip{gap:12px;margin:9px 0 8px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:#0c100d;min-height:34px}
+.selected-status{display:flex;align-items:center;gap:12px;min-width:0;font:10px 'JetBrains Mono',monospace;white-space:nowrap}
+.selected-status strong{font-weight:600}
+#selected-time{color:#bec8c0}
+#selected-countdown{color:var(--amber);font-variant-numeric:tabular-nums}
+.market-status-strip .market-legend{gap:9px;font-size:8px;flex-shrink:0}
+.ticket-status-line{display:flex;align-items:center;gap:8px!important;white-space:nowrap}
+.ticket-status-line #ticket-time{font:9px 'JetBrains Mono',monospace;color:var(--muted);margin-left:auto}
+.ticket-status-line .duration-label{font-size:9px}
+.ticket-market{padding:11px 0 9px}
+.ticket-market h3{margin:9px 0 0;font-size:18px}
+.overview{padding:10px 14px!important}
+.positions{padding:10px 12px}
+.position-row{gap:12px;margin-top:7px;padding:8px 0}
+.position-row>div:first-child{display:flex;align-items:center;flex-wrap:wrap;gap:5px 12px;min-width:0}
+.position-row>div:first-child small{margin-top:0}
+#positions-list:empty{display:none}
+@media(max-width:1150px){.selected-status{gap:8px;font-size:9px}.market-status-strip .market-legend{display:none}.ticket-status-line{gap:5px!important}}
+@media(max-height:820px){.market-status-strip{margin:7px 0;min-height:31px;padding:6px 9px}.ticket-market{padding:10px 0 8px}.ticket-market h3{margin-bottom:0}.overview{padding:9px 12px!important}body:not(.auth-page) footer{padding:9px 0}}
+/* Put hour navigation beside its readout instead of stacking four rows. */
+.hour-window{display:grid;grid-template-columns:auto auto;align-items:center;gap:4px 12px}
+.hour-window .hour-navigation{grid-column:2;grid-row:1/4;display:flex;flex-direction:column;align-items:stretch;margin:0}
+.hour-window>#hour-date{grid-column:1;grid-row:1;font-size:8px}
+.hour-window>#hour-window-label{grid-column:1;grid-row:2;margin:0;font-size:14px}
+.hour-window>#hour-remaining{grid-column:1;grid-row:3;font-size:8px}
+@media(max-width:1150px){.hour-window{column-gap:8px}.hour-navigation button{font-size:8px;padding:5px}.hour-window>#hour-window-label{font-size:12px}}
+
+.startup-help{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px;margin-bottom:12px;border:1px solid #ffb30055;border-radius:7px;background:#ffb3000b;font-size:11px;color:var(--amber)}.startup-help a{margin-left:auto;text-decoration:underline}.startup-help button{border:1px solid #ffb30055;border-radius:4px;background:transparent;padding:6px 10px;color:var(--amber)}
+
+/* Bright interval edges separate adjacent prediction segments. */
+.tier-cards>.market-card:not(:last-child){border-right-color:#ffd54f;box-shadow:2px 0 5px #ffb30018}
+.tier-cards>.market-card.selected{border-color:var(--green);box-shadow:0 0 0 1px #00e67612}
+
+/* Each prediction horizon has its own outline and horizontal divider. */
+.tier[data-duration="60"]{--tier-color:#ffd54f}
+.tier[data-duration="30"]{--tier-color:#00d4ff}
+.tier[data-duration="15"]{--tier-color:#b388ff}
+.tier[data-duration]{position:relative;padding-top:7px;border-top:2px solid var(--tier-color)}
+.tier[data-duration] .tier-label{color:var(--tier-color)}
+.tier[data-duration] .market-card{border-color:color-mix(in srgb,var(--tier-color) 65%,transparent)}
+.tier[data-duration] .market-card:not(:last-child){border-right-color:var(--tier-color);box-shadow:none}
+.tier[data-duration] .market-card:hover{border-color:var(--tier-color)}
+.tier[data-duration] .market-card.selected{border-color:var(--green);box-shadow:0 0 0 1px #00e67625}
