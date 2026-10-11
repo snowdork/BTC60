@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const {markets,quote,outcome,initialBalance,spot}=window.RolrModel;
+  const {markets,quote,outcome,initialBalance}=window.RolrModel;
   const $=id=>document.getElementById(id);
   const money=value=>value.toLocaleString('en-US',{style:'currency',currency:'USD'});
   const storageKey='rolr_phase1_positions_v1';
@@ -10,13 +10,13 @@
     if(Array.isArray(saved)) {
       let total=0;
       positions=saved.filter(p=>{
-        const m=markets.find(m=>m.id===p.marketId),q=m&&quote(m,p.side,p.budget,initialBalance);
+        const m=markets.find(m=>m.id===p.marketId),q=m&&quote({...m,status:'open',strike:p.strike??m.strike,up:Number.isFinite(p.cents)?(p.side==='up'?p.cents:100-p.cents):m.up},p.side,p.budget,initialBalance);
         if(!q || q.contracts!==p.contracts || q.cost!==p.cost || typeof p.id!=='string' || total+q.cost>initialBalance) return false;
         total+=q.cost;return true;
       }).slice(0,200);
     }
   } catch { /* Browser storage may be unavailable; use session state. */ }
-  let market=markets.find(m=>m.id==='15-2'),side='up',review=null;
+  let market=markets.find(m=>m.id==='15-2'),side='up',review=null,initialMarketChosen=false;
   const balance=()=>Math.round((initialBalance-positions.reduce((sum,p)=>sum+p.cost,0))*100)/100;
   function notify(message) {
     $('notification').textContent=message;$('notification').classList.add('visible');
@@ -26,8 +26,8 @@
     $('market-grid').innerHTML=[60,30,15].map(minutes=>{
       const items=markets.filter(m=>m.minutes===minutes);
       return `<div class="tier"><div class="tier-label">${minutes}<small>MINUTES</small></div><div class="tier-cards" style="--columns:${items.length}">${items.map(m=>{
-        const settled=m.status==='settled',queued=m.status==='queued',result=settled?outcome(m.strike,m.close):null;
-        return `<button type="button" class="market-card ${m.status} ${m.id===market.id?'selected':''}" data-market="${m.id}" aria-pressed="${m.id===market.id}" aria-label="${minutes} minute market ${m.start} to ${m.end} UTC, ${m.status}"><div class="card-top"><span class="card-time">${m.start} – ${m.end}</span><span class="badge ${queued?'neutral':settled?(result==='up'?'green':'red'):'green'}">${queued?'UPCOMING':settled?(result==='up'?'↗ UP WON':'↘ DOWN WON'):'● OPEN'}</span></div><div class="card-benchmark">${queued?'—':money(m.strike)}<small>${queued?'Benchmark set at open':'Price to beat'}</small></div><div class="card-bottom">${queued?'<span class="queued-label">Opens at 17:45</span>':settled?`<span>Final ${money(m.close)}</span>`:`<strong>Up ${m.up}¢ <span class="muted">/</span> Down ${100-m.up}¢</strong><span>${m.remaining}</span>`}</div></button>`;
+        const settled=m.status==='settled',queued=m.status==='queued',result=settled&&Number.isFinite(m.strike)&&Number.isFinite(m.close)?outcome(m.strike,m.close):null;
+        return `<button type="button" class="market-card ${m.status} ${m.id===market.id?'selected':''}" data-market="${m.id}" aria-pressed="${m.id===market.id}" aria-label="${minutes} minute market ${m.start} to ${m.end} UTC, ${m.status}"><div class="card-top"><span class="card-time">${m.start} – ${m.end}</span><span class="badge ${queued?'neutral':settled?(result===null?'neutral':result==='up'?'green':'red'):'green'}">${queued?'UPCOMING':settled?(result===null?'CLOSED':result==='up'?'↗ UP WON':'↘ DOWN WON'):'● OPEN'}</span></div><div class="card-benchmark">${Number.isFinite(m.strike)?money(m.strike):'—'}<small>${queued?'Benchmark set at open':'Demo price to beat'}</small></div><div class="card-bottom">${queued?`<span class="queued-label">Opens at ${m.start}</span>`:settled?`<span>${Number.isFinite(m.close)?'Final '+money(m.close):'Awaiting history'}</span>`:`<strong>Up ${m.up}¢ <span class="muted">/</span> Down ${100-m.up}¢</strong><span data-remaining="${m.id}">${m.remaining}</span>`}</div></button>`;
       }).join('')}</div></div>`;
     }).join('');
     document.querySelectorAll('[data-market]').forEach(button=>button.addEventListener('click',()=>{market=markets.find(m=>m.id===button.dataset.market);review=null;renderMarkets();renderTicket();}));
@@ -40,9 +40,9 @@
     $('ticket-status').className='badge '+(open?'green':'neutral');
     $('ticket-time').textContent=`${market.start} – ${market.end} UTC`;
     $('ticket-question').textContent='Bitcoin up or down?';
-    $('ticket-strike').textContent=queued?'Set at open':money(market.strike);
-    const delta=spot-market.strike;
-    $('ticket-delta').textContent=queued?'—':(delta>=0?'+':'−')+money(Math.abs(delta));
+    $('ticket-strike').textContent=queued?'Set at open':Number.isFinite(market.strike)?money(market.strike):'Loading…';
+    const delta=window.RolrModel.spot-market.strike;
+    $('ticket-delta').textContent=queued||!Number.isFinite(market.strike)||!Number.isFinite(window.RolrModel.spot)?'—':(delta>=0?'+':'−')+money(Math.abs(delta));
     $('ticket-delta').style.color=delta>=0?'var(--green)':'var(--red)';
     $('up-price').textContent=open?`${market.up}¢`:'—';
     $('down-price').textContent=open?`${100-market.up}¢`:'—';
@@ -54,16 +54,16 @@
     $('contracts').textContent=q?String(q.contracts):'—';$('cost').textContent=q?money(q.cost):'—';$('return').textContent=q?money(q.payout):'—';$('profit').textContent=q?'+'+money(q.profit):'—';
     $('submit-prediction').disabled=!q || positions.length>=200;
     $('submit-prediction').classList.toggle('bear',side==='down');
-    $('submit-prediction').textContent=open?`Review ${side==='up'?'Up':'Down'} prediction →`:queued?'Opens at 17:45 UTC':'Market settled';
-    $('ticket-note').textContent=!open?(queued?'Select an open market to make a prediction.':`Settled ${outcome(market.strike,market.close)==='up'?'Up':'Down'} at ${money(market.close)}.`):positions.length>=200?'Demo limit of 200 predictions reached.':!q?'Enter a budget of at least $1 within your demo balance.':'Simulated prices · No fees · No real money';
-    $('settlement-description').textContent=queued?'The starting benchmark is set when this interval opens.':`Up wins if the closing 60-second average is at least ${money(market.strike)}. Otherwise Down wins.`;
+    $('submit-prediction').textContent=open?`Review ${side==='up'?'Up':'Down'} prediction →`:queued?`Opens at ${market.start} UTC`:'Market settled';
+    $('ticket-note').textContent=!open?(queued?'Select an open market to make a prediction.':Number.isFinite(market.close)?`Settled ${outcome(market.strike,market.close)==='up'?'Up':'Down'} at ${money(market.close)}.`:'Waiting for market history.'):positions.length>=200?'Demo limit of 200 predictions reached.':!q?'Enter a budget of at least $1 within your demo balance.':'Simulated prices · No fees · No real money';
+    $('settlement-description').textContent=!Number.isFinite(market.strike)&&!queued?'Waiting for a demo benchmark from minute history.':queued?'The starting benchmark is set when this interval opens.':`Up wins if the closing 60-second average is at least ${money(market.strike)}. Otherwise Down wins.`;
     $('balance').textContent=money(balance());
   }
   function renderPositions() {
     $('position-count').textContent=positions.length;
     if(!positions.length)return;
     $('positions-list').replaceChildren(...positions.slice().reverse().map(p=>{
-      const m=markets.find(m=>m.id===p.marketId),row=document.createElement('div');row.className='position-row';
+      const m={...markets.find(m=>m.id===p.marketId),...(p.start?{start:p.start,end:p.end,minutes:p.minutes}:{})},row=document.createElement('div');row.className='position-row';
       const detail=document.createElement('div'),title=document.createElement('strong'),time=document.createElement('small');
       title.textContent=`${p.side==='up'?'↗ Up':'↘ Down'} · ${m.minutes} min`;title.style.color=p.side==='up'?'var(--green)':'var(--red)';time.textContent=`${m.start} – ${m.end} UTC · Demo pending`;detail.append(title,time);
       const values=document.createElement('div'),cost=document.createElement('strong'),contracts=document.createElement('small');cost.textContent=money(p.cost);contracts.textContent=`${p.contracts} contracts · ${money(p.contracts)} if correct`;values.append(cost,contracts);row.append(detail,values);return row;
@@ -76,7 +76,7 @@
   document.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',()=>$(button.dataset.close).close()));
   $('prediction-form').addEventListener('submit',event=>{
     event.preventDefault();const q=currentQuote();if(!q || positions.length>=200)return;
-    review={marketId:market.id,side,budget:Number($('stake').value),...q};
+    review={marketId:market.id,start:market.start,end:market.end,minutes:market.minutes,strike:market.strike,hour:window.RolrModel.hour,side,budget:Number($('stake').value),...q};
     $('review-title').textContent=`${side==='up'?'Up':'Down'} · Bitcoin ${market.minutes} min`;
     $('review-detail').textContent=`${market.start} – ${market.end} UTC · Benchmark ${money(market.strike)}`;
     $('review-summary').innerHTML=`<div><span>${q.contracts} contracts at ${q.cents}¢</span><strong>${money(q.cost)}</strong></div><div><span>Return if correct</span><strong>${money(q.payout)}</strong></div><div class="profit-row"><span>Potential profit</span><strong>+${money(q.profit)}</strong></div>`;
@@ -85,12 +85,14 @@
   $('confirm-prediction').addEventListener('click',()=>{
     if(!review)return;
     const m=markets.find(m=>m.id===review.marketId),q=quote(m,review.side,review.budget,balance());
-    if(!q || positions.length>=200){$('review-dialog').close();review=null;renderTicket();notify('Balance changed. Review your prediction again.');return;}
+    if(!q || review.hour!==window.RolrModel.hour || positions.length>=200){$('review-dialog').close();review=null;renderTicket();notify('Balance changed. Review your prediction again.');return;}
     positions.push({...review,id:crypto.randomUUID()});review=null;
     let persisted=true;try{localStorage.setItem(storageKey,JSON.stringify(positions));}catch{persisted=false;}
     $('review-dialog').close();renderPositions();renderTicket();
     notify(persisted?'Demo prediction placed. No real money used.':'Demo prediction placed for this session. Browser storage unavailable.');
   });
   window.addEventListener('storage',event=>{if(event.key===storageKey)location.reload();});
+  window.addEventListener('btc-market-update',()=>{if(!initialMarketChosen){const active=markets.find(m=>m.minutes===15&&m.status==='open'&&Number.isFinite(m.strike));if(active){market=active;initialMarketChosen=true;}}review=null;$('review-dialog').close();renderMarkets();renderTicket();});
+  window.addEventListener('btc-price-update',()=>{const delta=window.RolrModel.spot-market.strike; $('ticket-delta').textContent=Number.isFinite(market.strike)&&Number.isFinite(window.RolrModel.spot)?(delta>=0?'+':'−')+money(Math.abs(delta)):'—';$('ticket-delta').style.color=delta>=0?'var(--green)':'var(--red)';});
   renderMarkets();renderPositions();renderTicket();
 })();

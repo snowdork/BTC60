@@ -11,7 +11,7 @@
   ];
   function quote(market,side,budget,balance) {
     const cents = side === 'up' ? market.up : 100-market.up;
-    if (market.status !== 'open' || !['up','down'].includes(side) || !Number.isFinite(budget) || !Number.isFinite(balance) || budget<1 || budget>balance || !Number.isInteger(cents) || cents<=0 || cents>=100) return null;
+    if (market.status !== 'open' || !Number.isFinite(market.strike) || !['up','down'].includes(side) || !Number.isFinite(budget) || !Number.isFinite(balance) || budget<1 || budget>balance || !Number.isInteger(cents) || cents<=0 || cents>=100) return null;
     const contracts=Math.floor((Math.round(budget*100)+1e-7)/cents);
     const costCents=contracts*cents;
     return {cents,contracts,cost:costCents/100,payout:contracts,profit:(contracts*100-costCents)/100};
