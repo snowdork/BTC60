@@ -1,11 +1,11 @@
-# Velocity Terminal
+# Velocity Terminal — Phase1
 
-Laptop-focused browser application, minimum workspace width 1024px. Preserve the chart and execution desk side by side, multi-tier filmstrip, and telemetry strips.
+A clean, laptop-focused Bitcoin prediction workspace. Keep the entire hour and all seven intervals visible beside one order ticket: 60 minutes (one market), 30 minutes (two), 15 minutes (four). No 5-minute markets. No graph inside the 60-minute market.
 
-OLED surfaces: #080808, #0b0b0b, #101010, #131313, #181818, #202020, #242424, #2a2a2a. Bull #00e676 / #00a651; tie #ffb300; telemetry #00d4ff; bear #ff1744. Borders use white at 6–12% opacity with subtle active neon blooms.
+OLED surfaces #080808 / #101110 / #181a18. Emerald #00e676 for Up and selection, crimson #ff1744 for Down, amber #ffb300 for sample warnings, cyan #00d4ff for explanatory cues. Borders white at roughly 7%; restrained emphasis. Sora for concise headings, JetBrains Mono for tabular financial values.
 
-Sora 700/800 headlines, Space Grotesk fallback, JetBrains Mono tabular financial metrics and uppercase micro labels.
+One full-hour timeline; aligned market cards; explicit Open, Settled and Upcoming states. Selecting any card updates the persistent right-side ticket. Closed and upcoming cards support inspection, with order entry disabled. No hiding duration tiers: full-hour visibility is the primary feature.
 
-Orthogonal tier connectors, persistent tier visibility, active outlines, queued states, settlement ledger, quick stake presets, auto-roll and execution toggles. Three-way demo market: Bull above $67,510; Tie from $67,490 through $67,510 inclusive; Bear below $67,490. Demo multipliers: 1.92x / 8.33x / 2.08x.
+Binary outcomes only: Up includes equality. The final 60-second benchmark is compared with the starting benchmark. This follows the documented 15-minute comparison; using it for 30 and 60 minutes is proposed demo behavior. No tie band. Spot is contextual, not a settlement value.
 
-Displayed market values and prediction feedback are simulated.
+Choose side, set a budget, review, confirm. Quote in cents per contract; pay $1 per winning contract and $0 per losing contract. Whole contracts; exact cost stays within the budget. Zero demo fees. Saved demo positions deduct exact cost from the browser-local balance. Sample time and prices remain frozen and labeled; no live or provably settled claims.

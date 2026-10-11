@@ -1,44 +1,96 @@
 (() => {
-  const input = document.getElementById('customStakeInput');
-  const payout = document.getElementById('payoutDisplay');
-  const chips = [...document.querySelectorAll('.stake-chip')];
-  const money = value => '$' + value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-  const notify = message => {
-    const element = document.getElementById('notification');
-    element.textContent = message;
-    element.classList.add('visible');
-    clearTimeout(notify.timer);
-    notify.timer = setTimeout(() => element.classList.remove('visible'), 5000);
-  };
-  let multiplier = 1.92;
-  function updateStake() {
-    const amount = Math.max(0, Math.min(14250, Number(input.value) || 0));
-    payout.textContent = money(amount * multiplier);
-    payout.nextElementSibling.textContent = '+' + money(amount * (multiplier - 1)) + ' NET PROFIT';
-    chips.forEach(chip => {
-      const selected = Number(chip.dataset.stake) === amount;
-      chip.classList.toggle('selected', selected);
-      chip.setAttribute('aria-pressed', String(selected));
-    });
+  'use strict';
+  const {markets,quote,outcome,initialBalance,spot}=window.RolrModel;
+  const $=id=>document.getElementById(id);
+  const money=value=>value.toLocaleString('en-US',{style:'currency',currency:'USD'});
+  const storageKey='rolr_phase1_positions_v1';
+  let positions=[];
+  try {
+    const saved=JSON.parse(localStorage.getItem(storageKey)||'[]');
+    if(Array.isArray(saved)) {
+      let total=0;
+      positions=saved.filter(p=>{
+        const m=markets.find(m=>m.id===p.marketId),q=m&&quote(m,p.side,p.budget,initialBalance);
+        if(!q || q.contracts!==p.contracts || q.cost!==p.cost || typeof p.id!=='string' || total+q.cost>initialBalance) return false;
+        total+=q.cost;return true;
+      }).slice(0,200);
+    }
+  } catch { /* Browser storage may be unavailable; use session state. */ }
+  let market=markets.find(m=>m.id==='15-2'),side='up',review=null;
+  const balance=()=>Math.round((initialBalance-positions.reduce((sum,p)=>sum+p.cost,0))*100)/100;
+  function notify(message) {
+    $('notification').textContent=message;$('notification').classList.add('visible');
+    clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('notification').classList.remove('visible'),4500);
   }
-  chips.forEach(chip => chip.addEventListener('click', () => { input.value = chip.dataset.stake; updateStake(); }));
-  input.addEventListener('input', updateStake);
-  input.addEventListener('change', () => { input.value = Math.max(1, Math.min(14250, Number(input.value) || 1)); updateStake(); });
-  document.querySelectorAll('button').forEach(button => {
-    if (button.dataset.direction) button.addEventListener('click', () => {
-      if (!input.checkValidity() || !Number(input.value)) { input.reportValidity(); return; }
-      const direction = button.dataset.direction;
-      multiplier = Number(button.dataset.multiplier);
-      document.getElementById('returnMultiplier').textContent = `${multiplier.toFixed(2)}x ${direction}`;
-      updateStake();
-      document.querySelectorAll('[data-direction]').forEach(control => control.setAttribute('aria-pressed', String(control === button)));
-      notify(`Demo ${direction} prediction placed · ${money(Number(input.value))} USDC · No funds transferred`);
-    });
-    if (button.textContent.includes('DEPOSIT')) button.addEventListener('click', () => notify('Demo vault · $14,250.00 USDC available for simulated predictions'));
+  function renderMarkets() {
+    $('market-grid').innerHTML=[60,30,15].map(minutes=>{
+      const items=markets.filter(m=>m.minutes===minutes);
+      return `<div class="tier"><div class="tier-label">${minutes}<small>MINUTES</small></div><div class="tier-cards" style="--columns:${items.length}">${items.map(m=>{
+        const settled=m.status==='settled',queued=m.status==='queued',result=settled?outcome(m.strike,m.close):null;
+        return `<button type="button" class="market-card ${m.status} ${m.id===market.id?'selected':''}" data-market="${m.id}" aria-pressed="${m.id===market.id}" aria-label="${minutes} minute market ${m.start} to ${m.end} UTC, ${m.status}"><div class="card-top"><span class="card-time">${m.start} – ${m.end}</span><span class="badge ${queued?'neutral':settled?(result==='up'?'green':'red'):'green'}">${queued?'UPCOMING':settled?(result==='up'?'↗ UP WON':'↘ DOWN WON'):'● OPEN'}</span></div><div class="card-benchmark">${queued?'—':money(m.strike)}<small>${queued?'Benchmark set at open':'Price to beat'}</small></div><div class="card-bottom">${queued?'<span class="queued-label">Opens at 17:45</span>':settled?`<span>Final ${money(m.close)}</span>`:`<strong>Up ${m.up}¢ <span class="muted">/</span> Down ${100-m.up}¢</strong><span>${m.remaining}</span>`}</div></button>`;
+      }).join('')}</div></div>`;
+    }).join('');
+    document.querySelectorAll('[data-market]').forEach(button=>button.addEventListener('click',()=>{market=markets.find(m=>m.id===button.dataset.market);review=null;renderMarkets();renderTicket();}));
+  }
+  function currentQuote() {return quote(market,side,Number($('stake').value),balance());}
+  function renderTicket() {
+    const open=market.status==='open',queued=market.status==='queued';
+    $('ticket-duration').textContent=`${market.minutes} MIN`;
+    $('ticket-status').textContent=open?'OPEN':queued?'UPCOMING':'SETTLED';
+    $('ticket-status').className='badge '+(open?'green':'neutral');
+    $('ticket-time').textContent=`${market.start} – ${market.end} UTC`;
+    $('ticket-question').textContent='Bitcoin up or down?';
+    $('ticket-strike').textContent=queued?'Set at open':money(market.strike);
+    const delta=spot-market.strike;
+    $('ticket-delta').textContent=queued?'—':(delta>=0?'+':'−')+money(Math.abs(delta));
+    $('ticket-delta').style.color=delta>=0?'var(--green)':'var(--red)';
+    $('up-price').textContent=open?`${market.up}¢`:'—';
+    $('down-price').textContent=open?`${100-market.up}¢`:'—';
+    document.querySelectorAll('[data-side]').forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.side===side));button.disabled=!open;});
+    $('stake').disabled=!open;$('stake').max=balance().toFixed(2);
+    document.querySelectorAll('[data-stake]').forEach(button=>{button.disabled=!open;const amount=button.dataset.stake==='max'?balance():Number(button.dataset.stake);button.classList.toggle('selected',Number($('stake').value)===amount);button.setAttribute('aria-pressed',String(Number($('stake').value)===amount));});
+    const q=currentQuote();
+    $('contract-price').textContent=open?`at ${side==='up'?market.up:100-market.up}¢ each`:'';
+    $('contracts').textContent=q?String(q.contracts):'—';$('cost').textContent=q?money(q.cost):'—';$('return').textContent=q?money(q.payout):'—';$('profit').textContent=q?'+'+money(q.profit):'—';
+    $('submit-prediction').disabled=!q || positions.length>=200;
+    $('submit-prediction').classList.toggle('bear',side==='down');
+    $('submit-prediction').textContent=open?`Review ${side==='up'?'Up':'Down'} prediction →`:queued?'Opens at 17:45 UTC':'Market settled';
+    $('ticket-note').textContent=!open?(queued?'Select an open market to make a prediction.':`Settled ${outcome(market.strike,market.close)==='up'?'Up':'Down'} at ${money(market.close)}.`):positions.length>=200?'Demo limit of 200 predictions reached.':!q?'Enter a budget of at least $1 within your demo balance.':'Simulated prices · No fees · No real money';
+    $('settlement-description').textContent=queued?'The starting benchmark is set when this interval opens.':`Up wins if the closing 60-second average is at least ${money(market.strike)}. Otherwise Down wins.`;
+    $('balance').textContent=money(balance());
+  }
+  function renderPositions() {
+    $('position-count').textContent=positions.length;
+    if(!positions.length)return;
+    $('positions-list').replaceChildren(...positions.slice().reverse().map(p=>{
+      const m=markets.find(m=>m.id===p.marketId),row=document.createElement('div');row.className='position-row';
+      const detail=document.createElement('div'),title=document.createElement('strong'),time=document.createElement('small');
+      title.textContent=`${p.side==='up'?'↗ Up':'↘ Down'} · ${m.minutes} min`;title.style.color=p.side==='up'?'var(--green)':'var(--red)';time.textContent=`${m.start} – ${m.end} UTC · Demo pending`;detail.append(title,time);
+      const values=document.createElement('div'),cost=document.createElement('strong'),contracts=document.createElement('small');cost.textContent=money(p.cost);contracts.textContent=`${p.contracts} contracts · ${money(p.contracts)} if correct`;values.append(cost,contracts);row.append(detail,values);return row;
+    }));
+  }
+  document.querySelectorAll('[data-side]').forEach(button=>button.addEventListener('click',()=>{side=button.dataset.side;renderTicket();}));
+  document.querySelectorAll('[data-stake]').forEach(button=>button.addEventListener('click',()=>{$('stake').value=button.dataset.stake==='max'?balance().toFixed(2):button.dataset.stake;renderTicket();}));
+  $('stake').addEventListener('input',renderTicket);
+  ['rules-open','rules-inline'].forEach(id=>$(id).addEventListener('click',()=>$('rules-dialog').showModal()));
+  document.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',()=>$(button.dataset.close).close()));
+  $('prediction-form').addEventListener('submit',event=>{
+    event.preventDefault();const q=currentQuote();if(!q || positions.length>=200)return;
+    review={marketId:market.id,side,budget:Number($('stake').value),...q};
+    $('review-title').textContent=`${side==='up'?'Up':'Down'} · Bitcoin ${market.minutes} min`;
+    $('review-detail').textContent=`${market.start} – ${market.end} UTC · Benchmark ${money(market.strike)}`;
+    $('review-summary').innerHTML=`<div><span>${q.contracts} contracts at ${q.cents}¢</span><strong>${money(q.cost)}</strong></div><div><span>Return if correct</span><strong>${money(q.payout)}</strong></div><div class="profit-row"><span>Potential profit</span><strong>+${money(q.profit)}</strong></div>`;
+    $('review-dialog').showModal();
   });
-  document.querySelectorAll('nav a').forEach((link, index) => {
-    const destinations = ['main', '#tier-filter-bar', '#customStakeInput', 'table'];
-    link.addEventListener('click', event => { event.preventDefault(); document.querySelector(destinations[index]).scrollIntoView({behavior: 'smooth', block: 'center'}); });
+  $('confirm-prediction').addEventListener('click',()=>{
+    if(!review)return;
+    const m=markets.find(m=>m.id===review.marketId),q=quote(m,review.side,review.budget,balance());
+    if(!q || positions.length>=200){$('review-dialog').close();review=null;renderTicket();notify('Balance changed. Review your prediction again.');return;}
+    positions.push({...review,id:crypto.randomUUID()});review=null;
+    let persisted=true;try{localStorage.setItem(storageKey,JSON.stringify(positions));}catch{persisted=false;}
+    $('review-dialog').close();renderPositions();renderTicket();
+    notify(persisted?'Demo prediction placed. No real money used.':'Demo prediction placed for this session. Browser storage unavailable.');
   });
-  updateStake();
+  window.addEventListener('storage',event=>{if(event.key===storageKey)location.reload();});
+  renderMarkets();renderPositions();renderTicket();
 })();
