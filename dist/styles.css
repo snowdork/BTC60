@@ -1,0 +1,11 @@
+:root { color-scheme: dark; }
+html { scroll-behavior: smooth; }
+button, a, input { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid #00e676; outline-offset: 4px; }
+.stake-chip.selected { background: #00e676 !important; color: #090d14 !important; border-color: #00e676 !important; box-shadow: 0 0 12px #00e67640; }
+.stake-chip:not(.selected) { background: #162032 !important; color: #cbd5e1 !important; border-color: #1e293b !important; box-shadow: none !important; }
+#notification { position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; z-index: 100; padding: 16px 22px; background: #131b2a; border: 1px solid #00e676; border-radius: 8px; color: #e2e8f0; font: 12px/1.6 monospace; max-width: calc(100vw - 32px); width: max-content; transition: .2s; box-shadow: 0 8px 40px #0008; }
+#notification.visible { transform: translate(-50%, 0); opacity: 1; }
+@media(max-width: 640px) { header > div { gap: 8px !important; padding: 8px 12px !important; } header > div > div:first-child > div:first-child { gap: 6px !important; } header > div > div:first-child > div:first-child > div:last-child > span { display: none; } header > div > div:last-child > div:last-child { display: none; } main section { padding-left: 12px !important; padding-right: 12px !important; } #content-tier3, #content-tier4 { grid-template-columns: repeat(2,minmax(0,1fr)) !important; } }
+@media(prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
