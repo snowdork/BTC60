@@ -17,7 +17,7 @@
   function status(text,tone='amber'){$('feed-status').textContent=text;$('feed-status').className=`badge ${tone}`;}
   function broadcast(name){window.dispatchEvent(new Event(name));}
   function syncMarkets(now,force=false) {
-    const state=[];
+    const state=[];model.now=now;model.volatility=model.minuteVolatility(candles,now);
     model.hour=`${coin.symbol}:${mode}:${new Date(hour).toISOString()}`;
     model.markets.forEach(m=>{
       const index=Number(m.id.split('-')[1]),start=hour+index*m.minutes*60000,end=start+m.minutes*60000;
@@ -26,12 +26,13 @@
       const strike=marketStatus==='queued'?null:opening?Number(opening[4]):null;
       const close=marketStatus==='settled'&&closing?Number(closing[4]):null;
       const changed=m.status!==marketStatus||m.strike!==strike||m.close!==close||m.start!==time(start);
-      Object.assign(m,{start:time(start),end:time(end),status:marketStatus,strike,close,remaining:remaining(end-now)});
+      Object.assign(m,{start:time(start),end:time(end),status:marketStatus,strike,close,startsAt:start,endsAt:end,remaining:remaining(end-now)});
       if(m.up===null)m.up=50;
       state.push(changed);
       const label=document.querySelector(`[data-remaining="${m.id}"]`);if(label)label.textContent=m.remaining;
     });
     if(force||state.some(Boolean))broadcast('btc-market-update');
+    broadcast('btc-chances-update');
   }
   function appendPoint(t,price) {
     if(t<hour||t>hour+3600000||!Number.isFinite(price)||price<=0)return;
@@ -40,7 +41,7 @@
     if(last&&Math.floor(last.t/1000)*1000===bucket)last.price=price;
     else {points.push({t,price});points.sort((a,b)=>a.t-b.t);}
     if(points.length>3662)points.splice(0,points.length-3662);
-    lastPrice=price;lastPriceAt=Date.now();model.spot=price;
+    lastPrice=price;lastPriceAt=Date.now();model.priceUpdatedAt=lastPriceAt;model.spot=price;
     broadcast('btc-price-update');
   }
   function demoPrice(minute,second=0){return coin.demoBase*(1+(minute*1.5+Math.sin(minute*.48)*19+Math.sin(minute*1.8)*4+Math.sin(second*.5)*1.4)/67450);}
@@ -110,7 +111,7 @@
     status('DISCONNECTED');clearTimeout(retryTimer);retryTimer=setTimeout(connect,backoff);backoff=Math.min(30000,backoff*2);
   }
   function resetHour(now,targetHour=hourOf(now)) {
-    hour=targetHour;historical=hour<hourOf(now);model.isHistorical=historical;historyFailed=false;points=[];candles=[];lastPrice=null;lastPriceAt=0;model.spot=NaN;
+    hour=targetHour;historical=hour<hourOf(now);model.isHistorical=historical;model.feedMode=mode;model.priceUpdatedAt=0;historyFailed=false;points=[];candles=[];lastPrice=null;lastPriceAt=0;model.spot=NaN;
     syncMarkets(now,true);if(mode==='demo'){demoHistory(historical?hour+3600000:now);if(historical){lastPrice=points.at(-1)?.price??null;model.spot=lastPrice??NaN;syncMarkets(now,true);}}else loadHistory();
   }
   function setMode(next,targetHour) {
@@ -191,8 +192,8 @@
   window.addEventListener('pagehide',()=>{stopped=true;disconnect();cancelAnimationFrame(frameId);});
   function selectCoin(symbol){
     coin=window.RolrCoins.getCoin(symbol);model.coin=coin;
-    $('coin-select').value=coin.symbol;
-    for(const id of ['selector-coin-icon','price-coin-icon']){$(id).src=coin.icon;$(id).alt=id==='price-coin-icon'?`${coin.name} logo`:'';}
+    document.querySelectorAll('[data-coin]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.coin===coin.symbol)));
+    $('price-coin-icon').src=coin.icon;$('price-coin-icon').alt=`${coin.name} logo`;
     $('coin-name').textContent=coin.name.toUpperCase();
     $('market-pair-label').textContent=`${coin.symbol} / USD · PREDICTION MARKETS`;
     $('chart-pair-label').textContent=`${coin.symbol} / USD · 1H`;
@@ -206,7 +207,7 @@
   $('previous-hour').addEventListener('click',()=>navigateHour(hour-3600000));
   $('next-hour').addEventListener('click',()=>navigateHour(hour+3600000));
   $('current-hour').addEventListener('click',()=>navigateHour(hourOf(currentTime())));
-  $('coin-select').addEventListener('change',event=>selectCoin(event.target.value));
+  document.querySelectorAll('[data-coin]').forEach(button=>button.addEventListener('click',()=>{if(button.dataset.coin!==coin.symbol)selectCoin(button.dataset.coin);}));
   let savedCoin='BTC';try{savedCoin=localStorage.getItem('rolr_selected_coin')||'BTC';}catch{}
   selectCoin(savedCoin);frameId=requestAnimationFrame(frame);
 })();

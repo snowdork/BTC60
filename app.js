@@ -23,14 +23,26 @@
     $('notification').textContent=message;$('notification').classList.add('visible');
     clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('notification').classList.remove('visible'),4500);
   }
+  function renderChances() {
+    const model=window.RolrModel;
+    markets.forEach(m=>{
+      const element=document.querySelector(`[data-chances="${m.id}"]`);if(!element)return;
+      const stale=m.status==='open'&&model.feedMode==='live'&&(!model.priceUpdatedAt||Date.now()-model.priceUpdatedAt>15000);
+      const chance=model.estimateChances(m,stale?NaN:model.spot,model.now,model.volatility);
+      element.querySelector('.chance-up').textContent=`Up ${chance?chance.up+'%':'—'}`;
+      element.querySelector('.chance-down').textContent=`Down ${chance?chance.down+'%':'—'}`;
+      element.title=chance?.label==='ESTIMATE'?'Heuristic estimate centered on the price to beat, scaled by recent minute volatility and time remaining. Not calibrated odds; contract quotes are separate.':chance?.label==='BASELINE'?'Neutral 50/50 baseline before the interval opens; no benchmark is set yet.':chance?.label==='RESULT'?'Completed demo result, not a forecast.':'Waiting for a fresh price and valid benchmark.';
+    });
+  }
   function renderMarkets() {
     $('market-grid').innerHTML=[60,30,15].map(minutes=>{
       const items=markets.filter(m=>m.minutes===minutes);
       return `<div class="tier"><div class="tier-label">${minutes}<small>MINUTES</small></div><div class="tier-cards" style="--columns:${items.length}">${items.map(m=>{
         const settled=m.status==='settled',queued=m.status==='queued',result=settled&&Number.isFinite(m.strike)&&Number.isFinite(m.close)?outcome(m.strike,m.close):null;
-        return `<button type="button" class="market-card ${m.status} ${m.id===market.id?'selected':''}" data-market="${m.id}" aria-pressed="${m.id===market.id}" aria-label="${minutes} minute market ${m.start} to ${m.end} UTC, ${m.status}"><div class="card-top"><span class="card-time">${m.start} – ${m.end}</span><span class="badge ${queued?'neutral':settled?(result===null?'neutral':result==='up'?'green':'red'):'green'}">${queued?'UPCOMING':settled?(result===null?'CLOSED':result==='up'?'↗ UP WON':'↘ DOWN WON'):'● OPEN'}</span></div><div class="card-benchmark">${Number.isFinite(m.strike)?price(m.strike):'—'}<small>${queued?'Benchmark set at open':'Demo price to beat'}</small></div><div class="card-bottom">${queued?`<span class="queued-label">Opens at ${m.start}</span>`:settled?`<span>${Number.isFinite(m.close)?'Final '+price(m.close):'Awaiting history'}</span>`:`<strong>Up ${m.up}¢ <span class="muted">/</span> Down ${100-m.up}¢</strong><span data-remaining="${m.id}">${m.remaining}</span>`}</div></button>`;
+        return `<button type="button" class="market-card ${m.status} ${m.id===market.id?'selected':''}" data-market="${m.id}" aria-pressed="${m.id===market.id}" aria-label="${minutes} minute market ${m.start} to ${m.end} UTC, ${m.status}"><div class="card-top"><span class="card-time">${m.start} – ${m.end}</span><span class="badge ${queued?'neutral':settled?(result===null?'neutral':result==='up'?'green':'red'):'green'}">${queued?'UPCOMING':settled?(result===null?'CLOSED':result==='up'?'↗ UP WON':'↘ DOWN WON'):'● OPEN'}</span></div><div class="card-benchmark">${Number.isFinite(m.strike)?price(m.strike):'—'}<small>${queued?'Benchmark set at open':'Demo price to beat'}</small></div><div class="card-bottom">${queued?`<span class="queued-label">Opens at ${m.start}</span>`:settled?`<span>${Number.isFinite(m.close)?'Final '+price(m.close):'Awaiting history'}</span>`:`<span data-remaining="${m.id}">${m.remaining}</span>`}</div><div class="chance-row" data-chances="${m.id}"><span class="chance-up">Up —</span><span class="chance-down">Down —</span></div></button>`;
       }).join('')}</div></div>`;
     }).join('');
+    renderChances();
     document.querySelectorAll('[data-market]').forEach(button=>button.addEventListener('click',()=>{market=markets.find(m=>m.id===button.dataset.market);review=null;renderMarkets();renderTicket();}));
   }
   function currentQuote() {return quote(market,side,Number($('stake').value),balance());}
@@ -96,6 +108,7 @@
   window.addEventListener('storage',event=>{if(event.key===storageKey)location.reload();});
   window.addEventListener('coin-change',()=>{initialMarketChosen=false;review=null;$('review-dialog').close();renderMarkets();renderTicket();});
   window.addEventListener('btc-market-update',()=>{if(!initialMarketChosen){const active=markets.find(m=>m.minutes===15&&m.status==='open'&&Number.isFinite(m.strike));if(active){market=active;initialMarketChosen=true;}}review=null;$('review-dialog').close();renderMarkets();renderTicket();});
-  window.addEventListener('btc-price-update',()=>{const delta=(window.RolrModel.isHistorical?market.close:window.RolrModel.spot)-market.strike; $('ticket-delta').textContent=Number.isFinite(market.strike)&&Number.isFinite(window.RolrModel.isHistorical?market.close:window.RolrModel.spot)?(delta>=0?'+':'−')+price(Math.abs(delta)):'—';$('ticket-delta').style.color=delta>=0?'var(--green)':'var(--red)';});
+  window.addEventListener('btc-chances-update',renderChances);
+  window.addEventListener('btc-price-update',()=>{renderChances();const delta=(window.RolrModel.isHistorical?market.close:window.RolrModel.spot)-market.strike; $('ticket-delta').textContent=Number.isFinite(market.strike)&&Number.isFinite(window.RolrModel.isHistorical?market.close:window.RolrModel.spot)?(delta>=0?'+':'−')+price(Math.abs(delta)):'—';$('ticket-delta').style.color=delta>=0?'var(--green)':'var(--red)';});
   renderMarkets();renderPositions();renderTicket();
 })();
