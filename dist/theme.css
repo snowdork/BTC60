@@ -40,3 +40,7 @@
 [data-theme="light"] .tier[data-duration] .market-card.selected{border-color:var(--green)}
 
 [data-theme="light"] .market-card.settled{background:#b8bfbc;color:#26342d}[data-theme="light"] .market-card.settled:hover{background:#c1c8c4}
+
+[data-theme="light"] .market-card.queued{background:#fff0b3;color:#51451c}[data-theme="light"] .market-card.queued:hover{background:#ffe89a}
+
+[data-theme="light"] .market-card [data-remaining]{color:#805500}

@@ -139,7 +139,6 @@
     $('time-cursor-label').textContent=clock(now);
     $('workspace-clock').textContent=`${clock(now)} UTC`;
     $('hour-window-label').textContent=`${time(hour)} — ${time(hour+3600000)}`;
-    $('hour-remaining').textContent=historical?'Completed · demo settlements':`${remaining(hour+3600000-now)} remaining${mode==='demo'?' · demo':''}`;
     if($('chart-times').dataset.hour!==String(hour)){$('chart-times').dataset.hour=String(hour);$('chart-times').replaceChildren(...[0,15,30,45,60].map(minute=>{const span=document.createElement('span');span.textContent=time(hour+minute*60000);return span;}));}
     const valid=points.filter(p=>p.t>=hour&&p.t<=displayTime);
     const hasPoints=valid.length>0;

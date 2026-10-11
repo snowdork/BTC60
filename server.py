@@ -137,6 +137,32 @@ def fresh_spot(coin):
         raise ValueError('Live price unavailable. Reconnect before predicting.')
 
 
+def estimated_up(strike, spot, now, start, end, volatility):
+    if now-start<1:
+        return 50
+    uncertainty=max(.0001, volatility)*math.sqrt(max(1/60, (end-now)/60))
+    z=math.log(spot/strike)/uncertainty
+    probability=100/(1+math.exp(max(-700,min(700,-1.7*z))))
+    return max(1,min(99,math.floor(probability+.5)))
+
+
+def market_up(coin, strike, spot, now, start, end):
+    with connect() as conn:
+        product=conn.execute('SELECT product FROM coins WHERE symbol=?',(coin,)).fetchone()['product']
+    hour=now//3600*3600
+    query=urllib.parse.urlencode({'granularity':60,'start':datetime.fromtimestamp(hour-60,timezone.utc).isoformat(),'end':datetime.fromtimestamp(now,timezone.utc).isoformat()})
+    request=urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/candles?'+query,headers={'User-Agent':'BTC60-local-demo/1.0'})
+    try:
+        with urllib.request.urlopen(request,timeout=8) as response:
+            candles=json.load(response)
+        closed=sorted((c for c in candles if hour-60<=c[0] and c[0]+60<=now and math.isfinite(float(c[4])) and c[4]>0),key=lambda c:c[0])
+        returns=[math.log(b[4]/a[4]) for a,b in zip(closed,closed[1:]) if b[0]-a[0]==60]
+        volatility=max(.0001,math.sqrt(sum(r*r for r in returns)/len(returns))) if returns else .0001
+        return estimated_up(strike,spot,now,start,end,volatility)
+    except Exception:
+        raise ValueError('Pricing history unavailable. Review again shortly.')
+
+
 def _settle_due(user_id=None):
     with connect() as conn:
         pending = conn.execute('SELECT p.* FROM predictions p LEFT JOIN settlements s ON s.prediction_id=p.id WHERE s.prediction_id IS NULL AND p.ends_at<=? AND (? IS NULL OR p.user_id=?)', (int(time.time()) - 5, user_id, user_id)).fetchall()
@@ -368,15 +394,24 @@ class Handler(SimpleHTTPRequestHandler):
         duration, index = map(int, market_id.split('-'))
         start = now // 3600 * 3600 + index * duration * 60
         end = start + duration * 60
+        requested_start = data.get('startsAt')
+        if isinstance(requested_start, (int, float)) and now >= requested_start / 1000 + duration * 60:
+            raise ValueError('Too late to place. This interval has expired.')
         if not start <= now < end or data.get('startsAt') != start * 1000:
             raise ValueError('This market is closed or changed. Review again.')
         strike = candle_close(coin, start)
-        fresh_spot(coin)
+        spot = fresh_spot(coin)
         if data.get('strike') != strike:
             raise ValueError('Benchmark changed. Refresh and review again.')
-        cents = QUOTES[market_id] if side == 'up' else 100 - QUOTES[market_id]
-        if data.get('cents') != cents:
-            raise ValueError('Quote changed. Review your prediction again.')
+        up = market_up(coin, strike, spot, now, start, end)
+        cents = up if side == 'up' else 100 - up
+        reviewed = data.get('cents')
+        if isinstance(reviewed, bool) or not isinstance(reviewed, int) or not 1 <= reviewed <= 99 or abs(reviewed-cents)>2:
+            raise ValueError('Price moved more than 2¢. Live review has updated; confirm again.')
+        # Honor the reviewed price within the small demo execution allowance.
+        cents = reviewed
+        if not start <= time.time() < end:
+            raise ValueError('Too late to place. This interval has expired.')
         contracts = math.floor(round(budget * 100) / cents)
         cost = contracts * cents
         with connect() as conn:
@@ -385,7 +420,7 @@ class Handler(SimpleHTTPRequestHandler):
                 pass
             else:
                 if time.time() >= end:
-                    raise ValueError('Market closed. Select the next interval.')
+                    raise ValueError('Too late to place. This interval has expired.')
                 changed = conn.execute('UPDATE users SET balance_cents=balance_cents-? WHERE id=? AND balance_cents>=?', (cost, session['user_id'], round(budget * 100))).rowcount
                 if not changed or contracts < 1:
                     raise ValueError('Insufficient demo balance.')

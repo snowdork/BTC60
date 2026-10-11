@@ -76,3 +76,9 @@ The server publishes the demo purchase prices with the coin catalog; both the or
 The settlement details describe the actual Coinbase Exchange proxy: the minute candle close immediately before each interval boundary. This is not a 60-second average. Equal opening and closing benchmarks resolve Up; missing candles leave orders awaiting settlement.
 
 The status strip separates spot freshness, candle-history availability, and order readiness. Live orders require a connected, unpaused feed, a source timestamp within 15 seconds, valid history and benchmark, and a server-supplied quote. The server independently fetches a fresh Coinbase ticker before accepting a new order. Historical and synthetic previews cannot place orders.
+
+Purchase prices now follow the displayed heuristic percentage: 70% Up prices an Up contract at 70¢ and Down at 30¢. The ticket recalculates whole contracts, committed cost, return and profit with live percentages. A changed percentage invalidates review. Before saving an order, the server independently recomputes the heuristic from Coinbase spot and current-hour minute history and rejects changed quotes. Existing saved orders retain their original price and payout. These remain simulated model prices, not exchange order-book prices.
+
+Live review now updates contract price, quantity, return and profit until confirmation. Confirmation snapshots those terms. The demo server honors that reviewed price when its independent price differs by at most 2¢; larger moves reject without debiting funds and leave live review available to confirm again. Closed intervals and stale feeds remain blocked.
+
+The trading controller caches static controls and per-segment elements, uses a single delegated market-selection listener, and preserves the playfield DOM when selection changes. Live ticket and review quotes share one calculation path. Review totals only rebuild when price or contract count changes; currency formatting reuses a formatter.
