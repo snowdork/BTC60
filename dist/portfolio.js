@@ -1,6 +1,6 @@
 (() => {
   const account=window.BTC60Account,model=window.BTC60Portfolio,$=id=>document.getElementById(id);
-  let filter='all',coins=[];
+  let filter='all',coins=[],lastRender='';
   const money=cents=>(cents/100).toLocaleString('en-US',{style:'currency',currency:'USD'});
   const signed=cents=>(cents>=0?'+':'−')+money(Math.abs(cents));
   const date=seconds=>new Date(seconds*1000).toISOString().slice(0,10);
@@ -12,6 +12,8 @@
     $('portfolio-content').hidden=!account.user;$('portfolio-login').hidden=!!account.user;$('portfolio-logout').hidden=!account.user;$('portfolio-refresh').disabled=!account.user;
     $('portfolio-user').textContent=account.user?.name||'';
     if(!account.user){$('portfolio-message').textContent=account.error||'';return;}
+    const signature=JSON.stringify([account.user,account.predictions,filter,coins,account.predictions.filter(p=>p.settled_at==null).map(p=>model.result(p))]);
+    if(signature===lastRender)return;lastRender=signature;
     const stats=model.summary(account.predictions);
     $('portfolio-balance').textContent=money(account.user.balance_cents);$('portfolio-profit').textContent=signed(stats.profitCents);$('portfolio-profit').style.color=stats.profitCents>=0?'var(--green)':'var(--red)';
     $('portfolio-record').textContent=`${stats.wins} / ${stats.losses}`;$('portfolio-rate').textContent=stats.winRate==null?'No settled predictions':`${stats.winRate}% win rate`;
@@ -37,5 +39,5 @@
   $('portfolio-refresh').addEventListener('click',async()=>{const button=$('portfolio-refresh');button.disabled=true;$('portfolio-message').textContent='Checking closed predictions…';try{await account.settle();}catch(error){$('portfolio-message').textContent=error.message;}finally{button.disabled=false;}});
   $('portfolio-logout').addEventListener('click',()=>account.logout().catch(error=>{$('portfolio-message').textContent=error.message;}));
   fetch('/api/coins').then(response=>response.json()).then(data=>{coins=data.coins;render();}).catch(()=>{});
-  render();setInterval(render,10000);
+  render();setInterval(()=>{if(!document.hidden)render();},10000);
 })();

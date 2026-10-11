@@ -12,7 +12,7 @@
   let mode='live',paused=false,socket=null,retryTimer=null,fetchController=null,historyVersion=0;
   let hour=hourOf(Date.now()),points=[],candles=[],lastPriceAt=0,lastPrice=null,lastHistoryAt=0,backoff=1000;
   let demoEpoch=Date.now(),demoStart=new Date().setUTCHours(17,42,12,0),demoSecond=-1,lastDraw=0;
-  let frameId=0,stopped=false,connectionStartedAt=0;
+  let frameId=0,stopped=false,connectionStartedAt=0,lastPriceBroadcast=0;
   const currentTime=()=>mode==='demo'?demoStart+Date.now()-demoEpoch:Date.now();
   function status(text,tone='amber'){$('feed-status').textContent=text;$('feed-status').className=`badge ${tone}`;}
   function broadcast(name){window.dispatchEvent(new Event(name));}
@@ -39,10 +39,10 @@
     // One plotted point per second bounds the in-memory series to one hour.
     const bucket=Math.floor(t/1000)*1000,last=points.at(-1);
     if(last&&Math.floor(last.t/1000)*1000===bucket)last.price=price;
-    else {points.push({t,price});points.sort((a,b)=>a.t-b.t);}
+    else {points.push({t,price});if(last&&t<last.t)points.sort((a,b)=>a.t-b.t);}
     if(points.length>3662)points.splice(0,points.length-3662);
     lastPrice=price;lastPriceAt=Date.now();model.priceUpdatedAt=lastPriceAt;model.spot=price;
-    broadcast('btc-price-update');
+    if(Date.now()-lastPriceBroadcast>=1000){lastPriceBroadcast=Date.now();broadcast('btc-price-update');}
   }
   function demoPrice(minute,second=0){return coin.demoBase*(1+(minute*1.5+Math.sin(minute*.48)*19+Math.sin(minute*1.8)*4+Math.sin(second*.5)*1.4)/67450);}
   function demoHistory(now) {
@@ -140,7 +140,7 @@
     $('workspace-clock').textContent=`${clock(now)} UTC`;
     $('hour-window-label').textContent=`${time(hour)} — ${time(hour+3600000)}`;
     $('hour-remaining').textContent=historical?'Completed · demo settlements':`${remaining(hour+3600000-now)} remaining${mode==='demo'?' · demo':''}`;
-    $('chart-times').replaceChildren(...[0,15,30,45,60].map(minute=>{const span=document.createElement('span');span.textContent=time(hour+minute*60000);return span;}));
+    if($('chart-times').dataset.hour!==String(hour)){$('chart-times').dataset.hour=String(hour);$('chart-times').replaceChildren(...[0,15,30,45,60].map(minute=>{const span=document.createElement('span');span.textContent=time(hour+minute*60000);return span;}));}
     const valid=points.filter(p=>p.t>=hour&&p.t<=displayTime);
     const hasPoints=valid.length>0;
     $('chart-empty').hidden=hasPoints;
@@ -164,8 +164,8 @@
   }
   function frame(stamp) {
     if(stopped)return;
-    if(!document.hidden&&stamp-lastDraw>=250){
-      if(historical){lastDraw=stamp;if(!paused)draw(currentTime());frameId=requestAnimationFrame(frame);return;}
+    if(!document.hidden&&stamp-lastDraw>=1000){
+      if(historical){lastDraw=stamp;if(!paused)draw(currentTime());frameId=setTimeout(()=>frame(performance.now()),1000);return;}
       lastDraw=stamp;const now=currentTime();
       if(hourOf(now)!==hour)resetHour(now);
       if(mode==='demo'){
@@ -180,7 +180,7 @@
       }
       syncMarkets(now);if(!paused)draw(now);else status('PAUSED','neutral');
     }
-    frameId=requestAnimationFrame(frame);
+    frameId=setTimeout(()=>frame(performance.now()),1000);
   }
   $('demo-preview').addEventListener('click',()=>setMode(mode==='live'?'demo':'live'));
   $('feed-retry').addEventListener('click',()=>setMode('live',mode==='live'&&historical?hour:undefined));
@@ -189,7 +189,7 @@
     if(paused)status('PAUSED','neutral');else {status(mode==='demo'?'SIMULATED':Date.now()-lastPriceAt<15000?'LIVE':'STALE',mode==='demo'?'amber':Date.now()-lastPriceAt<15000?'green':'amber');syncMarkets(currentTime());draw(currentTime());}
   });
   document.addEventListener('visibilitychange',()=>{if(historical){if(!document.hidden){syncMarkets(currentTime());draw(currentTime());}return;}if(!document.hidden&&!paused){const now=currentTime();if(hourOf(now)!==hour)resetHour(now);syncMarkets(now,true);draw(now);if(mode==='live')loadHistory();}});
-  window.addEventListener('pagehide',()=>{stopped=true;disconnect();cancelAnimationFrame(frameId);});
+  window.addEventListener('pagehide',()=>{stopped=true;disconnect();clearTimeout(frameId);});
   function selectCoin(symbol){
     coin=window.RolrCoins.getCoin(symbol);model.coin=coin;
     document.querySelectorAll('[data-coin]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.coin===coin.symbol)));
@@ -209,5 +209,5 @@
   $('current-hour').addEventListener('click',()=>navigateHour(hourOf(currentTime())));
   document.querySelectorAll('[data-coin]').forEach(button=>button.addEventListener('click',()=>{if(button.dataset.coin!==coin.symbol)selectCoin(button.dataset.coin);}));
   let savedCoin=window.RolrCoins.available[0].symbol;try{const preference=localStorage.getItem('rolr_selected_coin');if(window.RolrCoins.available.some(coin=>coin.symbol===preference))savedCoin=preference;}catch{}
-  selectCoin(savedCoin);frameId=requestAnimationFrame(frame);
+  selectCoin(savedCoin);frameId=setTimeout(()=>frame(performance.now()),1000);
 })();

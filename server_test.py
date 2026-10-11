@@ -139,6 +139,22 @@ class AccountsTest(unittest.TestCase):
         with server.connect() as conn:
             self.assertEqual(conn.execute('SELECT count(*) FROM settlements s JOIN predictions p ON p.id=s.prediction_id WHERE p.user_id=?',(user_id,)).fetchone()[0],2)
 
+    def test_static_compression_revalidation_and_head(self):
+        import gzip
+        conn=http.client.HTTPConnection('127.0.0.1',self.http.server_port)
+        conn.request('GET','/styles.css',headers={'Accept-Encoding':'gzip'})
+        response=conn.getresponse();body=response.read();etag=response.getheader('ETag')
+        self.assertEqual(response.status,200)
+        self.assertEqual(response.getheader('Content-Encoding'),'gzip')
+        self.assertEqual(gzip.decompress(body),(server.ROOT/'styles.css').read_bytes())
+        self.assertLess(len(body),len(gzip.decompress(body)))
+        conn.request('GET','/styles.css',headers={'Accept-Encoding':'gzip','If-None-Match':etag})
+        response=conn.getresponse();self.assertEqual(response.status,304);self.assertEqual(response.read(),b'')
+        conn.request('HEAD','/responsive.css')
+        response=conn.getresponse();self.assertEqual(response.status,200);self.assertEqual(response.read(),b'')
+        self.assertGreater(int(response.getheader('Content-Length')),0)
+        conn.close()
+
     def test_private_files_not_served(self):
         for path in ['/data/btc60.sqlite3', '/server.py', '/.git/config', '/%2e%2e/server.py']:
             self.assertEqual(self.request('GET', path)[0], 404)

@@ -2,6 +2,7 @@
 import argparse
 import fcntl
 import hashlib
+import gzip
 import json
 import math
 import os
@@ -23,6 +24,7 @@ QUOTES = {'60-0': 68, '30-0': 54, '30-1': 58, '15-0': 49, '15-1': 57, '15-2': 62
 AUTH_ATTEMPTS = {}
 AUTH_LOCK = threading.Lock()
 SETTLE_LOCK = threading.Lock()
+STATIC_CACHE = {}
 
 
 def connect():
@@ -160,8 +162,6 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
     def end_headers(self):
-        if not self.path.startswith('/api/'):
-            self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'same-origin')
         self.send_header('X-Frame-Options', 'DENY')
@@ -176,7 +176,8 @@ class Handler(SimpleHTTPRequestHandler):
         if cookie:
             self.send_header('Set-Cookie', cookie)
         self.end_headers()
-        self.wfile.write(body)
+        if self.command!='HEAD':
+            self.wfile.write(body)
 
     def session(self):
         jar = cookies.SimpleCookie()
@@ -208,13 +209,47 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith('/api/'):
             return self.reply(404, {'error': 'Unknown endpoint.'})
         # Serve only public application assets, never SQLite, source or dotfiles.
-        public = {'index.html', 'welcome.html', 'login.html', 'signup.html', 'styles.css', 'auth.css', 'auth.js', 'account.js', 'app.js', 'btc-chart.js', 'market-model.js', 'coins.js', 'bootstrap.js', 'splash.js', 'portfolio.html', 'portfolio.js', 'portfolio-model.js', 'portfolio.css', 'theme.js', 'theme.css'}
+        public = {'index.html', 'welcome.html', 'login.html', 'signup.html', 'styles.css', 'auth.css', 'auth.js', 'account.js', 'app.js', 'btc-chart.js', 'market-model.js', 'coins.js', 'bootstrap.js', 'splash.js', 'portfolio.html', 'portfolio.js', 'portfolio-model.js', 'portfolio.css', 'theme.js', 'theme.css', 'responsive.css'}
         relative = urllib.parse.unquote(path).lstrip('/')
         if not relative:
             self.path = '/welcome.html'
         elif relative not in public and relative != 'assets/previews/prediction-playfield.png' and not (re.fullmatch(r'assets/coins/[a-zA-Z0-9_-]+\.svg', relative)):
             return self.reply(404, {'error': 'Not found.'})
-        super().do_GET()
+        self.serve_static()
+
+    def serve_static(self):
+        relative = urllib.parse.unquote(urllib.parse.urlsplit(self.path).path).lstrip('/')
+        path = ROOT / relative
+        if not path.is_file():
+            return self.reply(404, {'error': 'Not found.'})
+        stat = path.stat()
+        compressed = path.suffix in {'.html','.css','.js','.svg'} and 'gzip' in self.headers.get('Accept-Encoding','')
+        key = (relative,stat.st_mtime_ns,stat.st_size,compressed)
+        cached = STATIC_CACHE.get(key)
+        if cached is None:
+            raw = path.read_bytes()
+            body = gzip.compress(raw,compresslevel=6) if compressed else raw
+            etag = '"' + hashlib.sha256(body).hexdigest()[:24] + '"'
+            cached = (body,etag)
+            # Keep at most the current plain/gzip versions of each public file.
+            for old in list(STATIC_CACHE):
+                if old[0]==relative and old[3]==compressed:
+                    STATIC_CACHE.pop(old,None)
+            STATIC_CACHE[key] = cached
+        body,etag = cached
+        unchanged = self.headers.get('If-None-Match')==etag
+        self.send_response(304 if unchanged else 200)
+        self.send_header('Cache-Control','public, max-age=0, must-revalidate')
+        self.send_header('ETag',etag)
+        self.send_header('Vary','Accept-Encoding')
+        if not unchanged:
+            self.send_header('Content-Type',self.guess_type(str(path)))
+            self.send_header('Content-Length',str(len(body)))
+            if compressed:
+                self.send_header('Content-Encoding','gzip')
+        self.end_headers()
+        if not unchanged and self.command!='HEAD':
+            self.wfile.write(body)
 
     def do_HEAD(self):
         self.do_GET()

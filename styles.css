@@ -93,3 +93,9 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .tier[data-duration] .market-card:last-child::after{right:-1px}
 
 .portfolio-icon{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;color:var(--green);border:1px solid #00e67640;border-radius:6px;background:#00e67608;flex-shrink:0}.portfolio-icon:hover{background:#00e67618}.portfolio-icon svg{width:18px;height:18px}.pending-history-link{margin-left:auto;color:var(--green);font-size:9px;white-space:nowrap}.positions-heading{gap:12px}.positions-list-empty{padding:12px 0 2px;color:var(--muted);font-size:10px}@media(max-width:1150px){.positions-heading>.muted{display:none}}
+
+/* Direction colors remain visible before choosing an outcome. */
+.outcome.up>span,.outcome.up>strong{color:var(--green)}
+.outcome.down>span,.outcome.down>strong{color:var(--red)}
+.chance-up,.chance-down{white-space:nowrap}
+@media(max-width:1150px){.chance-row{gap:6px;font-size:11px}}

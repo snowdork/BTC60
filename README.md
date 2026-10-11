@@ -58,3 +58,12 @@ The portfolio icon in the terminal opens `portfolio.html`. History is restricted
 Visible account pages check settlements every 15 seconds and when focused. The background worker continues every 30 seconds. Missing price history leaves orders awaiting settlement. Server-side settlement inserts and winning balance credits remain atomic and idempotent. Refresh requests only process the signed-in user's orders; the worker processes all accounts. Run frontend checks with `node --test *.test.js` and account/settlement tests with `python3 -m unittest server_test.py`.
 
 The sun/moon icon in each page header toggles light and dark themes. The preference is saved locally and applied before page rendering, and synchronizes across tabs. Theme assets are `theme.js` and `theme.css`; include both in static copies.
+
+
+### Performance and responsive layouts
+
+The terminal keeps the full timeline aligned at a readable minimum width. On phones/tablets the order ticket moves below the markets and only the timeline scrolls sideways; the page itself fits the viewport. Coin selection scrolls independently, portfolio tables have their own scroll container, and account/splash pages reflow. Laptop layouts keep the ticket beside the playfield.
+
+Chart/time updates run once per second instead of four times per second. Streaming prices still update the model immediately; UI notifications are limited to once a second. Static chart time labels are built once per hour, sorted streaming data avoids repeated sorting, pending-order countdowns update existing elements, and unchanged account/history snapshots skip rebuilding rows. Hidden-tab rendering and polling are skipped. Native font fallbacks avoid external font requests.
+
+The local server gzip-compresses text assets and serves ETags for conditional revalidation. Browsers can reuse unchanged assets without downloading their bodies; changed files still refresh immediately. Account/API responses remain uncached. `responsive.css` is included on every page and must stay in the `dist/` copies.
