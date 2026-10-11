@@ -1,11 +1,27 @@
-:root { color-scheme: dark; }
+:root { color-scheme: dark; --surface: #131313; --surface-dim: #0b0b0b; --surface-bright: #242424; --surface-container-lowest: #080808; --surface-container-low: #101010; --surface-container: #181818; --surface-container-high: #202020; --surface-container-highest: #2a2a2a; --primary: #00e676; --primary-container: #00391c; --secondary: #ffb300; --secondary-container: #3d2800; --tertiary: #00d4ff; --error: #ff1744; --error-container: #40020d; --outline: rgba(255,255,255,.12); --outline-variant: rgba(255,255,255,.06); }
+body { min-width: 1024px; background: var(--surface-container-lowest); font-family: 'JetBrains Mono', monospace !important; font-variant-numeric: tabular-nums; }
+.font-mono { font-family: 'JetBrains Mono', monospace !important; }
+h1, h2, .font-display { font-family: Sora, 'Space Grotesk', sans-serif !important; font-weight: 800; letter-spacing: -.035em; }
+header { min-width: 1024px; }
+main { max-width: 1920px; margin-inline: auto; }
+main section > div { border-color: var(--outline); }
+button { transition-duration: 80ms !important; }
+[data-direction][aria-pressed="true"] { outline: 2px solid white; outline-offset: 3px; }
+.tie-prediction { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px; background: linear-gradient(100deg,#ffb300,#e59b00); color: #000; border: 1px solid #ffca50; border-radius: 8px; box-shadow: 0 0 18px #ffb30020; text-align: left; }
+.tie-prediction strong { display: block; font-size: 14px; }
+.tie-prediction small { display: block; font-size: 10px; margin-top: 3px; }
+.tie-icon { display: grid; place-items: center; background: #080808; color: #ffb300; width: 32px; height: 32px; border-radius: 4px; font-size: 22px; }
+.tie-odds { margin-left: auto; text-align: right; font-size: 16px; font-weight: 800; }
+#content-tier1, #content-tier2, #content-tier3, #content-tier4 { position: relative; }
+[id^="content-tier"]::before { content: ''; position: absolute; left: -9px; top: -10px; height: 20px; width: 9px; border-left: 1px solid var(--outline); border-bottom: 1px solid var(--outline); pointer-events: none; }
+@media (min-width: 1024px) and (max-width: 1535px) { header nav { display: none !important; } header > div { padding-inline: 24px !important; } }
 html { scroll-behavior: smooth; }
 button, a, input { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid #00e676; outline-offset: 4px; }
-.stake-chip.selected { background: #00e676 !important; color: #090d14 !important; border-color: #00e676 !important; box-shadow: 0 0 12px #00e67640; }
-.stake-chip:not(.selected) { background: #162032 !important; color: #cbd5e1 !important; border-color: #1e293b !important; box-shadow: none !important; }
-#notification { position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; z-index: 100; padding: 16px 22px; background: #131b2a; border: 1px solid #00e676; border-radius: 8px; color: #e2e8f0; font: 12px/1.6 monospace; max-width: calc(100vw - 32px); width: max-content; transition: .2s; box-shadow: 0 8px 40px #0008; }
+.stake-chip.selected { background: #00e676 !important; color: #080808 !important; border-color: #00e676 !important; box-shadow: 0 0 12px #00e67640; }
+.stake-chip:not(.selected) { background: #202020 !important; color: #d4d4d4 !important; border-color: #2a2a2a !important; box-shadow: none !important; }
+#notification { position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; z-index: 100; padding: 16px 22px; background: #181818; border: 1px solid #00e676; border-radius: 8px; color: #e5e5e5; font: 12px/1.6 monospace; max-width: calc(100vw - 32px); width: max-content; transition: .2s; box-shadow: 0 8px 40px #0008; }
 #notification.visible { transform: translate(-50%, 0); opacity: 1; }
 @media(max-width: 640px) { header > div { gap: 8px !important; padding: 8px 12px !important; } header > div > div:first-child > div:first-child { gap: 6px !important; } header > div > div:first-child > div:first-child > div:last-child > span { display: none; } header > div > div:last-child > div:last-child { display: none; } main section { padding-left: 12px !important; padding-right: 12px !important; } #content-tier3, #content-tier4 { grid-template-columns: repeat(2,minmax(0,1fr)) !important; } }
 @media(prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
