@@ -1,4 +1,4 @@
-# ROLR BTC60 — Phase1
+# BTC60 — Phase1
 
 Laptop-focused, buildless web app for seeing a complete hour of crypto predictions: one 60-minute market, two 30-minute markets, and four 15-minute markets. No 5-minute markets.
 
@@ -13,3 +13,5 @@ Run checks with `node --test market-model.test.js coins.test.js` and `node --che
 Deployable copies live in `dist/`. After source edits, copy `index.html`, `styles.css`, `market-model.js`, `coins.js`, `btc-chart.js`, `app.js`, and the `assets/` directory into `dist/`. `.openai/hosting.json` identifies the existing private Site. Keep development on the `Phase1` branch.
 
 The coin dropdown offers Bitcoin (BTC), Ethereum (ETH), Solana (SOL), XRP, and Dogecoin (DOGE). Selection persists locally and switches the public USD ticker/history feed, graph, prices, labels, and order context. Local SVG coin logos appear beside the selector and current price. Small-priced coins retain extra decimal places. Saved positions keep their original coin; the demo balance is shared across all coins.
+
+Use Previous hour to inspect the selected coin's completed hourly chart and all seven interval results. Next moves forward; Current hour restores the live feed. Historical views disable order entry and preserve their hour when switching coins. Historical closing prices and outcomes use Coinbase minute-candle proxies, not official exchange settlements. Missing candles leave affected results unavailable.

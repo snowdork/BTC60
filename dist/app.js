@@ -42,8 +42,9 @@
     $('ticket-time').textContent=`${market.start} – ${market.end} UTC`;
     $('ticket-question').textContent=`${window.RolrModel.coin.name} up or down?`;
     $('ticket-strike').textContent=queued?'Set at open':Number.isFinite(market.strike)?price(market.strike):'Loading…';
-    const delta=window.RolrModel.spot-market.strike;
-    $('ticket-delta').textContent=queued||!Number.isFinite(market.strike)||!Number.isFinite(window.RolrModel.spot)?'—':(delta>=0?'+':'−')+price(Math.abs(delta));
+    const delta=(window.RolrModel.isHistorical?market.close:window.RolrModel.spot)-market.strike;
+    $('ticket-delta-label').textContent=window.RolrModel.isHistorical?'SETTLED VS BENCHMARK':'SPOT VS BENCHMARK';
+    $('ticket-delta').textContent=queued||!Number.isFinite(market.strike)||!Number.isFinite(window.RolrModel.isHistorical?market.close:window.RolrModel.spot)?'—':(delta>=0?'+':'−')+price(Math.abs(delta));
     $('ticket-delta').style.color=delta>=0?'var(--green)':'var(--red)';
     $('up-price').textContent=open?`${market.up}¢`:'—';
     $('down-price').textContent=open?`${100-market.up}¢`:'—';
@@ -55,8 +56,8 @@
     $('contracts').textContent=q?String(q.contracts):'—';$('cost').textContent=q?money(q.cost):'—';$('return').textContent=q?money(q.payout):'—';$('profit').textContent=q?'+'+money(q.profit):'—';
     $('submit-prediction').disabled=!q || positions.length>=200;
     $('submit-prediction').classList.toggle('bear',side==='down');
-    $('submit-prediction').textContent=open?`Review ${side==='up'?'Up':'Down'} prediction →`:queued?`Opens at ${market.start} UTC`:'Market settled';
-    $('ticket-note').textContent=!open?(queued?'Select an open market to make a prediction.':Number.isFinite(market.close)?`Settled ${outcome(market.strike,market.close)==='up'?'Up':'Down'} at ${price(market.close)}.`:'Waiting for market history.'):positions.length>=200?'Demo limit of 200 predictions reached.':!q?'Enter a budget of at least $1 within your demo balance.':'Simulated prices · No fees · No real money';
+    $('submit-prediction').textContent=open?`Review ${side==='up'?'Up':'Down'} prediction →`:queued?`Opens at ${market.start} UTC`:window.RolrModel.isHistorical?'Historical market · Closed':'Market settled';
+    $('ticket-note').textContent=!open?(queued?'Select an open market to make a prediction.':Number.isFinite(market.strike)&&Number.isFinite(market.close)?`Demo settlement: ${outcome(market.strike,market.close)==='up'?'Up':'Down'} at ${price(market.close)}.`:'Waiting for market history.'):positions.length>=200?'Demo limit of 200 predictions reached.':!q?'Enter a budget of at least $1 within your demo balance.':'Simulated prices · No fees · No real money';
     $('settlement-description').textContent=!Number.isFinite(market.strike)&&!queued?'Waiting for a demo benchmark from minute history.':queued?'The starting benchmark is set when this interval opens.':`Up wins if the closing 60-second average is at least ${price(market.strike)}. Otherwise Down wins.`;
     $('balance').textContent=money(balance());
   }
@@ -95,6 +96,6 @@
   window.addEventListener('storage',event=>{if(event.key===storageKey)location.reload();});
   window.addEventListener('coin-change',()=>{initialMarketChosen=false;review=null;$('review-dialog').close();renderMarkets();renderTicket();});
   window.addEventListener('btc-market-update',()=>{if(!initialMarketChosen){const active=markets.find(m=>m.minutes===15&&m.status==='open'&&Number.isFinite(m.strike));if(active){market=active;initialMarketChosen=true;}}review=null;$('review-dialog').close();renderMarkets();renderTicket();});
-  window.addEventListener('btc-price-update',()=>{const delta=window.RolrModel.spot-market.strike; $('ticket-delta').textContent=Number.isFinite(market.strike)&&Number.isFinite(window.RolrModel.spot)?(delta>=0?'+':'−')+price(Math.abs(delta)):'—';$('ticket-delta').style.color=delta>=0?'var(--green)':'var(--red)';});
+  window.addEventListener('btc-price-update',()=>{const delta=(window.RolrModel.isHistorical?market.close:window.RolrModel.spot)-market.strike; $('ticket-delta').textContent=Number.isFinite(market.strike)&&Number.isFinite(window.RolrModel.isHistorical?market.close:window.RolrModel.spot)?(delta>=0?'+':'−')+price(Math.abs(delta)):'—';$('ticket-delta').style.color=delta>=0?'var(--green)':'var(--red)';});
   renderMarkets();renderPositions();renderTicket();
 })();
