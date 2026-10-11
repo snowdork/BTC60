@@ -44,3 +44,6 @@
 [data-theme="light"] .market-card.queued{background:#fff0b3;color:#51451c}[data-theme="light"] .market-card.queued:hover{background:#ffe89a}
 
 [data-theme="light"] .market-card [data-remaining]{color:#805500}
+
+.submit-prediction.pick-direction,
+[data-theme="light"] .submit-prediction.pick-direction{background:#2563eb;color:#fff}

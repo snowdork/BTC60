@@ -159,3 +159,8 @@ body:not(.auth-page) main{padding:10px 20px 0}
 
 /* A subdued rubber stamp marks completed intervals without crossing their data. */
 .settled-stamp{position:absolute;right:35px;top:50%;transform:translateY(-50%) rotate(-10deg);padding:3px 6px;border:2px double #34443b75;border-radius:3px;color:#34443b9c;font:800 10px monospace;letter-spacing:1px;line-height:1;pointer-events:none;user-select:none}.market-card.settled .card-context{padding-right:110px}
+
+.settled-stamp.has-wager{display:flex;flex-direction:column;gap:5px;border:0;padding:0;letter-spacing:.5px}
+.wager-settlement{display:block;border:2px solid currentColor;border-radius:3px;padding:4px 6px;background:var(--surface)}
+.wager-settlement.won,.segment-prediction.won{color:var(--green)}
+.wager-settlement.lost,.segment-prediction.lost{color:var(--red)}
