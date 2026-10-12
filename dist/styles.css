@@ -9,8 +9,7 @@
 .time-cursor{bottom:0}
 
 .timeline-stack{--chart-height:130px}.time-cursor>span{top:calc(var(--chart-height) + 18px)}@media(max-height:820px){.timeline-stack{--chart-height:105px}}
-.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.spot{display:flex;align-items:center;gap:9px}.spot>#price-coin-icon{width:30px;height:30px;flex-shrink:0}.spot>#btc-change{margin-left:2px}.workspace-label{gap:10px}
-.hour-navigation{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-bottom:6px}.hour-navigation button{font:9px Sora,sans-serif;border:1px solid var(--border);border-radius:4px;padding:5px 7px;background:#181d19;color:#bdc9c0}.hour-navigation button:hover{color:var(--green);border-color:#00e67650}#current-hour{color:var(--green)}.price-context{font:7px 'JetBrains Mono',monospace;color:var(--muted);margin-left:9px;letter-spacing:.7px}.time-cursor[hidden]{display:none}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.spot{display:flex;align-items:center;gap:9px}.spot>#price-coin-icon{width:30px;height:30px;flex-shrink:0}.spot>#btc-change{margin-left:2px}.workspace-label{gap:10px}#current-hour{color:var(--green)}.price-context{font:7px 'JetBrains Mono',monospace;color:var(--muted);margin-left:9px;letter-spacing:.7px}.time-cursor[hidden]{display:none}
 
 /* Fixed quarter-hour boundaries share the chart's full-hour axis. */
 .interval-guides{position:absolute;left:calc(var(--tier-gutter) + 1px);right:1px;top:35px;bottom:0;z-index:2;pointer-events:none}
@@ -64,11 +63,9 @@ body:not(.auth-page) main{padding:10px 20px 0}
 @media(max-height:820px){.market-status-strip{margin:7px 0;min-height:31px;padding:6px 9px}.ticket-market{padding:10px 0 8px}.ticket-market h3{margin-bottom:0}.overview{padding:9px 12px!important}body:not(.auth-page) footer{padding:9px 0}}
 /* Put hour navigation beside its readout instead of stacking four rows. */
 .hour-window{display:grid;grid-template-columns:auto auto;align-items:center;gap:4px 12px}
-.hour-window .hour-navigation{grid-column:2;grid-row:1/4;display:flex;flex-direction:column;align-items:stretch;margin:0}
 .hour-window>#hour-date{grid-column:1;grid-row:1;font-size:8px}
 .hour-window>#hour-window-label{grid-column:1;grid-row:2;margin:0;font-size:14px}
-.hour-window>#hour-remaining{grid-column:1;grid-row:3;font-size:8px}
-@media(max-width:1150px){.hour-window{column-gap:8px}.hour-navigation button{font-size:8px;padding:5px}.hour-window>#hour-window-label{font-size:12px}}
+@media(max-width:1150px){.hour-window{column-gap:8px}.hour-window>#hour-window-label{font-size:12px}}
 
 .startup-help{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px;margin-bottom:12px;border:1px solid #ffb30055;border-radius:7px;background:#ffb3000b;font-size:11px;color:var(--amber)}.startup-help a{margin-left:auto;text-decoration:underline}.startup-help button{border:1px solid #ffb30055;border-radius:4px;background:transparent;padding:6px 10px;color:var(--amber)}
 
@@ -99,3 +96,71 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .outcome.down>span,.outcome.down>strong{color:var(--red)}
 .chance-up,.chance-down{white-space:nowrap}
 @media(max-width:1150px){.chance-row{gap:6px;font-size:11px}}
+
+/* Phase2: data provenance, estimates and purchase prices have distinct labels. */
+.data-health{display:flex;align-items:center;flex-wrap:wrap;gap:5px 14px;margin:0 0 8px;color:var(--muted);font:8px 'JetBrains Mono',monospace}.data-health strong{font-weight:500;margin-left:auto}.chance-block{border-top:1px solid var(--border);padding-top:4px}.chance-block .chance-row{border:0;padding-top:2px}.card-distance{font:9px 'JetBrains Mono',monospace;line-height:1.4}.settlement-details{margin-top:7px;font-size:9px;color:var(--muted)}.settlement-details summary{cursor:pointer;color:var(--cyan)}.settlement-details p{line-height:1.6}.benchmark .eyebrow{font-size:7px;letter-spacing:0}.market-card{gap:5px}.card-benchmark small{font-size:7px}@media(max-width:1150px){.card-distance{font-size:8px}}@media(max-width:480px){.data-health strong{margin-left:0}}
+
+/* Keep the distance and countdown together to preserve laptop playfield space. */
+.card-context{display:flex;align-items:center;justify-content:space-between;gap:8px}.card-context .card-bottom{margin:0;white-space:nowrap}.card-distance{font-size:8px}.chance-block{padding-top:3px}
+@media(min-width:901px) and (max-height:820px){.chart-plot{height:70px}.timeline-stack{--chart-height:70px}.market-card{padding:7px 9px!important;gap:2px!important}.card-benchmark small{margin-top:1px}.chance-block .chance-row{padding-top:1px}.tier{margin-bottom:6px}}
+
+/* Saved predictions sit beside their segment benchmark. */
+.segment-price{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px}.segment-predictions{display:inline-flex;flex-wrap:wrap;gap:4px}.segment-prediction{display:inline-flex;align-items:center;gap:4px;padding:2px 5px;border:1px solid currentColor;border-radius:4px;font:600 10px monospace;letter-spacing:0;white-space:nowrap}.segment-prediction.up{color:var(--green);background:#00e67610}.segment-prediction.down{color:var(--red);background:#ff174410}
+
+/* Completed intervals show their confirmed direction at the right edge. */
+.segment-result{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:700 30px monospace;line-height:1;pointer-events:none}.segment-result.up{color:var(--green)}.segment-result.down{color:var(--red)}.market-card.settled .card-benchmark,.market-card.settled .card-context{padding-right:28px}
+
+/* Review repeats the chosen direction in words, an arrow, and color. */
+.review-direction{display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:16px;border:1px solid currentColor;border-radius:8px;color:var(--green);background:#00e6760c}.review-direction.down{color:var(--red);background:#ff17440c}.review-direction>span{font:700 34px monospace;line-height:1}.review-direction>strong{font-size:17px}.review-direction~h2{font-size:18px}#confirm-prediction{justify-content:center;gap:8px}
+
+.segment-prediction.won{color:var(--green);background:#00e67610}.segment-prediction.lost{color:var(--red);background:#ff174410}
+
+.review-estimate{margin-left:auto;text-align:right}.review-estimate strong{display:block;font:700 21px monospace;white-space:nowrap}@media(max-width:480px){.review-direction{flex-wrap:wrap}.review-estimate strong{font-size:18px}}
+
+/* Finished segments use a quiet grey surface with accessible outcome colors. */
+.market-card.settled{background:#b8bfbc;color:#26342d;--muted:#58645e;--green:#007c40;--red:#c9153e;--border:#26342d25}.market-card.settled:hover{background:#c1c8c4}.market-card.settled .card-bottom{color:var(--muted)}.market-card.settled .neutral{color:var(--muted)}
+
+.market-card.settled{border-style:dashed}
+
+.outcome #up-chance,.outcome #down-chance{font-size:20px}.outcome .outcome-quote{opacity:1;margin-top:6px;color:var(--muted)}.outcome-quote b{font-weight:600}.outcome small:last-child{margin-top:4px}
+
+/* Upcoming intervals use a pale yellow surface distinct from completed grey. */
+.market-card.queued{background:#fff0b3;color:#51451c;--muted:#75632f;--border:#75632f33}.market-card.queued:hover{background:#ffe89a}.market-card.queued .neutral{color:#75632f;background:#75632f0c;border-color:#75632f33}
+
+/* Keep active interval countdowns easy to scan at the right edge. */
+.market-card [data-remaining]{color:#ffd54f;font-weight:700;font-size:11px;font-variant-numeric:tabular-nums}
+
+.ticket-selected-window{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px 10px;margin-top:10px;padding:9px 10px;border:1px solid var(--border);border-radius:6px;background:var(--raised)}.ticket-selected-window strong{font-size:11px;color:var(--cyan)}.ticket-selected-window span{font:10px monospace;color:var(--text)}.ticket-status-line #ticket-duration,.ticket-status-line #ticket-time{display:none}.ticket-status-line{justify-content:flex-end}
+
+/* Price and countdown share a row; saved bets anchor the segment footer. */
+.segment-price{justify-content:space-between;gap:4px}.segment-countdown{margin-left:auto;letter-spacing:0;white-space:nowrap}.market-card>.segment-predictions{margin-top:auto;padding-top:4px}.card-distance{font-size:9px;white-space:nowrap}.card-context:has(.card-bottom:empty) .card-bottom{display:none}
+@media(max-width:1150px){.market-card .segment-countdown{font-size:10px}.card-distance{font-size:8px}}
+
+#review-error{color:var(--red);font-weight:600}#review-error:empty{display:none}
+
+.review-time{margin:10px 0;padding:9px 12px;border:1px solid var(--border);border-radius:6px;color:var(--amber);font:700 14px monospace;font-variant-numeric:tabular-nums}.review-time.expired{color:var(--red);border-color:var(--red)}
+
+/* Selection distinguishes an available interval from a closed one. */
+:root .tier[data-duration] .market-card.open.selected{border-color:#00e676;border-style:solid;box-shadow:inset 0 0 0 2px #00e676,0 0 0 1px #00e676,0 0 12px #00e67630}
+
+
+
+/* Closed and upcoming selections have informational panes instead of order controls. */
+:root .tier[data-duration] .market-card.settled.selected{border:2px solid #89938d;outline:none;box-shadow:none}
+:root .tier[data-duration] .market-card.settled.result-up.selected{border-color:#00e676;box-shadow:inset 0 0 0 2px #00e676,0 0 0 1px #00e676}
+:root .tier[data-duration] .market-card.settled.result-down.selected{border-color:#ff1744;box-shadow:inset 0 0 0 2px #ff1744,0 0 0 1px #ff1744}
+.ticket-coin{display:flex;align-items:center;gap:9px;margin-top:9px}.ticket-coin h3{margin:0}.ticket-coin img{object-fit:contain}.interval-details h3{font-size:18px;margin:14px 0}.interval-details dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px 14px;font-size:10px;line-height:1.5}.interval-details dt{color:var(--muted)}.interval-details dd{margin:0;text-align:right;overflow-wrap:anywhere}.interval-details p{font-size:10px;line-height:1.7;color:var(--muted)}
+
+.ticket-market>.ticket-coin{justify-content:flex-start}.ticket-market>.ticket-coin h3{margin:0}
+
+/* Frame the hour range with previous and next controls. */
+.hour-window{grid-template-columns:1fr;gap:4px;text-align:center}.hour-window>#hour-date{grid-column:1;grid-row:1}.hour-time-navigation{display:flex;align-items:center;justify-content:center;gap:10px;grid-column:1;grid-row:2}.hour-time-navigation>#hour-window-label{margin:0;font:500 14px monospace;white-space:nowrap}.hour-time-navigation button,.hour-window>#current-hour{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border:1px solid var(--border);border-radius:6px;background:var(--raised);color:var(--text)}.hour-time-navigation svg,.hour-window>#current-hour svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.hour-time-navigation button:hover,.hour-window>#current-hour:hover{color:var(--green);border-color:var(--green)}.hour-time-navigation button:disabled{opacity:.3}.hour-window>#current-hour{grid-column:1;grid-row:3;justify-self:center;color:var(--green)}
+@media(max-width:480px){.hour-window{grid-template-columns:1fr}.hour-time-navigation{justify-content:flex-start}.hour-window>#current-hour{justify-self:start}}
+
+/* A subdued rubber stamp marks completed intervals without crossing their data. */
+.settled-stamp{position:absolute;right:35px;top:50%;transform:translateY(-50%) rotate(-10deg);padding:3px 6px;border:2px double #34443b75;border-radius:3px;color:#34443b9c;font:800 10px monospace;letter-spacing:1px;line-height:1;pointer-events:none;user-select:none}.market-card.settled .card-context{padding-right:110px}
+
+.settled-stamp.has-wager{display:flex;flex-direction:column;gap:5px;border:0;padding:0;letter-spacing:.5px}
+.wager-settlement{display:block;border:2px solid currentColor;border-radius:3px;padding:4px 6px;background:var(--surface)}
+.wager-settlement.won,.segment-prediction.won{color:var(--green)}
+.wager-settlement.lost,.segment-prediction.lost{color:var(--red)}

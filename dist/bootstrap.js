@@ -5,14 +5,14 @@
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);
     let response;try{response=await fetch('/api/coins',{signal:controller.signal,cache:'no-store'});}finally{clearTimeout(timeout);}
     if(!response.ok||!response.headers.get('Content-Type')?.includes('application/json'))throw Error('Coin API unavailable. Run or restart python3 server.py and open http://127.0.0.1:8000/index.html.');
-    const data=await response.json();window.RolrCoins=window.RolrCoinCatalog.createCatalog(data.coins);
+    const data=await response.json();window.BTC60MarketConfig=data.marketConfig;window.RolrCoins=window.RolrCoinCatalog.createCatalog(data.coins);
     if(!window.RolrCoins.available.length)throw Error('No coins are currently available for predictions.');
     picker.replaceChildren(...window.RolrCoins.available.map(coin=>{
       const button=document.createElement('button');button.type='button';button.className='coin-button';button.dataset.coin=coin.symbol;button.setAttribute('aria-label',`Select ${coin.name}`);button.setAttribute('aria-pressed','false');button.title=`${coin.name} (${coin.symbol})`;
       if(coin.icon){const icon=document.createElement('img');icon.src=coin.icon;icon.alt='';icon.width=24;icon.height=24;icon.addEventListener('error',()=>{icon.hidden=true;});button.append(icon);}
       const label=document.createElement('span');label.textContent=coin.symbol;button.append(label);return button;
     }));
-    for(const src of ['market-model.js','app.js','btc-chart.js'])await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=resolve;script.onerror=()=>reject(Error('Unable to load the terminal.'));document.head.append(script);});
+    for(const src of ['market-model.js','app.js','btc-chart.js'])await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=()=>{try{if(src==='market-model.js')window.RolrModel.configure(window.BTC60MarketConfig);resolve();}catch(error){reject(error);}};script.onerror=()=>reject(Error('Unable to load the terminal.'));document.head.append(script);});
   }catch(error){
     picker.textContent='Coins unavailable';
     const connectionError=error instanceof TypeError||error.name==='AbortError'||error instanceof SyntaxError;

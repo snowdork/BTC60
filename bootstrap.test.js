@@ -7,7 +7,7 @@ async function run(protocol,fetch){
  const elements=new Map(),loaded=[];
  const element=id=>{if(!elements.has(id))elements.set(id,{textContent:'Connecting…',hidden:true,addEventListener(){},append(){},replaceChildren(){},setAttribute(){},dataset:{}});return elements.get(id);};
  const document={getElementById:element,querySelector:()=>element('picker'),createElement:()=>({dataset:{},setAttribute(){},addEventListener(){},append(){}}),head:{append(script){loaded.push(script.src);script.onload();}}};
- const context={document,location:{protocol,reload(){}},window:{RolrCoinCatalog:{createCatalog}},fetch,AbortController,setTimeout,clearTimeout,Error,TypeError,SyntaxError};
+ const context={document,location:{protocol,reload(){}},window:{RolrCoinCatalog:{createCatalog},RolrModel:{configure(){}}},fetch,AbortController,setTimeout,clearTimeout,Error,TypeError,SyntaxError};
  await vm.runInNewContext(fs.readFileSync('bootstrap.js','utf8'),context);
  return {elements,loaded};
 }

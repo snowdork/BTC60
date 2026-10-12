@@ -2,10 +2,10 @@
 :root[data-theme="light"]{color-scheme:light;--bg:#f1f5f3;--surface:#fff;--raised:#e7eeea;--border:#142e242b;--text:#152b21;--muted:#586d61;--green:#007c40;--red:#c9153e;--amber:#976500;--cyan:#007b98}
 [data-theme="light"] .topbar{background:#fff}
 [data-theme="light"] .auth-page{background:radial-gradient(ellipse at 75% 20%,#b9f0cc77,transparent 55%),var(--bg)}
-[data-theme="light"] :is(.market-card,.market-card.settled,.coin-picker,.benchmark,.budget-input,.chart-plot,.auth-card input,.market-status-strip,.outcome,.history-filters button,.hour-navigation button,.stake-presets button,dialog){background:var(--surface);color:var(--text);border-color:var(--border)}
+[data-theme="light"] :is(.market-card,.market-card.settled,.coin-picker,.benchmark,.budget-input,.chart-plot,.auth-card input,.market-status-strip,.outcome,.history-filters button,.stake-presets button,dialog){background:var(--surface);color:var(--text);border-color:var(--border)}
 [data-theme="light"] .market-card:hover{background:#eef7f1}
 [data-theme="light"] .market-card.selected{background:#e6f7ed}
-[data-theme="light"] :is(.ticket-market p,.duration-label,.workspace-label,.card-time,.card-bottom,.rules-strip,.rules-strip strong,.rules-strip button,.side-label>span,.ticket-rule p,.empty-state strong,.order-math>div,.ticket-market>div,.hour-navigation button,.chart-toolbar button,.account-name,dialog p,.snapshot strong,.positions-heading>.muted){color:var(--muted)}
+[data-theme="light"] :is(.ticket-market p,.duration-label,.workspace-label,.card-time,.card-bottom,.rules-strip,.rules-strip strong,.rules-strip button,.side-label>span,.ticket-rule p,.empty-state strong,.order-math>div,.ticket-market>div,.chart-toolbar button,.account-name,dialog p,.snapshot strong,.positions-heading>.muted){color:var(--muted)}
 [data-theme="light"] :is(.order-math strong,.price-clock strong,#selected-time){color:var(--text)}
 [data-theme="light"] .chance-down{color:var(--red)}
 [data-theme="light"] .coin-button{color:var(--muted)}
@@ -38,3 +38,12 @@
 [data-theme="light"] .tier[data-duration="15"]{--tier-color:#7950bf}
 [data-theme="light"] .tier[data-duration] .market-card{border-color:color-mix(in srgb,var(--tier-color) 60%,transparent)}
 [data-theme="light"] .tier[data-duration] .market-card.selected{border-color:var(--green)}
+
+[data-theme="light"] .market-card.settled{background:#b8bfbc;color:#26342d}[data-theme="light"] .market-card.settled:hover{background:#c1c8c4}
+
+[data-theme="light"] .market-card.queued{background:#fff0b3;color:#51451c}[data-theme="light"] .market-card.queued:hover{background:#ffe89a}
+
+[data-theme="light"] .market-card [data-remaining]{color:#805500}
+
+.submit-prediction.pick-direction,
+[data-theme="light"] .submit-prediction.pick-direction{background:#2563eb;color:#fff}
