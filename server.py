@@ -1,5 +1,6 @@
 """Local BTC60 demo server: SQLite accounts, sessions, orders and settlements."""
 from concurrent.futures import ThreadPoolExecutor
+from decimal import Decimal, ROUND_CEILING
 import argparse
 import odds
 import fcntl
@@ -205,7 +206,7 @@ def _settle_due(user_id=None):
         except Exception:
             continue  # Keep pending and retry; never invent a settlement.
         outcome = 'up' if close >= p['strike'] else 'down'
-        payout = p['contracts'] * 100 if outcome == p['side'] else 0
+        payout = (p['cost_cents']*100+p['cents']-1)//p['cents'] if outcome == p['side'] else 0
         with connect() as conn:
             conn.execute('BEGIN IMMEDIATE')
             inserted = conn.execute('INSERT OR IGNORE INTO settlements(prediction_id,close_price,outcome,payout_cents,settled_at) VALUES(?,?,?,?,?)', (p['id'], close, outcome, payout, int(time.time()))).rowcount
@@ -447,8 +448,8 @@ class Handler(SimpleHTTPRequestHandler):
         cents = up if side == 'up' else 100 - up
         if not start <= time.time() < end - 30:
             raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
-        contracts = math.floor(round(budget * 100) / cents)
-        cost = contracts * cents
+        cost = int((Decimal(str(budget))*100).to_integral_value(rounding=ROUND_CEILING))
+        contracts = cost / cents
         with connect() as conn:
             conn.execute('BEGIN IMMEDIATE')
             if conn.execute('SELECT id FROM predictions WHERE user_id=? AND request_id=?', (session['user_id'], request_id)).fetchone():
@@ -456,8 +457,8 @@ class Handler(SimpleHTTPRequestHandler):
             else:
                 if time.time() >= end - 30:
                     raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
-                changed = conn.execute('UPDATE users SET balance_cents=balance_cents-? WHERE id=? AND balance_cents>=?', (cost, session['user_id'], round(budget * 100))).rowcount
-                if not changed or contracts < 1:
+                changed = conn.execute('UPDATE users SET balance_cents=balance_cents-? WHERE id=? AND balance_cents>=?', (cost, session['user_id'], cost)).rowcount
+                if not changed or contracts <= 0:
                     raise ValueError('Insufficient demo balance.')
                 conn.execute('INSERT INTO predictions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', (secrets.token_hex(16), session['user_id'], request_id, coin, market_id, side, start, end, strike, cents, contracts, cost, now))
         return self.reply(201, self.account(session))

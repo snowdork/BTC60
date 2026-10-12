@@ -230,3 +230,114 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .price-clock strong{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.4}
 .price-clock .clock-divider{color:var(--muted);font-size:16px}
 @media(max-width:480px){.price-clock strong{font-size:16px}}
+
+/* A compact instrument header: price, live clocks, and market window. */
+.terminal-overview.overview{padding:16px 18px!important;border-radius:12px}
+.terminal-overview .overview-top{display:grid;grid-template-columns:minmax(130px,1fr) auto auto;gap:20px;align-items:center}
+.terminal-overview .price-heading{display:flex;align-items:center;flex-wrap:wrap;gap:6px 9px}
+.terminal-overview #coin-name{font-size:10px;font-weight:600;letter-spacing:1.2px;color:var(--text)}
+.terminal-overview .price-context{margin:0;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font:8px 'JetBrains Mono',monospace;color:var(--muted);letter-spacing:.5px}
+.terminal-overview .price-row{margin-top:8px}
+.terminal-overview .spot{display:flex;align-items:flex-start;flex-direction:column;gap:5px;font-size:26px;letter-spacing:-1px;line-height:1.15}
+.terminal-overview .spot>#btc-change{margin:0;font:9px 'JetBrains Mono',monospace;letter-spacing:0}
+.terminal-overview .price-clock{display:flex;align-items:center;gap:18px;padding:0 20px;border-left:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap}
+.terminal-overview .clock-face{display:flex;flex-direction:column;gap:9px}
+.terminal-overview .clock-caption{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:9px}
+.terminal-overview .clock-caption .status-dot{width:5px;height:5px}
+.terminal-overview .price-clock strong{font:500 17px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:var(--text);letter-spacing:-.5px;line-height:1.3}
+.terminal-overview .hour-window{display:flex;flex-direction:column;gap:8px;min-width:210px;text-align:left}
+.terminal-overview .window-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.terminal-overview .window-heading .eyebrow{font-size:8px;letter-spacing:.5px}
+.terminal-overview .hour-time-navigation{display:flex;justify-content:space-between;gap:10px;padding:3px;border:1px solid var(--border);border-radius:8px;background:var(--bg)}
+.terminal-overview .hour-time-navigation>#hour-window-label{font:500 13px 'JetBrains Mono',monospace;color:var(--text)}
+.terminal-overview .hour-time-navigation button{width:28px;height:28px;border:0;border-radius:5px;background:var(--raised);color:var(--text)}
+.terminal-overview .hour-time-navigation button:hover:not(:disabled){background:var(--surface);color:var(--cyan)}
+.terminal-overview .hour-time-navigation button:disabled{cursor:default;opacity:.25}
+.terminal-overview .hour-window>#current-hour{align-self:flex-end;width:auto;height:auto;gap:6px;padding:4px 7px;border:0;background:transparent;font-size:9px;color:var(--green)}
+.terminal-overview .hour-window>#current-hour[hidden]{display:none}
+@media(min-width:851px) and (max-width:1250px){
+ .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto;gap:14px 20px}
+ .terminal-overview .price-clock{grid-column:1/-1;grid-row:2;justify-content:space-between;border:0;border-top:1px solid var(--border);padding:12px 0 0}
+ .terminal-overview .clock-face{flex-direction:row;align-items:center;gap:10px}
+}
+@media(max-width:850px){
+ .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto;gap:16px}
+ .terminal-overview .price-clock{grid-column:1/-1;grid-row:2;border:0;border-top:1px solid var(--border);padding:12px 0 0;justify-content:space-between}
+ .terminal-overview .clock-face{flex-direction:row;align-items:center;gap:10px}
+}
+@media(max-width:480px){
+ .terminal-overview.overview{padding:14px!important}
+ .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr);gap:14px}
+ .terminal-overview .hour-window{min-width:0;width:100%;grid-row:2}
+ .terminal-overview .price-clock{grid-row:3;gap:10px}
+ .terminal-overview .clock-face{flex-direction:column;align-items:flex-start;gap:5px}
+ .terminal-overview .price-clock strong{font-size:16px}
+ .terminal-overview .spot{flex-direction:row;align-items:baseline;gap:10px;flex-wrap:wrap}
+}
+
+/* Keep price, timezone-suffixed clocks, and navigation on a single desktop row. */
+.terminal-overview .overview-top{grid-template-columns:minmax(110px,1fr) auto auto;gap:14px}
+.terminal-overview .price-clock{grid-column:auto;grid-row:auto;flex-wrap:nowrap;justify-content:center;gap:12px;border-top:0;border-left:1px solid var(--border);border-right:1px solid var(--border);padding:0 14px}
+.terminal-overview .clock-face{display:block}
+.terminal-overview .price-clock strong{font-size:16px}
+.terminal-overview .hour-window{min-width:200px}
+@media(max-width:1050px) and (min-width:851px){
+ .terminal-overview.overview{padding:12px!important}
+ .terminal-overview .overview-top{gap:10px}
+ .terminal-overview .price-clock{gap:10px;padding:0 10px}
+ .terminal-overview .price-clock strong{font-size:14px}
+ .terminal-overview .hour-window{min-width:180px}
+ .terminal-overview .hour-time-navigation>#hour-window-label{font-size:12px}
+ .terminal-overview .spot{font-size:23px}
+}
+@media(max-width:650px){
+ .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto}
+ .terminal-overview .price-clock{grid-column:1/-1;grid-row:2;border:0;border-top:1px solid var(--border);padding:10px 0 0;justify-content:space-between}
+ .terminal-overview .hour-window{grid-row:1;min-width:180px;width:auto}
+}
+@media(max-width:380px){
+ .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr)}
+ .terminal-overview .hour-window{grid-row:2;width:100%}
+ .terminal-overview .price-clock{grid-row:3}
+}
+
+.terminal-overview .price-clock .clock-divider{font-size:20px;font-weight:800;line-height:1;color:var(--text)}
+
+#review-dialog .review-close{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:44px;height:44px;padding:9px;border:1px solid var(--muted);border-radius:9px;background:var(--raised);color:var(--text)}
+#review-dialog .review-close svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}
+#review-dialog .review-close:hover{background:var(--surface);border-color:var(--text)}
+
+#review-dialog .review-actions{display:flex;align-items:stretch;gap:10px;margin-top:16px}
+#review-dialog .review-cancel{min-height:44px;padding:12px 20px;border:1px solid var(--muted);border-radius:6px;background:var(--raised);color:var(--text);font-weight:600}
+#review-dialog .review-cancel:hover{border-color:var(--text);background:var(--surface)}
+#review-dialog .review-actions .submit-prediction{flex:1;min-width:0;min-height:44px}
+
+/* Center live clocks in the space between price and hour navigation. */
+.terminal-overview .overview-top{grid-template-columns:auto minmax(0,1fr) auto;gap:16px}
+.terminal-overview .price-clock{justify-self:stretch;justify-content:center;gap:12px;padding:0 12px}
+.terminal-overview .hour-window{min-width:244px}
+.terminal-overview .hour-time-navigation{gap:12px;padding:4px;border-radius:10px}
+.terminal-overview .hour-time-navigation button{width:40px;height:40px;flex-shrink:0;border-radius:7px;font-size:20px}
+.terminal-overview .hour-time-navigation svg{width:22px;height:22px;stroke-width:2.25}
+.terminal-overview .hour-time-navigation>#hour-window-label{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.terminal-overview .hour-window>#current-hour{min-height:36px;padding:6px 10px;font-size:12px;border:1px solid var(--border);border-radius:7px;background:var(--raised)}
+.terminal-overview .window-heading .eyebrow{font-size:9px}
+@media(min-width:851px) and (max-width:1150px){
+ .terminal-overview .overview-top{gap:8px}
+ .terminal-overview .price-clock{gap:8px;padding:0 8px}
+ .terminal-overview .hour-window{min-width:220px}
+ .terminal-overview .hour-time-navigation{gap:8px}
+ .terminal-overview .hour-time-navigation button{width:36px;height:40px}
+ .terminal-overview .hour-time-navigation>#hour-window-label{font-size:14px}
+}
+@media(max-width:720px){
+ .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto}
+ .terminal-overview .price-clock{grid-column:1/-1;grid-row:2;justify-content:center;border:0;border-top:1px solid var(--border);padding:12px 0 0}
+ .terminal-overview .hour-window{grid-column:2;grid-row:1;min-width:220px}
+ .terminal-overview .hour-time-navigation>#hour-window-label{font-size:14px}
+}
+@media(max-width:420px){
+ .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr)}
+ .terminal-overview .hour-window{grid-column:1;grid-row:2;min-width:0;width:100%}
+ .terminal-overview .price-clock{grid-row:3}
+}

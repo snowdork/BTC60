@@ -57,7 +57,7 @@ class AccountsTest(unittest.TestCase):
         with patch('server.time.time', return_value=now), patch('server.candle_close', return_value=100), patch('server.fresh_spot',return_value=101), patch('server.market_up',return_value=68):
             status, account, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
             self.assertEqual(status, 201, account)
-            self.assertEqual(account['user']['balance_cents'], 1425000 - 73 * 68)
+            self.assertEqual(account['user']['balance_cents'], 1425000 - 5000)
             self.assertEqual(len(account['predictions']), 1)
             status, replay, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
             self.assertEqual(replay['user']['balance_cents'], account['user']['balance_cents'])
@@ -73,7 +73,7 @@ class AccountsTest(unittest.TestCase):
             server.settle_due()
             server.settle_due()
         _, settled, _ = self.request('GET', '/api/account', cookie=cookie)
-        self.assertEqual(settled['user']['balance_cents'], 1425000 - 73 * 68 + 7300)
+        self.assertEqual(settled['user']['balance_cents'], 1425000 - 5000 + 7353)
         self.assertEqual(settled['predictions'][0]['outcome'], 'up')
         status, _, other_cookie = self.request('POST', '/api/signup', {'name': 'Other', 'email': 'other@example.com', 'password': 'strong-password-456'})
         self.assertEqual(status, 200)
@@ -96,7 +96,8 @@ class AccountsTest(unittest.TestCase):
                 saved = conn.execute('SELECT * FROM predictions WHERE request_id=?', (order['requestId'],)).fetchone()
                 self.assertEqual(saved['strike'], 100)
                 self.assertEqual(saved['cents'], 70)
-                self.assertEqual(saved['contracts'], 71)
+                self.assertAlmostEqual(saved['contracts'], 5000/70)
+                self.assertEqual(saved['cost_cents'], 5000)
             balance = account['user']['balance_cents']
         with patch('server.time.time', return_value=start + 3570):
             order['requestId'] = 'live-request-00000002'
@@ -157,7 +158,7 @@ class AccountsTest(unittest.TestCase):
         _, settled, _ = self.request('GET','/api/account',cookie=cookie)
         up=next(p for p in settled['predictions'] if p['side']=='up')
         down=next(p for p in settled['predictions'] if p['side']=='down')
-        self.assertEqual(up['payout_cents'],up['contracts']*100)
+        self.assertEqual(up['payout_cents'],(up['cost_cents']*100+up['cents']-1)//up['cents'])
         self.assertEqual(down['payout_cents'],0)
         self.assertIsNotNone(down['settled_at'])
         self.assertEqual(settled['user']['balance_cents'],1425000-cost+up['payout_cents'])

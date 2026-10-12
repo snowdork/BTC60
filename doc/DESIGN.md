@@ -47,11 +47,11 @@ Without a validated artifact for a coin, the normal-CDF model remains explicitly
 
 ## Review and execution
 
-Users select a side and a budget of at least $1 within their available demo balance. Whole contracts keep exact committed cost within that budget; fees are zero. A winning contract returns $1 and a losing contract returns $0. Potential profit is winning return minus cost.
+Users select a side and a budget of at least $1 within their available demo balance. Fractional shares use the full budget; fees are zero. Stakes with sub-cent precision round up to the next cent. Winning payouts use integer arithmetic to round up to the next cent: `(cost_cents * 100 + price_cents - 1) // price_cents`. A winning contract returns $1 and a losing contract returns $0. Potential profit is winning return minus cost.
 
 Review remains live as spot, benchmark, and model prices change. It shows contract price, count, cost, potential return, profit, and interval countdown. Confirmation authorizes execution at the server's current model price within the selected budget. The server does not enforce the browser quote or benchmark, and there is no 2¢ tolerance. Final quantity and return can differ from review. Expired intervals, unavailable authoritative data, and insufficient balance prevent saving.
 
-The server validates coin availability, side, request ID, budget, and current UTC start. It computes the authoritative opening benchmark, spot, model price, whole-contract count, and cost. A transaction atomically debits funds and inserts the prediction. Per-account unique request IDs make retries idempotent. Saved terms remain fixed after execution.
+The server validates coin availability, side, request ID, budget, and current UTC start. It computes the authoritative opening benchmark, spot, model price, fractional share count, and cost. A transaction atomically debits funds and inserts the prediction. Per-account unique request IDs make retries idempotent. Saved terms remain fixed after execution.
 
 ## Settlement and portfolio
 

@@ -9,6 +9,7 @@
   const price=value=>window.RolrCoins.formatPrice(value,window.RolrModel.coin.symbol);
   const currency=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
   const money=value=>currency.format(value);
+  const shares=value=>new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(value);
   const account=window.BTC60Account;
   let positions=[];
   const predictionIndex=new Map();
@@ -101,7 +102,7 @@
     const signature=`${q.cents}:${q.contracts}`;
     if(signature===reviewSummarySignature)return;
     reviewSummarySignature=signature;
-    $('review-summary').innerHTML=`<div><span>${q.contracts} contracts at ${q.cents}¢</span><strong>${money(q.cost)}</strong></div><div><span>Return if correct</span><strong>${money(q.payout)}</strong></div><div class="profit-row"><span>Potential profit</span><strong>+${money(q.profit)}</strong></div>`;
+    $('review-summary').innerHTML=`<div><span>${shares(q.contracts)} shares at ${q.cents}¢</span><strong>${money(q.cost)}</strong></div><div><span>Return if correct</span><strong>${money(q.payout)}</strong></div><div class="profit-row"><span>Potential profit</span><strong>+${money(q.profit)}</strong></div>`;
   }
   function renderReviewChance(){
     if(!review)return;
@@ -205,7 +206,7 @@
     $('up-price').textContent=open&&chance?`${chance.up}¢`:'—';
     $('down-price').textContent=open&&chance?`${chance.down}¢`:'—';
     $('contract-price').textContent=q?`at ${q.cents}¢ each`:'';
-    $('contracts').textContent=q?String(q.contracts):'—';$('cost').textContent=q?money(q.cost):'—';$('return').textContent=q?money(q.payout):'—';$('profit').textContent=q?'+'+money(q.profit):'—';
+    $('contracts').textContent=q?shares(q.contracts):'—';$('cost').textContent=q?money(q.cost):'—';$('return').textContent=q?money(q.payout):'—';$('profit').textContent=q?'+'+money(q.profit):'—';
     if(open)$('ticket-note').textContent=q?'Bets close 30s before interval end · No real money':(side===null?'Choose Up or Down to review your prediction.':'Enter a budget of at least $1 within your demo balance.');
     return q;
   }
@@ -281,7 +282,7 @@
       const detail=document.createElement('div'),title=document.createElement('strong'),time=document.createElement('small');
       title.textContent=`${p.side==='up'?'↗ Up':'↘ Down'} · ${p.coin} · ${p.minutes} min`;title.style.color=p.side==='up'?'var(--green)':'var(--red)';
       time.id=`pending-time-${p.id}`;detail.append(title,time);
-      const values=document.createElement('div'),cost=document.createElement('strong'),contracts=document.createElement('small');cost.textContent=money(p.cost);contracts.textContent=`${p.contracts} contracts · ${money(p.contracts)} if correct`;values.append(cost,contracts);row.append(detail,values);return row;
+      const values=document.createElement('div'),cost=document.createElement('strong'),contracts=document.createElement('small');cost.textContent=money(p.cost);contracts.textContent=`${shares(p.contracts)} shares · ${money(Math.ceil(p.cost_cents*100/p.cents)/100)} if correct`;values.append(cost,contracts);row.append(detail,values);return row;
     }));
     renderPendingTimes();
   }
@@ -305,7 +306,7 @@
     $('review-arrow').textContent=arrow;
     $('review-side').textContent=`Predict ${direction}`;
     $('confirm-prediction').classList.toggle('bear',down);
-    $('confirm-prediction').textContent=`${arrow} Place ${direction} demo prediction`;
+    $('confirm-prediction').textContent=down?'Predict DOWN Now':'Predict UP Now';
     $('review-title').textContent=`${side==='up'?'Up':'Down'} · ${window.RolrModel.coin.name} ${market.minutes} min`;
     $('review-detail').textContent=`${market.start} – ${market.end} UTC · Benchmark ${price(market.strike)}`;
     renderReviewSummary(q);

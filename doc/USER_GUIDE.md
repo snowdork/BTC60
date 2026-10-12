@@ -22,12 +22,12 @@ The prediction pane shows the selected interval within its UTC hour, current spo
 
 1. Sign in, select an open interval, and check that the status strip says data is ready.
 2. Choose Up or Down and enter a budget of at least $1 within your available balance.
-3. Review the contract price, whole-contract count, exact cost, possible return, and potential profit.
+3. Review the contract price, fractional share count, exact cost, possible return, and potential profit.
 4. Confirm before the betting countdown expires. Bets close 30 seconds before the interval ends to allow final processing.
 
 Review updates live. Confirmation buys at the server's current model price within your budget, so the final contract count, cost, and possible return can differ from the displayed review. Check the saved prediction for executed terms. A prediction is saved only when the server accepts it; errors appear in the review.
 
-Only the exact contract cost is deducted. For example, a $10 budget at 70¢ buys 14 contracts for $9.80. A win returns $14, for $4.20 profit; a loss returns $0 and loses $9.80. There are no demo fees.
+The full bet amount is deducted. For example, $10 at 70¢ buys about 14.285714 shares. A win returns $14.29, for $4.29 profit; a loss returns $0 and loses $10. Winning payouts round up to the next cent. There are no demo fees.
 
 ## Results and portfolio
 

@@ -12,9 +12,10 @@
   function quote(market,side,budget,balance) {
     const cents = side === 'up' ? market.up : 100-market.up;
     if (market.status !== 'open' || !Number.isFinite(market.strike) || !['up','down'].includes(side) || !Number.isFinite(budget) || !Number.isFinite(balance) || budget<1 || budget>balance || !Number.isInteger(cents) || cents<=0 || cents>=100) return null;
-    const contracts=Math.floor((Math.round(budget*100)+1e-7)/cents);
-    const costCents=contracts*cents;
-    return {cents,contracts,cost:costCents/100,payout:contracts,profit:(contracts*100-costCents)/100};
+    const costCents=Math.ceil(budget*100-1e-7);
+    if(costCents>Math.round(balance*100))return null;
+    const contracts=costCents/cents,payoutCents=Math.ceil(costCents*100/cents);
+    return {cents,contracts,cost:costCents/100,payout:payoutCents/100,profit:(payoutCents-costCents)/100};
   }
   // Fast/slow EWMA variance over the trailing 24 hours, with zero log drift.
   function minuteVolatility(candles,now) {
