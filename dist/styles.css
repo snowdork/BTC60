@@ -224,3 +224,9 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .chart-coin-icon img{width:32px;height:32px;object-fit:contain}
 @media(max-height:820px){.chart-coin-icon{top:30px}}
 @media(max-width:850px){.chart-coin-icon{top:35px}}
+
+/* Live wall-clock times remain readable alongside the spot price. */
+.price-clock{flex-wrap:wrap;gap:7px 10px}
+.price-clock strong{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.4}
+.price-clock .clock-divider{color:var(--muted);font-size:16px}
+@media(max-width:480px){.price-clock strong{font-size:16px}}

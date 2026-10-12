@@ -7,6 +7,8 @@
   const hourOf=t=>Math.floor(t/3600000)*3600000;
   const time=t=>new Date(t).toISOString().slice(11,16);
   const clock=t=>new Date(t).toISOString().slice(11,19);
+  const localClock=new Intl.DateTimeFormat(undefined,{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',timeZoneName:'short'});
+  const localTimezone=localClock.resolvedOptions().timeZone;
   const remaining=ms=>`${Math.max(0,Math.floor(ms/60000))}m ${String(Math.max(0,Math.floor(ms/1000)%60)).padStart(2,'0')}s`;
   let historical=false,historyFailed=false;
   let mode='live',paused=false,socket=null,retryTimer=null,fetchController=null,historyVersion=0;
@@ -63,22 +65,47 @@
   async function loadHistory() {
     if(mode!=='live'||stopped)return;
     if(fetchController)fetchController.abort();
-    historyFailed=false;model.historyStatus='loading';
+    historyFailed=false;model.historyStatus='loading';model.pricingHistoryStatus='loading';
     const controller=new AbortController();fetchController=controller;
     const version=++historyVersion,requestedHour=hour,requestedCoin=coin.symbol;
-    const timeout=setTimeout(()=>controller.abort(),10000);
+    const timeout=setTimeout(()=>controller.abort(),60000);
     try {
       const params=new URLSearchParams({granularity:'60',start:new Date(hour-60000).toISOString(),end:new Date(Math.min(Date.now(),hour+3600000)).toISOString()});
       const response=await fetch(`https://api.exchange.coinbase.com/products/${coin.product}/candles?${params}`,{signal:controller.signal});
       if(!response.ok)throw new Error('History unavailable');
-      const data=await response.json();
-      if(mode!=='live'||version!==historyVersion||requestedHour!==hour||requestedCoin!==coin.symbol)return;
-      if(!Array.isArray(data))throw new Error('Invalid history');
-      candles=data.filter(c=>Array.isArray(c)&&c.length>=5&&c.slice(0,5).every(Number.isFinite)&&c[4]>0&&c[0]*1000>=hour-60000&&c[0]*1000<Math.min(Date.now(),hour+3600000)).sort((a,b)=>a[0]-b[0]);
-      const history=candles.filter(c=>c[0]*1000>=hour&&c[0]*1000+60000<=Math.min(Date.now(),hour+3600000)).map(c=>({t:c[0]*1000+60000,price:c[4]}));
-      // Keep streaming points received while history was loading.
-      const cutoff=history.at(-1)?.t??hour;
-      points=[...history,...points.filter(p=>p.t>cutoff)];lastHistoryAt=Date.now();model.historyStatus='ready';model.historyUpdatedAt=lastHistoryAt;
+      const chartData=await response.json();
+      const isCurrentRequest=()=>mode==='live'&&version===historyVersion&&requestedHour===hour&&requestedCoin===coin.symbol;
+      if(!isCurrentRequest())return;
+      if(!Array.isArray(chartData))throw new Error('Invalid chart history');
+      function applyHistory(data){
+        const displayEnd=Math.min(Date.now(),hour+3600000);
+        candles=[...new Map(data.filter(c=>Array.isArray(c)&&c.length>=5&&c.slice(0,5).every(Number.isFinite)&&c[4]>0&&c[0]*1000>=displayEnd-86400000&&c[0]*1000<displayEnd).map(c=>[c[0],c])).values()].sort((a,b)=>a[0]-b[0]);
+        const history=candles.filter(c=>c[0]*1000>=hour&&c[0]*1000+60000<=displayEnd).map(c=>({t:c[0]*1000+60000,price:c[4]}));
+        // The preceding minute's close is the known price at the hour's start.
+        const opening=candles.find(c=>c[0]*1000===hour-60000);
+        if(opening)history.unshift({t:hour,price:opening[4]});
+        const cutoff=history.at(-1)?.t??hour;
+        points=[...history,...points.filter(p=>p.t>cutoff)];
+        lastHistoryAt=Date.now();model.historyStatus='ready';model.historyUpdatedAt=lastHistoryAt;
+        syncMarkets(Date.now(),true);draw(Date.now());
+      }
+      // Render chart history immediately; the longer pricing backfill is independent.
+      applyHistory(chartData);
+      if(!historical){
+        try{
+          const pricingResponse=await fetch(`/api/pricing-history?coin=${encodeURIComponent(coin.symbol)}`,{signal:controller.signal});
+          if(!pricingResponse.ok)throw new Error('Pricing history unavailable');
+          const pricingData=(await pricingResponse.json()).candles;
+          if(!Array.isArray(pricingData))throw new Error('Invalid pricing history');
+          if(!isCurrentRequest())return;
+          applyHistory([...pricingData,...chartData]);
+          model.pricingHistoryStatus='ready';
+        }catch(error){
+          if(!isCurrentRequest())return;
+          model.pricingHistoryStatus='error';broadcast('btc-chances-update');
+          $('chart-source').textContent='Chart history loaded · pricing history unavailable';
+        }
+      }
       if(historical){lastPrice=candles.find(c=>c[0]*1000===hour+3600000-60000)?.[4]??null;model.spot=lastPrice??NaN;status('HISTORICAL','neutral');$('chart-source').textContent='Coinbase history · demo settlements';}
       syncMarkets(Date.now(),true);draw(Date.now());
     } catch(error) {
@@ -141,7 +168,10 @@
     // Pixel geometry keeps one vertical line aligned on every duration row.
     stack.style.setProperty('--cursor-x',`${bounds.left-stackBounds.left+fraction*bounds.width}px`);
     $('time-cursor-label').textContent=clock(now);
-    $('workspace-clock').textContent=`${clock(now)} UTC`;
+    const wallTime=Date.now();
+    $('workspace-clock').textContent=`${clock(wallTime)} UTC`;
+    $('workspace-local-clock').textContent=localClock.format(wallTime);
+    $('workspace-local-clock').title=`Local time · ${localTimezone}`;
     $('hour-window-label').textContent=`${time(hour)} — ${time(hour+3600000)}`;
     if($('chart-times').dataset.hour!==String(hour)){$('chart-times').dataset.hour=String(hour);$('chart-times').replaceChildren(...[0,15,30,45,60].map(minute=>{const span=document.createElement('span');span.textContent=time(hour+minute*60000);return span;}));}
     const valid=points.filter(p=>p.t>=hour&&p.t<=displayTime);

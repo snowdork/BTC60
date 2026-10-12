@@ -16,9 +16,9 @@ test('chance model is centered on the benchmark and complements to 100',()=>{con
 test('less time or lower volatility makes a price displacement more decisive',()=>{const m={status:'open',strike:100,endsAt:3600000};const long=estimateChances(m,100.1,0,.001);assert(estimateChances(m,100.1,3000000,.001).up>long.up);assert(estimateChances(m,100.1,0,.0002).up>long.up);});
 test('chance model is independent of coin price units',()=>{const a=estimateChances({status:'open',strike:100,endsAt:900000},100.1,0,.001);const b=estimateChances({status:'open',strike:.1,endsAt:900000},.1001,0,.001);assert.equal(a.up,b.up);});
 test('queued baseline and completed outcomes are distinguished from estimates',()=>{assert.deepEqual(estimateChances({status:'queued'},NaN,0),{up:50,down:50,label:'BASELINE'});assert.deepEqual(estimateChances({status:'settled',strike:100,close:100},NaN,0),{up:100,down:0,label:'RESULT'});assert.deepEqual(estimateChances({status:'settled',strike:100,close:99},NaN,0),{up:0,down:100,label:'RESULT'});assert.equal(estimateChances({status:'open',strike:100,endsAt:100},NaN,0),null);assert.equal(estimateChances({status:'open',strike:100,endsAt:100},100,100),null);});
-test('volatility uses only completed consecutive minute candles',()=>{const candles=[[0,0,0,0,100],[60,0,0,0,101],[120,0,0,0,1000]];const sigma=minuteVolatility(candles,120000);assert(Math.abs(sigma-Math.log(1.01))<1e-10);assert.equal(minuteVolatility([],120000),.0001);assert.equal(minuteVolatility([[0,0,0,0,100],[120,0,0,0,1000]],180000),.0001);});
+test('volatility uses only completed consecutive minute candles',()=>{const candles=[[0,0,0,0,100],[60,0,0,0,101],[120,0,0,0,1000]];const sigma=minuteVolatility(candles,120000);assert(Math.abs(sigma-Math.log(1.01))<1e-10);assert(Number.isNaN(minuteVolatility([],120000)));assert(Number.isNaN(minuteVolatility([[0,0,0,0,100],[120,0,0,0,1000]],180000)));});
 
-test('each interval opens at 50/50 then follows price movement',()=>{for(const minutes of [15,30,60]){const m={status:'open',strike:100,startsAt:60000,endsAt:60000+minutes*60000};for(const now of [60000,60250,60999])assert.deepEqual(estimateChances(m,101,now,.001),{up:50,down:50,label:'BASELINE'});assert(estimateChances(m,101,61000,.001).up>50);assert(estimateChances(m,99,61000,.001).down>50);}});
+test('opening probability responds immediately to price movement',()=>{for(const minutes of [15,30,60]){const m={status:'open',strike:100,startsAt:60000,endsAt:60000+minutes*60000};assert(estimateChances(m,101,60000,.001).up>50);assert.equal(estimateChances(m,100,60000,.001).up,50);}});
 
 const {dataStatus,configure}=require('./market-model.js');
 test('prediction gate requires fresh connected data, benchmark and server quote',()=>{
@@ -46,4 +46,10 @@ test('betting closes exactly 30 seconds before every interval ends',()=>{
   assert.equal(dataStatus(model,market,now+1).ready,false);
   assert.match(dataStatus(model,market,now+1).reason,/Betting closed/);
  }
+});
+
+test('pricing backfill failures are distinct from benchmark failures',()=>{
+ const now=100000,market={status:'open',strike:100,up:62,endsAt:200000},model={feedMode:'live',feedConnection:'connected',spot:101,priceUpdatedAt:now,historyStatus:'ready',quoteReady:true};
+ assert.equal(dataStatus({...model,pricingHistoryStatus:'error'},market,now).reason,'Odds history unavailable · reconnect');
+ assert.equal(dataStatus({...model,pricingHistoryStatus:'loading'},market,now).ready,false);
 });

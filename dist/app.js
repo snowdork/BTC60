@@ -77,7 +77,7 @@
 
     $('price-health').textContent=model.feedMode==='demo'?'Synthetic preview':model.isHistorical?'Historical view':state.age===null?'Spot: no live update':`Spot updated ${state.age}s ago`;
     $('history-health').textContent=model.feedMode==='demo'?'Synthetic benchmarks':model.historyStatus==='ready'?'History loaded':model.historyStatus==='error'?'History unavailable':'Loading history';
-    $('execution-health').textContent=state.ready?'Data ready · Demo orders':state.reason;
+    $('execution-health').textContent=state.ready?`Data ready · ${model.calibrations?.[model.coin.symbol]?'Calibrated':'Uncalibrated'} model`:state.reason;
     $('execution-health').style.color=state.ready?'var(--green)':'var(--amber)';
     $('submit-prediction').disabled=!state.ready||(side!==null&&!q)||!account.ready;
     $('submit-prediction').textContent=!state.ready?state.reason:side===null?'Pick Up or Down':!account.user?'Log in to predict →':`Review ${side==='up'?'Up':'Down'} prediction →`;
@@ -143,7 +143,7 @@
       }
       setText(marketElements.get(m.id).up,`↗ Up ${chance?chance.up+'%':'—'}`);
       setText(marketElements.get(m.id).down,`↘ Down ${chance?chance.down+'%':'—'}`);
-      element.title=chance?.label==='ESTIMATE'?'Heuristic estimate centered on the price to beat, scaled by recent minute volatility and time remaining. Not calibrated odds; demo contract prices follow these percentages.':chance?.label==='BASELINE'?'Neutral 50/50 starting baseline. Percentages update with price movement after the opening second.':chance?.label==='RESULT'?'Completed demo result, not a forecast.':'Waiting for a fresh price and valid benchmark.';
+      element.title=chance?.label==='ESTIMATE'?'Model probability based on adaptive 24-hour volatility and time to settlement. Historical calibration applies when validated for this coin; demo contract prices follow these percentages.':chance?.label==='BASELINE'?'Neutral baseline for an upcoming interval.':chance?.label==='RESULT'?'Completed demo result, not a forecast.':'Waiting for a fresh price and valid benchmark.';
     });
   }
   function renderSegmentPredictions(){

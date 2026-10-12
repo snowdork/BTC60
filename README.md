@@ -88,3 +88,14 @@ Custom coins need a supported Coinbase USD product, display precision, positive 
 `dist/` contains static copies, not a standalone account backend. After frontend changes, synchronize all root HTML, CSS, and browser JavaScript files plus `assets/` into `dist/`; exclude tests and backend scripts. Include portfolio, theme, and responsive assets. The welcome preview is `assets/previews/prediction-playfield.png`. `.openai/hosting.json` identifies the existing private Site.
 
 The Python server binds to loopback for local development. Public account hosting requires a production server, HTTPS, Secure session cookies, and account recovery/email verification. Static hosting cannot replace the Python/SQLite API.
+
+Odds use adaptive trailing 24-hour volatility and a normal-CDF probability model. To fit and validate historical calibration, run `python3 scripts/calibrate-odds.py BTC candles.json`; see [model details](doc/DESIGN.md#estimates-and-demo-pricing). Without a validated artifact, probabilities are labeled uncalibrated.
+
+Historical calibration can be prepared with resumable downloads:
+
+```bash
+python3 scripts/download-odds-history.py BTC-USD data/btc-candles.json --days 30
+python3 scripts/calibrate-odds.py BTC data/btc-candles.json
+```
+
+Both commands report progress. Rerun the download command after interruption to resume saved batches. Coinbase must be reachable from the machine running it. Calibration activates only if held-out Brier score and log loss both improve; otherwise the existing model is preserved. Repeat using each coin's product and symbol. Reload the terminal after a successful calibration export.

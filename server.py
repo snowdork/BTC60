@@ -1,5 +1,7 @@
 """Local BTC60 demo server: SQLite accounts, sessions, orders and settlements."""
+from concurrent.futures import ThreadPoolExecutor
 import argparse
+import odds
 import fcntl
 import hashlib
 import gzip
@@ -137,28 +139,55 @@ def fresh_spot(coin):
         raise ValueError('Live price unavailable. Reconnect before predicting.')
 
 
-def estimated_up(strike, spot, now, start, end, volatility):
-    if now-start<1:
-        return 50
-    uncertainty=max(.0001, volatility)*math.sqrt(max(1/60, (end-now)/60))
-    z=math.log(spot/strike)/uncertainty
-    probability=100/(1+math.exp(max(-700,min(700,-1.7*z))))
-    return max(1,min(99,math.floor(probability+.5)))
+def estimated_up(strike, spot, now, start, end, volatility, calibration=None):
+    return max(1, min(99, math.floor(100*odds.probability(strike, spot, now, end, volatility, calibration)+.5)))
+
+
+HISTORY_CACHE = {}
+HISTORY_LOCK = threading.Lock()
+
+
+def pricing_history(product, now):
+    # Six requests stay below Coinbase's 300-candle limit per request.
+    boundary = int(now)//60*60
+    key = (product, boundary)
+    with HISTORY_LOCK:
+        cached = HISTORY_CACHE.get(key)
+    if cached is not None:
+        return cached
+    with HISTORY_LOCK:
+        previous = max((k for k in HISTORY_CACHE if k[0]==product and 0<boundary-k[1]<=300), default=None, key=lambda k:k[1])
+        previous_candles = list(HISTORY_CACHE[previous]) if previous else []
+    candles = {c[0]:c for c in previous_candles if boundary-86400<=c[0]<boundary}
+    ranges = [(previous[1]-60,boundary)] if previous else [(boundary-(i+1)*14400,boundary-i*14400) for i in range(6)]
+
+    def fetch_batch(interval):
+        start,end=interval
+        query=urllib.parse.urlencode({'granularity':60,'start':datetime.fromtimestamp(start,timezone.utc).isoformat(),'end':datetime.fromtimestamp(end,timezone.utc).isoformat()})
+        request=urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/candles?'+query,headers={'User-Agent':'BTC60-local-demo/1.0'})
+        with urllib.request.urlopen(request,timeout=8) as response:
+            batch=json.load(response)
+        if not isinstance(batch,list):raise ValueError('Invalid pricing history.')
+        return [c for c in batch if isinstance(c,list) and len(c)>=5 and all(isinstance(c[i],(int,float)) and math.isfinite(c[i]) for i in (0,4)) and c[4]>0 and start<=c[0]<end]
+
+    # A cold load takes two bounded waves; subsequent minutes fetch only the delta.
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        for batch in pool.map(fetch_batch,ranges):
+            candles.update({c[0]:c for c in batch})
+    result=sorted(candles.values())
+    with HISTORY_LOCK:
+        for old in list(HISTORY_CACHE):
+            if boundary-old[1]>600:del HISTORY_CACHE[old]
+        HISTORY_CACHE[key]=result
+    return result
 
 
 def market_up(coin, strike, spot, now, start, end):
     with connect() as conn:
         product=conn.execute('SELECT product FROM coins WHERE symbol=?',(coin,)).fetchone()['product']
-    hour=now//3600*3600
-    query=urllib.parse.urlencode({'granularity':60,'start':datetime.fromtimestamp(hour-60,timezone.utc).isoformat(),'end':datetime.fromtimestamp(now,timezone.utc).isoformat()})
-    request=urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/candles?'+query,headers={'User-Agent':'BTC60-local-demo/1.0'})
     try:
-        with urllib.request.urlopen(request,timeout=8) as response:
-            candles=json.load(response)
-        closed=sorted((c for c in candles if hour-60<=c[0] and c[0]+60<=now and math.isfinite(float(c[4])) and c[4]>0),key=lambda c:c[0])
-        returns=[math.log(b[4]/a[4]) for a,b in zip(closed,closed[1:]) if b[0]-a[0]==60]
-        volatility=max(.0001,math.sqrt(sum(r*r for r in returns)/len(returns))) if returns else .0001
-        return estimated_up(strike,spot,now,start,end,volatility)
+        volatility = odds.minute_volatility(pricing_history(product, now), now)
+        return estimated_up(strike, spot, now, start, end, volatility, odds.calibrations().get(coin))
     except Exception:
         raise ValueError('Pricing history unavailable. Review again shortly.')
 
@@ -244,7 +273,18 @@ class Handler(SimpleHTTPRequestHandler):
         if path == '/api/coins':
             with connect() as conn:
                 records = [dict(row) for row in conn.execute('SELECT symbol,name,product,precision,demo_base AS demoBase,icon,enabled,sort_order AS sortOrder FROM coins ORDER BY sort_order,symbol')]
-            return self.reply(200, {'coins': records, 'marketConfig': {'quotes': QUOTES, 'settlement': {'source':'Coinbase Exchange', 'method':'Minute candle close immediately before interval boundaries', 'version':'coinbase-minute-close-v1', 'tie':'up'}}})
+            return self.reply(200, {'coins': records, 'marketConfig': {'quotes': QUOTES, 'oddsVersion': odds.VERSION, 'calibrations': odds.calibrations(), 'settlement': {'source':'Coinbase Exchange', 'method':'Minute candle close immediately before interval boundaries', 'version':'coinbase-minute-close-v1', 'tie':'up'}}})
+        if path == '/api/pricing-history':
+            query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            coin = query.get('coin', [''])[0]
+            with connect() as conn:
+                row = conn.execute('SELECT product FROM coins WHERE symbol=? AND enabled=1', (coin,)).fetchone()
+            if row is None:
+                return self.reply(400, {'error':'Unknown coin.'})
+            try:
+                return self.reply(200, {'candles':pricing_history(row['product'], time.time())})
+            except Exception:
+                return self.reply(503, {'error':'Pricing history unavailable.'})
         if path == '/api/account':
             session = self.session()
             if not session:
