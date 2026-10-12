@@ -1,7 +1,9 @@
 (() => {
   const account=window.BTC60Account,model=window.BTC60Portfolio,$=id=>document.getElementById(id);
   let filter='all',coins=[],lastRender='';
-  const money=cents=>(cents/100).toLocaleString('en-US',{style:'currency',currency:'USD'});
+  const currency=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
+  const shareFormatter=new Intl.NumberFormat('en-US',{maximumFractionDigits:2});
+  const money=cents=>currency.format(cents/100);
   const signed=cents=>(cents>=0?'+':'−')+money(Math.abs(cents));
   const date=seconds=>new Date(seconds*1000).toISOString().slice(0,10);
   const time=seconds=>new Date(seconds*1000).toISOString().slice(11,16);
@@ -24,7 +26,7 @@
     $('history-rows').replaceChildren(...predictions.map(p=>{
       const row=document.createElement('tr'),state=model.result(p),settled=p.settled_at!=null;
       const add=(text,small)=>{const cell=document.createElement('td');cell.textContent=text;if(small){const label=document.createElement('small');label.textContent=small;cell.append(label);}row.append(cell);return cell;};
-      const coin=coins.find(c=>c.symbol===p.coin),cell=add(`${p.coin} · ${p.market_id.split('-')[0]} MIN`,`${new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(p.contracts)} shares at ${p.cents}¢`);
+      const coin=coins.find(c=>c.symbol===p.coin),cell=add(`${p.coin} · ${p.market_id.split('-')[0]} MIN`,`${shareFormatter.format(p.contracts)} shares at ${p.cents}¢`);
       if(coin?.icon){const image=document.createElement('img');image.src=coin.icon;image.alt='';image.width=24;image.height=24;image.style.marginRight='7px';image.style.verticalAlign='middle';image.onerror=()=>image.remove();cell.prepend(image);}
       add(p.side==='up'?'↗ Up':'↘ Down').style.color=p.side==='up'?'var(--green)':'#ff6a84';
       add(`${time(p.starts_at)}–${time(p.ends_at)}`,date(p.starts_at));

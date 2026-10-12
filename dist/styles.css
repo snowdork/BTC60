@@ -240,60 +240,54 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .terminal-overview .price-row{margin-top:8px}
 .terminal-overview .spot{display:flex;align-items:flex-start;flex-direction:column;gap:5px;font-size:26px;letter-spacing:-1px;line-height:1.15}
 .terminal-overview .spot>#btc-change{margin:0;font:9px 'JetBrains Mono',monospace;letter-spacing:0}
-.terminal-overview .price-clock{display:flex;align-items:center;gap:18px;padding:0 20px;border-left:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap}
-.terminal-overview .clock-face{display:flex;flex-direction:column;gap:9px}
+.terminal-overview .price-clock{display:flex;align-items:center;white-space:nowrap}
+.terminal-overview .clock-face{flex-direction:column;gap:9px}
 .terminal-overview .clock-caption{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:9px}
 .terminal-overview .clock-caption .status-dot{width:5px;height:5px}
 .terminal-overview .price-clock strong{font:500 17px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:var(--text);letter-spacing:-.5px;line-height:1.3}
-.terminal-overview .hour-window{display:flex;flex-direction:column;gap:8px;min-width:210px;text-align:left}
+.terminal-overview .hour-window{display:flex;flex-direction:column;gap:8px;text-align:left}
 .terminal-overview .window-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}
-.terminal-overview .window-heading .eyebrow{font-size:8px;letter-spacing:.5px}
-.terminal-overview .hour-time-navigation{display:flex;justify-content:space-between;gap:10px;padding:3px;border:1px solid var(--border);border-radius:8px;background:var(--bg)}
+.terminal-overview .window-heading .eyebrow{letter-spacing:.5px}
+.terminal-overview .hour-time-navigation{display:flex;justify-content:space-between;border:1px solid var(--border);background:var(--bg)}
 .terminal-overview .hour-time-navigation>#hour-window-label{font:500 13px 'JetBrains Mono',monospace;color:var(--text)}
-.terminal-overview .hour-time-navigation button{width:28px;height:28px;border:0;border-radius:5px;background:var(--raised);color:var(--text)}
+.terminal-overview .hour-time-navigation button{border:0;background:var(--raised);color:var(--text)}
 .terminal-overview .hour-time-navigation button:hover:not(:disabled){background:var(--surface);color:var(--cyan)}
 .terminal-overview .hour-time-navigation button:disabled{cursor:default;opacity:.25}
-.terminal-overview .hour-window>#current-hour{align-self:flex-end;width:auto;height:auto;gap:6px;padding:4px 7px;border:0;background:transparent;font-size:9px;color:var(--green)}
+.terminal-overview .hour-window>#current-hour{align-self:flex-end;width:auto;height:auto;gap:6px;color:var(--green)}
 .terminal-overview .hour-window>#current-hour[hidden]{display:none}
 @media(min-width:851px) and (max-width:1250px){
  .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto;gap:14px 20px}
- .terminal-overview .price-clock{grid-column:1/-1;grid-row:2;justify-content:space-between;border:0;border-top:1px solid var(--border);padding:12px 0 0}
+ .terminal-overview .price-clock{border:0}
  .terminal-overview .clock-face{flex-direction:row;align-items:center;gap:10px}
 }
 @media(max-width:850px){
  .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto;gap:16px}
- .terminal-overview .price-clock{grid-column:1/-1;grid-row:2;border:0;border-top:1px solid var(--border);padding:12px 0 0;justify-content:space-between}
+ .terminal-overview .price-clock{border:0}
  .terminal-overview .clock-face{flex-direction:row;align-items:center;gap:10px}
 }
 @media(max-width:480px){
  .terminal-overview.overview{padding:14px!important}
  .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr);gap:14px}
- .terminal-overview .hour-window{min-width:0;width:100%;grid-row:2}
- .terminal-overview .price-clock{grid-row:3;gap:10px}
+ .terminal-overview .hour-window{width:100%;grid-row:2}
  .terminal-overview .clock-face{flex-direction:column;align-items:flex-start;gap:5px}
- .terminal-overview .price-clock strong{font-size:16px}
  .terminal-overview .spot{flex-direction:row;align-items:baseline;gap:10px;flex-wrap:wrap}
 }
 
 /* Keep price, timezone-suffixed clocks, and navigation on a single desktop row. */
 .terminal-overview .overview-top{grid-template-columns:minmax(110px,1fr) auto auto;gap:14px}
-.terminal-overview .price-clock{grid-column:auto;grid-row:auto;flex-wrap:nowrap;justify-content:center;gap:12px;border-top:0;border-left:1px solid var(--border);border-right:1px solid var(--border);padding:0 14px}
+.terminal-overview .price-clock{grid-column:auto;grid-row:auto;flex-wrap:nowrap;border-top:0;border-left:1px solid var(--border);border-right:1px solid var(--border)}
 .terminal-overview .clock-face{display:block}
-.terminal-overview .price-clock strong{font-size:16px}
-.terminal-overview .hour-window{min-width:200px}
+.terminal-overview .price-clock strong{font-size:17px}
 @media(max-width:1050px) and (min-width:851px){
  .terminal-overview.overview{padding:12px!important}
  .terminal-overview .overview-top{gap:10px}
- .terminal-overview .price-clock{gap:10px;padding:0 10px}
- .terminal-overview .price-clock strong{font-size:14px}
- .terminal-overview .hour-window{min-width:180px}
- .terminal-overview .hour-time-navigation>#hour-window-label{font-size:12px}
+ .terminal-overview .price-clock strong{font-size:15px}
  .terminal-overview .spot{font-size:23px}
 }
 @media(max-width:650px){
  .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto}
- .terminal-overview .price-clock{grid-column:1/-1;grid-row:2;border:0;border-top:1px solid var(--border);padding:10px 0 0;justify-content:space-between}
- .terminal-overview .hour-window{grid-row:1;min-width:180px;width:auto}
+ .terminal-overview .price-clock{grid-column:1/-1;grid-row:2;border:0;border-top:1px solid var(--border)}
+ .terminal-overview .hour-window{grid-row:1;width:auto}
 }
 @media(max-width:380px){
  .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr)}
@@ -341,3 +335,7 @@ body:not(.auth-page) main{padding:10px 20px 0}
  .terminal-overview .hour-window{grid-column:1;grid-row:2;min-width:0;width:100%}
  .terminal-overview .price-clock{grid-row:3}
 }
+
+/* Only the banner fractional digits follow the latest one-second price move. */
+#btc-spot .spot-decimals[data-trend="up"]{color:var(--green)}
+#btc-spot .spot-decimals[data-trend="down"]{color:var(--red)}

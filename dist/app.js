@@ -9,7 +9,8 @@
   const price=value=>window.RolrCoins.formatPrice(value,window.RolrModel.coin.symbol);
   const currency=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
   const money=value=>currency.format(value);
-  const shares=value=>new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(value);
+  const shareFormatter=new Intl.NumberFormat('en-US',{maximumFractionDigits:2});
+  const shares=value=>shareFormatter.format(value);
   const account=window.BTC60Account;
   let positions=[];
   const predictionIndex=new Map();
