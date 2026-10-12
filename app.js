@@ -39,7 +39,36 @@
     $('selected-countdown').textContent=label;
   }
   function health(){return window.RolrModel.dataStatus(window.RolrModel,market);}
+  function renderPredictionContext(){
+    const model=window.RolrModel,closed=market.status==='settled',queued=market.status==='queued';
+    const benchmark=Number.isFinite(market.strike)?market.strike:null;
+    const age=Date.now()-model.priceUpdatedAt;
+    const fresh=model.feedMode==='demo'||(model.feedConnection==='connected'&&model.priceUpdatedAt>0&&age>=-5000&&age<=15000);
+    const value=closed?market.close:!queued&&fresh?model.spot:null;
+    const available=Number.isFinite(value)&&benchmark!==null;
+    $('ticket-spot-label').textContent=closed?'CLOSING BENCHMARK':model.feedMode==='demo'?'SYNTHETIC SPOT':'LIVE SPOT';
+    $('ticket-spot').textContent=Number.isFinite(value)?price(value):'—';
+    $('ticket-price-time').textContent=closed?'Minute candle immediately before interval close':queued?'Starting benchmark is set when this interval opens':model.feedMode==='demo'?'Synthetic preview · no account orders':fresh?`Source update ${new Date(model.priceUpdatedAt).toISOString().slice(11,19)} UTC`: 'Waiting for a connected, fresh price';
+    const start=market.startsAt,end=market.endsAt;
+    if(Number.isFinite(start)&&Number.isFinite(end)){
+      const hour=Math.floor(start/3600000)*3600000;
+      const utc=t=>new Date(t).toISOString().slice(11,16);
+      $('ticket-hour-selection').style.left=`${(start-hour)/3600000*100}%`;
+      $('ticket-hour-selection').style.width=`${market.minutes/60*100}%`;
+      $('ticket-hour-start').textContent=utc(hour);$('ticket-hour-end').textContent=utc(hour+3600000);
+      $('ticket-hour-map').setAttribute('aria-label',`Selected ${market.minutes}-minute interval ${utc(start)} to ${utc(end)} UTC within the hour`);
+      $('ticket-interval-timing').textContent=closed?'Interval complete':queued?`Opens ${utc(start)} UTC`:`${market.remaining} left`;
+    }
+    const delta=available?value-benchmark:null;
+    $('ticket-comparison').textContent=queued?'Benchmark available at open':!available?'Comparison unavailable':`${delta===0?'At the benchmark':`${price(Math.abs(delta))} ${delta>0?'above':'below'} benchmark`} (${delta>=0?'+':''}${(delta/benchmark*100).toFixed(3)}%)`;
+    $('ticket-comparison').style.color=delta===null?'var(--muted)':delta>=0?'var(--green)':'var(--red)';
+    $('ticket-up-rule').textContent=benchmark===null?'↗ Up: close ≥ benchmark':`↗ Up: close ≥ ${price(benchmark)}`;
+    $('ticket-down-rule').textContent=benchmark===null?'↘ Down: close < benchmark':`↘ Down: close < ${price(benchmark)}`;
+    const context=document.querySelector('.prediction-context');
+    context.dataset.side=side||'';
+  }
   function renderExecutionState(){
+    renderPredictionContext();
     const model=window.RolrModel,state=health();
     const chance=market.status==='open'&&(state.ready||model.feedMode==='demo')?model.estimateChances(market,model.spot,model.now,model.volatility):null;
     $('up-chance').textContent=chance?`${chance.up}%`:'—';

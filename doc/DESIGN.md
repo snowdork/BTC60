@@ -20,6 +20,10 @@ The database catalog supplies selectable coins, Coinbase products, precision, ic
 
 Demo preview explicitly uses animated synthetic data and cannot save predictions. Pause freezes chart rendering and blocks orders; UTC interval availability continues advancing. Reconnect reloads live data. The backend independently checks the interval, retrieves the benchmark, fetches a fresh Coinbase ticker, and recomputes pricing before accepting an order.
 
+## Prediction pane context
+
+The ticket shows a compact UTC-hour bar highlighting the selected interval, time remaining, a spot/source timestamp, distance from the opening benchmark, and explicit Up/Down closing-price thresholds. Selected-side rules receive emphasis. Historical/completed intervals use their closing benchmark; upcoming intervals wait for an opening benchmark. Live comparisons require a connected fresh feed; synthetic context is labeled. This context lives in the ticket and does not add overlays to the hourly graph.
+
 ## Estimates and demo pricing
 
 For open markets, the opening benchmark is the model's 50/50 center. Minute volatility is the RMS of consecutive completed-minute log returns, floored at 0.0001. With time remaining in minutes:

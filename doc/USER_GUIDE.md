@@ -16,6 +16,8 @@ Each UTC hour shows one 60-minute interval, two 30-minute intervals, and four 15
 
 Up/Down percentages are heuristic model estimates, not calibrated odds. They also set simulated contract prices: 70% Up means an Up contract costs 70¢. Percentages and prices change with spot, time remaining, and recent volatility. Upcoming cards hide percentages; completed cards show results when candle history is available.
 
+The prediction pane shows the selected interval within its UTC hour, current spot and source time, distance from the benchmark, and the exact closing-price conditions for Up and Down. Completed intervals show their closing benchmark; upcoming intervals wait for their opening benchmark. Stale or disconnected prices hide the live comparison.
+
 ## Make a prediction
 
 1. Sign in, select an open interval, and check that the status strip says data is ready.
