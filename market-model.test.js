@@ -37,3 +37,13 @@ test('purchase prices are configured by server, independently of model chances',
  assert.equal(estimateChances({status:'open',strike:100,endsAt:100000},100,0).up,50);
  assert.throws(()=>configure({quotes:{}}));
 });
+
+test('betting closes exactly 30 seconds before every interval ends',()=>{
+ const now=100000,model={feedMode:'live',feedConnection:'connected',spot:101,priceUpdatedAt:now,historyStatus:'ready',quoteReady:true};
+ for(const minutes of [15,30,60]){
+  const market={status:'open',strike:100,up:62,minutes,endsAt:now+30001};
+  assert.equal(dataStatus(model,market,now).ready,true);
+  assert.equal(dataStatus(model,market,now+1).ready,false);
+  assert.match(dataStatus(model,market,now+1).reason,/Betting closed/);
+ }
+});

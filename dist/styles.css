@@ -87,8 +87,8 @@ body:not(.auth-page) main{padding:10px 20px 0}
 /* Quarter-hour guides belong to the chart; each row marks only its own ends. */
 .interval-guides{bottom:auto;height:var(--chart-height)}
 .tier[data-duration] .market-card::after{content:'';position:absolute;top:-1px;bottom:-1px;right:-5px;border-left:2px dashed #ffd54f;filter:drop-shadow(0 0 3px #ffb30045);pointer-events:none}
-.tier[data-duration] .market-card:last-child::after{right:-1px}
-.tier[data-duration] .market-card:first-child::before{content:'';position:absolute;top:-1px;bottom:-1px;left:-1px;border-left:2px dashed #ffd54f;filter:drop-shadow(0 0 3px #ffb30045);pointer-events:none}
+.tier[data-duration] .market-card:last-child::after{right:-5px}
+.tier[data-duration] .market-card:first-child::before{content:'';position:absolute;top:-1px;bottom:-1px;left:-5px;border-left:2px dashed #ffd54f;filter:drop-shadow(0 0 3px #ffb30045);pointer-events:none}
 
 .portfolio-icon{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;color:var(--green);border:1px solid #00e67640;border-radius:6px;background:#00e67608;flex-shrink:0}.portfolio-icon:hover{background:#00e67618}.portfolio-icon svg{width:18px;height:18px}.pending-history-link{margin-left:auto;color:var(--green);font-size:9px;white-space:nowrap}.positions-heading{gap:12px}.positions-list-empty{padding:12px 0 2px;color:var(--muted);font-size:10px}@media(max-width:1150px){.positions-heading>.muted{display:none}}
 
@@ -218,3 +218,9 @@ body:not(.auth-page) main{padding:10px 20px 0}
   .ticket .stake-presets button{min-height:38px}
   .ticket .budget-input input{font-size:22px}
 }
+
+/* Selected coin occupies the graph gutter beside the price plot. */
+.chart-coin-icon{position:absolute;left:0;top:35px;width:var(--tier-gutter);height:var(--chart-height);display:flex;align-items:center;justify-content:center;pointer-events:none}
+.chart-coin-icon img{width:32px;height:32px;object-fit:contain}
+@media(max-height:820px){.chart-coin-icon{top:30px}}
+@media(max-width:850px){.chart-coin-icon{top:35px}}

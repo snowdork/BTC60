@@ -88,11 +88,11 @@
     $('ticket-delta').style.color=delta>=0?'var(--green)':'var(--red)';
     if(review&&!reviewExpired()&&!state.ready&&!submitting){review=null;$('review-dialog').close();notify('Data unavailable. Wait for reconnection and review again.');}
   }
-  function reviewExpired(){return !!review&&Date.now()>=review.endsAt;}
+  function reviewExpired(){return !!review&&Date.now()>=review.endsAt-30000;}
   function renderReviewTiming(){
     if(!review)return;
-    const seconds=Math.max(0,Math.ceil((review.endsAt-Date.now())/1000));
-    $('review-time').textContent=seconds?`${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s remaining`:'Too late to place';
+    const seconds=Math.max(0,Math.ceil((review.endsAt-30000-Date.now())/1000));
+    $('review-time').textContent=seconds?`${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s to betting cutoff`:'Betting closed · final 30 seconds';
     $('review-time').classList.toggle('expired',!seconds);
     if(!seconds){$('confirm-prediction').disabled=true;if(!submitting)$('confirm-prediction').textContent='Too late to place';}
   }
@@ -206,7 +206,7 @@
     $('down-price').textContent=open&&chance?`${chance.down}¢`:'—';
     $('contract-price').textContent=q?`at ${q.cents}¢ each`:'';
     $('contracts').textContent=q?String(q.contracts):'—';$('cost').textContent=q?money(q.cost):'—';$('return').textContent=q?money(q.payout):'—';$('profit').textContent=q?'+'+money(q.profit):'—';
-    if(open)$('ticket-note').textContent=q?'Simulated prices · No fees · No real money':(side===null?'Choose Up or Down to review your prediction.':'Enter a budget of at least $1 within your demo balance.');
+    if(open)$('ticket-note').textContent=q?'Bets close 30s before interval end · No real money':(side===null?'Choose Up or Down to review your prediction.':'Enter a budget of at least $1 within your demo balance.');
     return q;
   }
   function renderIntervalDetails(){
@@ -254,7 +254,7 @@
     const q=currentQuote();
     $('submit-prediction').classList.toggle('bear',side==='down');
     $('submit-prediction').classList.toggle('pick-direction',side===null);
-    $('ticket-note').textContent=!open?(queued?'Select an open market to make a prediction.':Number.isFinite(market.strike)&&Number.isFinite(market.close)?`Demo settlement: ${outcome(market.strike,market.close)==='up'?'Up':'Down'} at ${price(market.close)}.`:'Waiting for market history.'):!q?(side===null?'Choose Up or Down to review your prediction.':'Enter a budget of at least $1 within your demo balance.'):'Simulated prices · No fees · No real money';
+    $('ticket-note').textContent=!open?(queued?'Select an open market to make a prediction.':Number.isFinite(market.strike)&&Number.isFinite(market.close)?`Demo settlement: ${outcome(market.strike,market.close)==='up'?'Up':'Down'} at ${price(market.close)}.`:'Waiting for market history.'):!q?(side===null?'Choose Up or Down to review your prediction.':'Enter a budget of at least $1 within your demo balance.'):'Bets close 30s before interval end · No real money';
     $('settlement-description').textContent=!Number.isFinite(market.strike)&&!queued?'Waiting for a demo benchmark from minute history.':queued?'The starting benchmark is set when this interval opens.':`Up wins if the closing minute-candle close is at least ${price(market.strike)}. An unchanged price resolves Up. Coinbase proxy · not a 60-second average.`;
     $('balance').textContent=money(balance());
     renderExecutionState();

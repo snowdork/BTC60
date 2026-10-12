@@ -23,7 +23,7 @@ The prediction pane shows the selected interval within its UTC hour, current spo
 1. Sign in, select an open interval, and check that the status strip says data is ready.
 2. Choose Up or Down and enter a budget of at least $1 within your available balance.
 3. Review the contract price, whole-contract count, exact cost, possible return, and potential profit.
-4. Confirm before the countdown expires.
+4. Confirm before the betting countdown expires. Bets close 30 seconds before the interval ends to allow final processing.
 
 Review updates live. Confirmation buys at the server's current model price within your budget, so the final contract count, cost, and possible return can differ from the displayed review. Check the saved prediction for executed terms. A prediction is saved only when the server accepts it; errors appear in the review.
 

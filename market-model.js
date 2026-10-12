@@ -50,6 +50,7 @@
     if(!Number.isFinite(market.strike)||market.strike<=0)return {ready:false,reason:'Opening benchmark unavailable',age};
     if(!model.quoteReady||!Number.isInteger(market.up))return {ready:false,reason:'Purchase quote unavailable',age};
     if(market.status!=='open'||!Number.isFinite(market.endsAt)||now>=market.endsAt)return {ready:false,reason:'Market closed',age};
+    if(now>=market.endsAt-30000)return {ready:false,reason:'Betting closed · final 30 seconds',age};
     return {ready:true,reason:'Ready',age};
   }
   function configure(config){

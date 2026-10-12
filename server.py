@@ -395,9 +395,9 @@ class Handler(SimpleHTTPRequestHandler):
         start = now // 3600 * 3600 + index * duration * 60
         end = start + duration * 60
         requested_start = data.get('startsAt')
-        if isinstance(requested_start, (int, float)) and now >= requested_start / 1000 + duration * 60:
-            raise ValueError('Too late to place. This interval has expired.')
-        if not start <= now < end or data.get('startsAt') != start * 1000:
+        if isinstance(requested_start, (int, float)) and time.time() >= requested_start / 1000 + duration * 60 - 30:
+            raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
+        if not start <= now < end - 30 or data.get('startsAt') != start * 1000:
             raise ValueError('This market is closed or changed. Review again.')
         strike = candle_close(coin, start)
         spot = fresh_spot(coin)
@@ -405,8 +405,8 @@ class Handler(SimpleHTTPRequestHandler):
         # benchmark/history or displayed quote changed during confirmation.
         up = market_up(coin, strike, spot, now, start, end)
         cents = up if side == 'up' else 100 - up
-        if not start <= time.time() < end:
-            raise ValueError('Too late to place. This interval has expired.')
+        if not start <= time.time() < end - 30:
+            raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
         contracts = math.floor(round(budget * 100) / cents)
         cost = contracts * cents
         with connect() as conn:
@@ -414,8 +414,8 @@ class Handler(SimpleHTTPRequestHandler):
             if conn.execute('SELECT id FROM predictions WHERE user_id=? AND request_id=?', (session['user_id'], request_id)).fetchone():
                 pass
             else:
-                if time.time() >= end:
-                    raise ValueError('Too late to place. This interval has expired.')
+                if time.time() >= end - 30:
+                    raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
                 changed = conn.execute('UPDATE users SET balance_cents=balance_cents-? WHERE id=? AND balance_cents>=?', (cost, session['user_id'], round(budget * 100))).rowcount
                 if not changed or contracts < 1:
                     raise ValueError('Insufficient demo balance.')

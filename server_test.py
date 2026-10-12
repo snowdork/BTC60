@@ -84,12 +84,12 @@ class AccountsTest(unittest.TestCase):
         self.assertEqual(self.request('POST', '/api/logout', {}, cookie, csrf)[0], 200)
         self.assertEqual(self.request('GET', '/api/account', cookie=cookie)[0], 401)
 
-    def test_live_execution_accepts_updated_benchmark_and_quote_until_expiry(self):
+    def test_live_execution_accepts_updated_benchmark_and_quote_until_cutoff(self):
         _, _, cookie = self.request('POST', '/api/signup', {'name': 'Live', 'email': 'live@example.com', 'password': 'strong-password-123'})
         csrf = self.request('GET', '/api/account', cookie=cookie)[1]['csrf']
         start = int(server.time.time()) // 3600 * 3600
         order = {'coin': 'BTC', 'marketId': '60-0', 'side': 'up', 'budget': 50, 'requestId': 'live-request-00000001', 'startsAt': start * 1000, 'strike': 99, 'cents': 10}
-        with patch('server.time.time', return_value=start + 3599), patch('server.candle_close', return_value=100), patch('server.fresh_spot', return_value=101), patch('server.market_up', return_value=70):
+        with patch('server.time.time', return_value=start + 3569), patch('server.candle_close', return_value=100), patch('server.fresh_spot', return_value=101), patch('server.market_up', return_value=70):
             status, account, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
             self.assertEqual(status, 201, account)
             with server.connect() as conn:
@@ -98,7 +98,7 @@ class AccountsTest(unittest.TestCase):
                 self.assertEqual(saved['cents'], 70)
                 self.assertEqual(saved['contracts'], 71)
             balance = account['user']['balance_cents']
-        with patch('server.time.time', return_value=start + 3600):
+        with patch('server.time.time', return_value=start + 3570):
             order['requestId'] = 'live-request-00000002'
             status, _, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
             self.assertEqual(status, 400)
