@@ -25,3 +25,35 @@ By default the database is `data/btc60.sqlite3`, and backups go under `data/back
 Use `--db /path/to/test.sqlite3` for a separate database; `BTC60_DB` is also supported. For the backup command only, `--backup-dir /path/to/backups` changes the destination. These commands never push, deploy, or send data externally. TRUMP and AVAX remain disabled in the current default seed.
 
 A reset invalidates all sessions and removes all users, prediction records, settlements, and custom coin edits. The backup retains the previous state. It is never run implicitly by `init` or server startup.
+
+## Categories and Oil migration
+
+Version 3 adds `categories`, and adds `category`, `feed`, and `unit` columns to the
+legacy `coins` instrument table. Existing instruments become `crypto` / `coinbase`
+/ `USD`. Five oil instruments are added once as `oil` / `simulated` / `USD/barrel`.
+The migration preserves accounts, orders, balances, and previous settlements.
+
+Enabled instrument limits apply per category (eight each). Category integrity is
+enforced by triggers so populated legacy SQLite tables can migrate without a
+rebuild. Categories containing instruments cannot be deleted or renamed by ID.
+An instrument with orders cannot change category, product, feed, or demo base.
+Disable it instead and use a new symbol for a different source.
+
+`categories.seed.json` supplies default category presentation and `oil.seed.json`
+supplies the initial crude catalog. Restarting does not overwrite administrator
+changes. Back up with the maintenance command before migrating a working database.
+
+## Live Oil source migration (version 4)
+
+`instrument_sources` overrides the legacy feed for new prices and orders.
+`prediction_sources` saves the provider and exact product for each newly placed
+order. Old predictions without a snapshot use their original `coins.feed` and
+`coins.product`, including simulated Oil. Changing a live mapping affects future
+orders only; saved source snapshots continue to settle against the old product.
+
+WTI maps to `WTI/USD`; Brent maps to `XBR/USD`. Other requested crude types retain
+empty live mappings and cannot place orders. Do not map them to an unrelated
+instrument merely to populate a quote. Credentials belong in the server environment,
+never SQLite, source files, or browser code.
+
+Version 5 allows OilPriceAPI source overrides in instrument_sources. Existing prediction_sources snapshots remain unchanged. Credentials stay outside SQLite in a server-only ignored file or environment variable.

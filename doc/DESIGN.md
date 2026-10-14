@@ -20,28 +20,38 @@ The database catalog supplies selectable coins, Coinbase products, precision, ic
 
 Demo preview explicitly uses animated synthetic data and cannot save predictions. Pause freezes chart rendering and blocks orders; UTC interval availability continues advancing. Reconnect reloads live data. The backend independently checks the interval, retrieves the benchmark, fetches a fresh Coinbase ticker, and recomputes pricing before accepting an order.
 
+## Prediction pane context
+
+The ticket shows a compact UTC-hour bar highlighting the selected interval, time remaining, a spot/source timestamp, distance from the opening benchmark, and explicit Up/Down closing-price thresholds. Selected-side rules receive emphasis. Historical/completed intervals use their closing benchmark; upcoming intervals wait for an opening benchmark. Live comparisons require a connected fresh feed; synthetic context is labeled. This context lives in the ticket and does not add overlays to the hourly graph.
+
 ## Estimates and demo pricing
 
-For open markets, the opening benchmark is the model's 50/50 center. Minute volatility is the RMS of consecutive completed-minute log returns, floored at 0.0001. With time remaining in minutes:
+Open-market probabilities use zero expected log return and a normal terminal log-return distribution. Minute variance blends equal weights of EWMA estimates with 10- and 60-minute half-lives, using completed consecutive returns from a trailing 24-hour history. Missing history blocks quotes; a numerical variance floor of 1e-12 prevents division by zero. These initial parameters are candidates for historical validation, not fitted constants.
 
 ```text
-uncertainty = max(0.0001, volatility) × sqrt(max(1/60, minutes remaining))
-z = log(spot / opening benchmark) / uncertainty
-Up = clamp(round(100 / (1 + exp(-1.7 × z))), 1, 99)
+variance = 0.5 × fastEWMA + 0.5 × slowEWMA
+z = log(spot / benchmark) / sqrt(variance × minutes to settlement)
+rawUp = NormalCDF(z)
+calibratedUp = sigmoid(slope × logit(rawUp) + intercept)  # when available
+Up = clamp(round(100 × probability), 1, 99)
 Down = 100 − Up
 ```
 
-The first second of an interval displays a neutral 50/50 baseline. Upcoming cards hide percentages; completed cards show a 100/0 result only when benchmarks exist. Open percentages are hidden when required live inputs are unavailable. Distance from the opening benchmark provides additional context.
+The first second responds to live price movement. The 30-second betting cutoff does not change time to settlement. Ties resolve Up. Upcoming cards hide probabilities; completed cards show confirmed 100/0 outcomes. Quotes remain simulated prices, not exchange order-book prices.
 
-These are uncalibrated heuristic estimates. Demo purchase prices follow the percentages: 70% Up means 70¢ per Up contract and 30¢ per Down contract. Catalog API quote values bootstrap configuration; they are not fixed execution prices. Quotes are simulated rather than exchange order-book prices.
+The server caches 24 hours of Coinbase candles per product per minute. Cold loads fetch six batches with three concurrent requests and eight-second request timeouts; subsequent minutes fetch only the missing delta from a recent snapshot. Each batch stays below Coinbase's 300-candle request limit. The browser uses this history alongside its chart history. Python and JavaScript implement equivalent algorithms, with parity tests. Execution recalculates using authoritative live prices, so a displayed quote can move before confirmation.
+
+Run `python3 scripts/calibrate-odds.py BTC candles.json` using chronological Coinbase-format minute candles (`[timestamp, low, high, open, close, volume]`, timestamp in seconds). The fitter samples each 15/30/60-minute window at its midpoint, derives labels from the actual settlement rule, and uses the first 70% of time for calibration fitting and the remainder for validation. Whole-hour splits prevent outcomes crossing the split. It requires at least 500 fitting and 200 validation windows and exports only when both held-out Brier score and log loss improve. The artifact records metrics and time bounds in `data/odds-calibration.json`; `/api/coins` distributes coefficients to the browser. Reload the terminal after calibration changes. Midpoint validation does not establish accuracy at every time remaining; validate more granular observations before extending claims.
+
+Without a validated artifact for a coin, the normal-CDF model remains explicitly uncalibrated. Historical outcomes have not been supplied with this repository. Do not fabricate calibration coefficients or claim measured accuracy improvements. Keep a subsequent untouched period for independent evaluation after model selection.
 
 ## Review and execution
 
-Users select a side and a budget of at least $1 within their available demo balance. Whole contracts keep exact committed cost within that budget; fees are zero. A winning contract returns $1 and a losing contract returns $0. Potential profit is winning return minus cost.
+Users select a side and a budget of at least $1 within their available demo balance. Fractional shares use the full budget; fees are zero. Stakes with sub-cent precision round up to the next cent. Winning payouts use integer arithmetic to round up to the next cent: `(cost_cents * 100 + price_cents - 1) // price_cents`. A winning contract returns $1 and a losing contract returns $0. Potential profit is winning return minus cost.
 
 Review remains live as spot, benchmark, and model prices change. It shows contract price, count, cost, potential return, profit, and interval countdown. Confirmation authorizes execution at the server's current model price within the selected budget. The server does not enforce the browser quote or benchmark, and there is no 2¢ tolerance. Final quantity and return can differ from review. Expired intervals, unavailable authoritative data, and insufficient balance prevent saving.
 
-The server validates coin availability, side, request ID, budget, and current UTC start. It computes the authoritative opening benchmark, spot, model price, whole-contract count, and cost. A transaction atomically debits funds and inserts the prediction. Per-account unique request IDs make retries idempotent. Saved terms remain fixed after execution.
+The server validates coin availability, side, request ID, budget, and current UTC start. It computes the authoritative opening benchmark, spot, model price, fractional share count, and cost. A transaction atomically debits funds and inserts the prediction. Per-account unique request IDs make retries idempotent. Saved terms remain fixed after execution.
 
 ## Settlement and portfolio
 
@@ -70,3 +80,5 @@ SQLite stores users, hashed sessions, predictions, settlements, coins, and migra
 UI/chart updates run once per second; incoming prices update the model immediately. The controller caches controls, delegates market selection, and avoids rebuilding unchanged rows and totals. Volatility is cached until candles change or a minute closes. Hidden tabs skip rendering and account polling. Static text assets support gzip and ETag revalidation; account/API responses are uncached.
 
 The local server is a demo development service. Production hosting needs HTTPS, a production server, Secure cookies, and account recovery/email verification. See [README.md](../README.md) for development and [the maintenance guide](DATABASE_MAINTENANCE.md) for database operations.
+
+Historical downloads use `scripts/download-odds-history.py` with progress and atomic per-batch checkpoints. The fitter uses damped Newton optimization (at most 80 iterations), reports each preparation stage, and preserves existing coefficients on unsuccessful validation. Network failures stop with a resumable checkpoint instead of silently waiting indefinitely.

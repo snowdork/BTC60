@@ -1,17 +1,43 @@
 /* Public Coinbase spot visualization. Contract quotes and benchmarks are demos. */
 (() => {
   'use strict';
-  const model=window.RolrModel,$=id=>document.getElementById(id);
+  const model=window.PredictModel,$=id=>document.getElementById(id);
   let coin=model.coin;
-  const money=v=>window.RolrCoins.formatPrice(v,coin.symbol);
+  const simulated=()=>coin.feed==='simulated';
+  const serverFeed=()=>simulated()||['twelvedata','oilpriceapi'].includes(coin.feed);
+  const maxAge=()=>coin.maxPriceAgeMs||15000;
+  const sourceLabel=()=>coin.feed==='oilpriceapi'?'OilPriceAPI spot assessments':coin.feed==='twelvedata'?'Twelve Data live oil':simulated()?'Simulated oil':'Coinbase';
+  const money=v=>window.PredictCoins.formatPrice(v,coin.symbol);
   const hourOf=t=>Math.floor(t/3600000)*3600000;
   const time=t=>new Date(t).toISOString().slice(11,16);
   const clock=t=>new Date(t).toISOString().slice(11,19);
+  const localClock=new Intl.DateTimeFormat(undefined,{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',timeZoneName:'short'});
+  const localTimezone=localClock.resolvedOptions().timeZone;
   const remaining=ms=>`${Math.max(0,Math.floor(ms/60000))}m ${String(Math.max(0,Math.floor(ms/1000)%60)).padStart(2,'0')}s`;
   let historical=false,historyFailed=false;
   let mode='live',paused=false,socket=null,retryTimer=null,fetchController=null,historyVersion=0;
-  let hour=hourOf(Date.now()),points=[],candles=[],lastPriceAt=0,lastPrice=null,lastHistoryAt=0,backoff=1000;
+  let hour=hourOf(Date.now()),points=[],candles=[],lastPriceAt=0,lastPrice=null,lastHistoryAt=0,lastSpotPollAt=-Infinity,backoff=1000;
   let demoEpoch=Date.now(),demoStart=new Date().setUTCHours(17,42,12,0),demoSecond=-1,lastDraw=0;
+  let lastPlotAt=-Infinity;
+  let previousBannerPrice,bannerTrend='';
+  function renderBannerPrice(){
+    const value=Number.isFinite(lastPrice)?lastPrice:null;
+    if(value===previousBannerPrice)return;
+    if(value!==null&&Number.isFinite(previousBannerPrice)){
+      bannerTrend=value>previousBannerPrice?'up':'down';
+    }
+    if(value===null)bannerTrend='';
+    previousBannerPrice=value;
+    const formatted=value===null?'—':money(value),decimal=formatted.lastIndexOf('.');
+    const banner=$('btc-spot');
+    if(decimal<0){banner.textContent=formatted;return;}
+    const digits=document.createElement('span');
+    digits.className='spot-decimals';
+    digits.dataset.trend=bannerTrend;
+    digits.textContent=formatted.slice(decimal+1);
+    banner.replaceChildren(formatted.slice(0,decimal+1),digits);
+  }
+  let spotController=null;
   let frameId=0,stopped=false,connectionStartedAt=0,lastPriceBroadcast=0;
   const currentTime=()=>mode==='demo'?demoStart+Date.now()-demoEpoch:Date.now();
   function status(text,tone='amber'){$('feed-status').textContent=text;$('feed-status').className=`badge ${tone}`;}
@@ -63,36 +89,91 @@
   async function loadHistory() {
     if(mode!=='live'||stopped)return;
     if(fetchController)fetchController.abort();
-    historyFailed=false;model.historyStatus='loading';
+    historyFailed=false;model.historyStatus='loading';model.pricingHistoryStatus='loading';
     const controller=new AbortController();fetchController=controller;
     const version=++historyVersion,requestedHour=hour,requestedCoin=coin.symbol;
-    const timeout=setTimeout(()=>controller.abort(),10000);
+    const timeout=setTimeout(()=>controller.abort(),60000);
     try {
       const params=new URLSearchParams({granularity:'60',start:new Date(hour-60000).toISOString(),end:new Date(Math.min(Date.now(),hour+3600000)).toISOString()});
-      const response=await fetch(`https://api.exchange.coinbase.com/products/${coin.product}/candles?${params}`,{signal:controller.signal});
+      const historyUrl=serverFeed()?`/api/candles?coin=${encodeURIComponent(coin.symbol)}&start=${Math.floor((hour-60000)/1000)}&end=${Math.floor(Math.min(Date.now(),hour+3600000)/1000)}`:`https://api.exchange.coinbase.com/products/${coin.product}/candles?${params}`;
+      const response=await fetch(historyUrl,{signal:controller.signal});
       if(!response.ok)throw new Error('History unavailable');
-      const data=await response.json();
-      if(mode!=='live'||version!==historyVersion||requestedHour!==hour||requestedCoin!==coin.symbol)return;
-      if(!Array.isArray(data))throw new Error('Invalid history');
-      candles=data.filter(c=>Array.isArray(c)&&c.length>=5&&c.slice(0,5).every(Number.isFinite)&&c[4]>0&&c[0]*1000>=hour-60000&&c[0]*1000<Math.min(Date.now(),hour+3600000)).sort((a,b)=>a[0]-b[0]);
-      const history=candles.filter(c=>c[0]*1000>=hour&&c[0]*1000+60000<=Math.min(Date.now(),hour+3600000)).map(c=>({t:c[0]*1000+60000,price:c[4]}));
-      // Keep streaming points received while history was loading.
-      const cutoff=history.at(-1)?.t??hour;
-      points=[...history,...points.filter(p=>p.t>cutoff)];lastHistoryAt=Date.now();model.historyStatus='ready';model.historyUpdatedAt=lastHistoryAt;
-      if(historical){lastPrice=candles.find(c=>c[0]*1000===hour+3600000-60000)?.[4]??null;model.spot=lastPrice??NaN;status('HISTORICAL','neutral');$('chart-source').textContent='Coinbase history · demo settlements';}
-      syncMarkets(Date.now(),true);draw(Date.now());
+      const chartData=await response.json();
+      const isCurrentRequest=()=>mode==='live'&&version===historyVersion&&requestedHour===hour&&requestedCoin===coin.symbol;
+      if(!isCurrentRequest())return;
+      if(!Array.isArray(chartData))throw new Error('Invalid chart history');
+      function applyHistory(data){
+        const displayEnd=Math.min(Date.now(),hour+3600000);
+        candles=[...new Map(data.filter(c=>Array.isArray(c)&&c.length>=5&&c.slice(0,5).every(Number.isFinite)&&c[4]>0&&c[0]*1000>=displayEnd-86400000&&c[0]*1000<displayEnd).map(c=>[c[0],c])).values()].sort((a,b)=>a[0]-b[0]);
+        const history=candles.filter(c=>c[0]*1000>=hour&&c[0]*1000+60000<=displayEnd).map(c=>({t:c[0]*1000+60000,price:c[4]}));
+        // The preceding minute's close is the known price at the hour's start.
+        const opening=candles.find(c=>c[0]*1000===hour-60000);
+        if(opening)history.unshift({t:hour,price:opening[4]});
+        const cutoff=history.at(-1)?.t??hour;
+        points=[...history,...points.filter(p=>p.t>cutoff)];
+        lastHistoryAt=Date.now();model.historyStatus='ready';model.historyUpdatedAt=lastHistoryAt;
+        syncMarkets(Date.now(),true);draw(Date.now(),true);
+      }
+      // Render chart history immediately; the longer pricing backfill is independent.
+      applyHistory(chartData);
+      if(!historical){
+        try{
+          const pricingResponse=await fetch(`/api/pricing-history?coin=${encodeURIComponent(coin.symbol)}`,{signal:controller.signal});
+          if(!pricingResponse.ok)throw new Error('Pricing history unavailable');
+          const pricingData=(await pricingResponse.json()).candles;
+          if(!Array.isArray(pricingData))throw new Error('Invalid pricing history');
+          if(!isCurrentRequest())return;
+          applyHistory([...pricingData,...chartData]);
+          model.pricingHistoryStatus='ready';
+        }catch(error){
+          if(!isCurrentRequest())return;
+          model.pricingHistoryStatus='error';broadcast('btc-chances-update');
+          $('chart-source').textContent='Chart history loaded · pricing history unavailable';
+        }
+      }
+      if(historical){lastPrice=candles.find(c=>c[0]*1000===hour+3600000-60000)?.[4]??null;model.spot=lastPrice??NaN;status('HISTORICAL','neutral');$('chart-source').textContent=`${sourceLabel()} history · demo settlements`;}
+      syncMarkets(Date.now(),true);draw(Date.now(),true);
     } catch(error) {
       if(mode==='live'&&version===historyVersion){historyFailed=true;model.historyStatus='error';broadcast('btc-chances-update');$('chart-source').textContent='History unavailable · reconnect or preview demo';}
     } finally {clearTimeout(timeout);if(fetchController===controller)fetchController=null;}
   }
+  async function pollServerSpot(){
+    if(spotController||stopped||historical||mode!=='live')return;
+    if(coin.category==='oil'&&Date.now()-lastSpotPollAt<5000)return;
+    lastSpotPollAt=Date.now();
+    const controller=new AbortController(),requestedCoin=coin.symbol,version=historyVersion;
+    spotController=controller;
+    const timeout=setTimeout(()=>controller.abort(),8000);
+    try{
+      const response=await fetch(`/api/spot?coin=${encodeURIComponent(requestedCoin)}`,{signal:controller.signal,cache:'no-store'});
+      const tick=await response.json();
+      if(!response.ok)throw Error(tick.error||'Oil price feed unavailable');
+      if(version!==historyVersion||coin.symbol!==requestedCoin||mode!=='live'||historical)return;
+      if(coin.feed==='oilpriceapi'&&tick.quoteKind==='assessment'){
+        if(!Number.isFinite(tick.price)||tick.price<=0||!Number.isFinite(tick.time)||tick.time>Date.now()+5000)throw Error('Invalid oil assessment');
+        appendPoint(Date.now(),tick.price);model.priceUpdatedAt=tick.time;model.feedConnection='disconnected';
+        $('chart-source').textContent=`OilPriceAPI · assessed ${new Date(tick.time).toISOString().slice(0,16).replace('T',' ')} UTC · checked every 5s`;
+        $('feed-message').textContent=`${tick.message} Source: ${new Date(tick.time).toISOString().slice(0,16).replace('T',' ')} UTC`;$('feed-message').hidden=false;
+        status('SPOT ASSESSMENT','amber');broadcast('btc-price-update');return;
+      }
+      if(!Number.isFinite(tick.price)||tick.price<=0||!Number.isFinite(tick.time)||Date.now()-tick.time>maxAge()||tick.time>Date.now()+5000)throw Error('Oil quote stale or invalid');
+      appendPoint(tick.time,tick.price);model.feedConnection='connected';
+      $('feed-message').textContent='';$('feed-message').hidden=true;
+      if(!paused)status(simulated()?'SIMULATED OIL':'LIVE OIL',simulated()?'amber':'green');
+    }catch(error){
+      if(version===historyVersion&&coin.symbol===requestedCoin){model.feedConnection='disconnected';status('UNAVAILABLE');$('feed-message').textContent=controller.signal.aborted?'Oil provider timed out. Retry shortly.':error.message;$('feed-message').hidden=false;}
+    }finally{clearTimeout(timeout);if(spotController===controller)spotController=null;}
+  }
   function disconnect() {
     clearTimeout(retryTimer);retryTimer=null;
+    if(spotController){spotController.abort();spotController=null;}
     if(socket){const old=socket;socket=null;old.onclose=null;old.close();}
     if(fetchController){fetchController.abort();fetchController=null;}
-    historyVersion++;
+    historyVersion++;lastSpotPollAt=-Infinity;
   }
   function connect() {
     if(mode!=='live'||historical||stopped)return;
+    if(serverFeed()){pollServerSpot();return;}
     status(lastPriceAt?'RECONNECTING':'CONNECTING');
     connectionStartedAt=Date.now();model.feedConnection='connecting';
     try {socket=new WebSocket('wss://ws-feed.exchange.coinbase.com');}catch{scheduleRetry();return;}
@@ -115,40 +196,49 @@
     model.feedConnection='disconnected';status('DISCONNECTED');clearTimeout(retryTimer);retryTimer=setTimeout(connect,backoff);backoff=Math.min(30000,backoff*2);
   }
   function resetHour(now,targetHour=hourOf(now)) {
+    lastPlotAt=-Infinity;
+    previousBannerPrice=undefined;bannerTrend='';
+    $('feed-message').textContent='';$('feed-message').hidden=true;
     hour=targetHour;historical=hour<hourOf(now);model.isHistorical=historical;model.feedMode=mode;model.priceUpdatedAt=0;model.historyStatus='loading';model.feedConnection='disconnected';model.historyUpdatedAt=0;historyFailed=false;points=[];candles=[];lastPrice=null;lastPriceAt=0;model.spot=NaN;
     syncMarkets(now,true);if(mode==='demo'){demoHistory(historical?hour+3600000:now);if(historical){lastPrice=points.at(-1)?.price??null;model.spot=lastPrice??NaN;syncMarkets(now,true);}}else loadHistory();
   }
   function setMode(next,targetHour) {
     disconnect();mode=next;paused=false;lastHistoryAt=0;backoff=1000;demoEpoch=Date.now();demoSecond=-1;
-    $('demo-preview').textContent=mode==='demo'?`Live ${coin.symbol}`:'Demo preview';
+    $('demo-preview').textContent=mode==='demo'?`${simulated()?'Oil game':'Live '+coin.symbol}`:'Demo preview';
     $('chart-pause').textContent='Pause';$('chart-pause').setAttribute('aria-pressed','false');
     $('clock-label').textContent=mode==='demo'?'Simulated UTC':'UTC';
     resetHour(currentTime(),targetHour);
     if(mode==='demo'){status('SIMULATED','amber');$('chart-source').textContent='Animated demo · no live feed';}
-    else{$('chart-source').textContent='Coinbase spot · demo contracts';connect();}
-    if(historical){status('HISTORICAL','neutral');$('chart-source').textContent=mode==='demo'?'Simulated history · demo settlements':'Coinbase history · demo settlements';}
+    else{$('chart-source').textContent=`${sourceLabel()} prices · demo contracts`;connect();}
+    if(historical){status('HISTORICAL','neutral');$('chart-source').textContent=mode==='demo'?'Simulated history · demo settlements':`${sourceLabel()} history · demo settlements`;}
     draw(currentTime());
   }
-  function draw(now) {
+  function draw(now,force=false) {
     const displayTime=historical?hour+3600000:now;
     $('time-cursor').hidden=historical;
     $('next-hour').disabled=!historical;$('current-hour').hidden=!historical;$('chart-pause').disabled=historical;
     $('hour-date').textContent=`${new Date(hour).toISOString().slice(0,10)} · UTC`;
-    $('price-context').textContent=historical?'HOUR CLOSE':mode==='demo'?'SIMULATED SPOT':'LIVE SPOT';
+    $('price-context').textContent=coin.feed==='oilpriceapi'?'SPOT ASSESSMENT · USD / BARREL':historical?'HOUR CLOSE':mode==='demo'?'SYNTHETIC PREVIEW':simulated()?'SIMULATED · USD / BARREL':coin.feed==='twelvedata'?'LIVE SPOT · USD / BARREL':'LIVE SPOT';
     $('market-heading').textContent=historical?'Settlement history · demo results':'Choose your market';
     const fraction=Math.max(0,Math.min(1,(now-hour)/3600000));
     const stack=$('timeline-stack'),chart=$('btc-chart'),bounds=chart.getBoundingClientRect(),stackBounds=stack.getBoundingClientRect();
     // Pixel geometry keeps one vertical line aligned on every duration row.
     stack.style.setProperty('--cursor-x',`${bounds.left-stackBounds.left+fraction*bounds.width}px`);
     $('time-cursor-label').textContent=clock(now);
-    $('workspace-clock').textContent=`${clock(now)} UTC`;
+    const wallTime=Date.now();
+    $('workspace-clock').textContent=`${clock(wallTime)} UTC`;
+    $('workspace-local-clock').textContent=localClock.format(wallTime);
+    $('workspace-local-clock').title=`Local time · ${localTimezone}`;
     $('hour-window-label').textContent=`${time(hour)} — ${time(hour+3600000)}`;
     if($('chart-times').dataset.hour!==String(hour)){$('chart-times').dataset.hour=String(hour);$('chart-times').replaceChildren(...[0,15,30,45,60].map(minute=>{const span=document.createElement('span');span.textContent=time(hour+minute*60000);return span;}));}
+    renderBannerPrice();
+    const plotTime=Date.now();
+    if(!force&&plotTime-lastPlotAt<2000)return;
+    lastPlotAt=plotTime;
     const valid=points.filter(p=>p.t>=hour&&p.t<=displayTime);
     const hasPoints=valid.length>0;
     $('chart-empty').hidden=hasPoints;
-    $('chart-empty').textContent=historical?(historyFailed?'History unavailable. Select Reconnect to retry.':'Loading the selected hour…'):mode==='demo'?'Starting demo…':lastPriceAt?'Waiting for history…':`Waiting for live ${coin.symbol}/USD · use Demo preview if unavailable`;
-    $('btc-spot').textContent=Number.isFinite(lastPrice)?money(lastPrice):'—';
+    $('chart-empty').textContent=coin.feed==='oilpriceapi'&&mode==='live'?'Checking latest spot assessment every 5 seconds…':historical?(historyFailed?'History unavailable. Select Reconnect to retry.':'Loading the selected hour…'):mode==='demo'?'Starting demo…':lastPriceAt?'Waiting for history…':`Waiting for live ${coin.symbol}/USD · use Demo preview if unavailable`;
     const opening=candles.find(c=>c[0]*1000===hour-60000)?.[4];
     const change=Number.isFinite(lastPrice)&&Number.isFinite(opening)?lastPrice-opening:null;
     $('btc-change').textContent=change===null?'Waiting for price data':`${change>=0?'+':'−'}${money(Math.abs(change))} ${historical?'that hour':'this hour'}`;
@@ -163,7 +253,7 @@
     $('btc-tip').setAttribute('cx',x(last.t));$('btc-tip').setAttribute('cy',y(last.price));$('btc-tip').setAttribute('visibility','visible');
     $('chart-price-high').textContent=money(high);$('chart-price-low').textContent=money(low);
     const tag=$('chart-price-tag');tag.hidden=false;tag.textContent=money(last.price);tag.style.left=`${Math.min(90,Math.max(10,x(last.t)/10))}%`;tag.style.top=`${Math.max(10,y(last.price)/130*100)}%`;
-    $('chart-description').textContent=historical?`${coin.name} historical price from ${time(hour)} to ${time(hour+3600000)} UTC on ${new Date(hour).toISOString().slice(0,10)}. Last available price ${money(last.price)}. Outcomes are demo settlement proxies.`:`${mode==='demo'?'Simulated':'Coinbase'} ${coin.symbol}/USD hourly price. Latest ${money(last.price)}. Red dashed cursor at ${clock(now)} UTC.`;
+    $('chart-description').textContent=historical?`${coin.name} historical price from ${time(hour)} to ${time(hour+3600000)} UTC on ${new Date(hour).toISOString().slice(0,10)}. Last available price ${money(last.price)}. Outcomes are demo settlement proxies.`:`${mode==='demo'?'Simulated':coin.feed==='oilpriceapi'?'Polled spot assessment (observation times, not market ticks)':sourceLabel()} ${coin.symbol}/USD hourly price. Latest ${money(last.price)}. Red dashed cursor at ${clock(now)} UTC.`;
   }
   function frame(stamp) {
     if(stopped)return;
@@ -176,8 +266,9 @@
         if(second!==demoSecond){demoSecond=second;const minute=(now-hour)/60000;appendPoint(now,demoPrice(minute,second));}
         status('SIMULATED','amber');
       } else {
-        if(lastPriceAt&&Date.now()-lastPriceAt>15000){status('STALE');if(socket){socket.close();}}
-        if(!lastPriceAt&&stamp>15000)status('DISCONNECTED');
+        if(serverFeed())pollServerSpot();
+        if(coin.feed!=='oilpriceapi'&&lastPriceAt&&Date.now()-model.priceUpdatedAt>maxAge()){status('STALE');if(socket){socket.close();}}
+        if(!serverFeed()&&!lastPriceAt&&stamp>15000)status('DISCONNECTED');
         if(socket&&Date.now()-connectionStartedAt>20000&&(!lastPriceAt||socket.readyState===WebSocket.CONNECTING))socket.close();
         if(!fetchController&&Date.now()-lastHistoryAt>60000){lastHistoryAt=Date.now();loadHistory();}
       }
@@ -189,12 +280,12 @@
   $('feed-retry').addEventListener('click',()=>setMode('live',mode==='live'&&historical?hour:undefined));
   $('chart-pause').addEventListener('click',()=>{
     paused=!paused;model.paused=paused;broadcast('btc-chances-update');$('chart-pause').textContent=paused?'Resume':'Pause';$('chart-pause').setAttribute('aria-pressed',String(paused));
-    if(paused)status('PAUSED','neutral');else {status(mode==='demo'?'SIMULATED':Date.now()-lastPriceAt<15000?'LIVE':'STALE',mode==='demo'?'amber':Date.now()-lastPriceAt<15000?'green':'amber');syncMarkets(currentTime());draw(currentTime());}
+    if(paused)status('PAUSED','neutral');else {status(mode==='demo'?'SIMULATED':Date.now()-model.priceUpdatedAt<maxAge()?(simulated()?'SIMULATED OIL':serverFeed()?'LIVE OIL':'LIVE'):'STALE',mode==='demo'||simulated()?'amber':Date.now()-model.priceUpdatedAt<maxAge()?'green':'amber');syncMarkets(currentTime());draw(currentTime());}
   });
   document.addEventListener('visibilitychange',()=>{if(historical){if(!document.hidden){syncMarkets(currentTime());draw(currentTime());}return;}if(!document.hidden&&!paused){const now=currentTime();if(hourOf(now)!==hour)resetHour(now);syncMarkets(now,true);draw(now);if(mode==='live')loadHistory();}});
   window.addEventListener('pagehide',()=>{stopped=true;disconnect();clearTimeout(frameId);});
   function selectCoin(symbol){
-    coin=window.RolrCoins.getCoin(symbol);model.coin=coin;
+    coin=window.PredictCoins.getCoin(symbol);model.coin=coin;
     document.querySelectorAll('[data-coin]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.coin===coin.symbol)));
     $('price-coin-icon').hidden=!coin.icon;$('price-coin-icon').onerror=()=>{$('price-coin-icon').hidden=true;};if(coin.icon)$('price-coin-icon').src=coin.icon;$('price-coin-icon').alt=`${coin.name} logo`;
     $('coin-name').textContent=coin.name.toUpperCase();
@@ -202,8 +293,12 @@
     $('chart-pair-label').textContent=`${coin.symbol} / USD · 1H`;
     $('chart-title').textContent=`${coin.name} hourly price`;
     document.querySelector('.hour-chart').setAttribute('aria-label',`${coin.name} price for the current hour`);
-    document.title='BTC60';
-    try{localStorage.setItem('rolr_selected_coin',coin.symbol);}catch{}
+    document.title=`${coin.name} · ${window.BTC60Category?.name||'Crypto'} · BTC60`;
+    const description=coin.feed==='oilpriceapi'?'OilPriceAPI physical spot assessments with original source dates. These feeds do not supply the exact minute benchmarks required by this hourly game. Predictions remain unavailable.':coin.feed==='twelvedata'?'Twelve Data live spot prices in USD per barrel, updated minutely. Benchmarks use the exact completed one-minute candle before each interval boundary. Closed markets, stale quotes, and missing benchmark candles block new orders. No simulated substitute is used.':simulated()?'Simulated oil prices in USD per barrel. Opening and closing benchmarks use the simulated minute close immediately before each interval boundary. These are illustrative prices, not exchange quotes.':'Coinbase Exchange USD prices. Opening and closing benchmarks use the minute candle close immediately before each interval boundary. These are proxy demo settlements, not official exchange contracts or averaged prices.';
+    $('settlement-source').textContent=coin.feed==='oilpriceapi'?'HOURLY PREDICTIONS UNAVAILABLE':coin.feed==='twelvedata'?'DEMO SETTLEMENT · LIVE OIL MINUTE CLOSE':simulated()?'DEMO SETTLEMENT · SIMULATED OIL':'DEMO SETTLEMENT · COINBASE MINUTE CLOSE';
+    $('settlement-source-detail').textContent=description;
+    $('rules-source').textContent=description;
+    try{localStorage.setItem(`predict_selected_coin_${coin.category||'crypto'}`,coin.symbol);}catch{}
     setMode(mode,historical?hour:undefined);broadcast('coin-change');
   }
   function navigateHour(target){setMode(mode,Math.min(target,hourOf(currentTime())));}
@@ -211,6 +306,6 @@
   $('next-hour').addEventListener('click',()=>navigateHour(hour+3600000));
   $('current-hour').addEventListener('click',()=>navigateHour(hourOf(currentTime())));
   document.querySelectorAll('[data-coin]').forEach(button=>button.addEventListener('click',()=>{if(button.dataset.coin!==coin.symbol)selectCoin(button.dataset.coin);}));
-  let savedCoin=window.RolrCoins.available[0].symbol;try{const preference=localStorage.getItem('rolr_selected_coin');if(window.RolrCoins.available.some(coin=>coin.symbol===preference))savedCoin=preference;}catch{}
+  let savedCoin=window.PredictCoins.available[0].symbol;try{const preference=localStorage.getItem(`predict_selected_coin_${window.BTC60Category?.id||'crypto'}`)||localStorage.getItem('predict_selected_coin');if(window.PredictCoins.available.some(coin=>coin.symbol===preference))savedCoin=preference;}catch{}
   selectCoin(savedCoin);frameId=setTimeout(()=>frame(performance.now()),1000);
 })();

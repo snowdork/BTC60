@@ -87,7 +87,8 @@ body:not(.auth-page) main{padding:10px 20px 0}
 /* Quarter-hour guides belong to the chart; each row marks only its own ends. */
 .interval-guides{bottom:auto;height:var(--chart-height)}
 .tier[data-duration] .market-card::after{content:'';position:absolute;top:-1px;bottom:-1px;right:-5px;border-left:2px dashed #ffd54f;filter:drop-shadow(0 0 3px #ffb30045);pointer-events:none}
-.tier[data-duration] .market-card:last-child::after{right:-1px}
+.tier[data-duration] .market-card:last-child::after{right:-5px}
+.tier[data-duration] .market-card:first-child::before{content:'';position:absolute;top:-1px;bottom:-1px;left:-5px;border-left:2px dashed #ffd54f;filter:drop-shadow(0 0 3px #ffb30045);pointer-events:none}
 
 .portfolio-icon{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;color:var(--green);border:1px solid #00e67640;border-radius:6px;background:#00e67608;flex-shrink:0}.portfolio-icon:hover{background:#00e67618}.portfolio-icon svg{width:18px;height:18px}.pending-history-link{margin-left:auto;color:var(--green);font-size:9px;white-space:nowrap}.positions-heading{gap:12px}.positions-list-empty{padding:12px 0 2px;color:var(--muted);font-size:10px}@media(max-width:1150px){.positions-heading>.muted{display:none}}
 
@@ -141,7 +142,7 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .review-time{margin:10px 0;padding:9px 12px;border:1px solid var(--border);border-radius:6px;color:var(--amber);font:700 14px monospace;font-variant-numeric:tabular-nums}.review-time.expired{color:var(--red);border-color:var(--red)}
 
 /* Selection distinguishes an available interval from a closed one. */
-:root .tier[data-duration] .market-card.open.selected{border-color:#00e676;border-style:solid;box-shadow:inset 0 0 0 2px #00e676,0 0 0 1px #00e676,0 0 12px #00e67630}
+:root .tier[data-duration] .market-card.open.selected{border-color:#2979ff;border-style:solid;box-shadow:inset 0 0 0 2px #2979ff,0 0 0 1px #2979ff,0 0 12px #2979ff30}
 
 
 
@@ -164,3 +165,177 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .wager-settlement{display:block;border:2px solid currentColor;border-radius:3px;padding:4px 6px;background:var(--surface)}
 .wager-settlement.won,.segment-prediction.won{color:var(--green)}
 .wager-settlement.lost,.segment-prediction.lost{color:var(--red)}
+
+.prediction-context{margin:-4px 0 18px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--raised)}.prediction-context-top{display:flex;justify-content:space-between;align-items:center;gap:8px}.prediction-context-top span{font:8px monospace;color:var(--muted);letter-spacing:.6px}.prediction-context-top strong{font:600 15px monospace}.prediction-context-time,.prediction-context-note{font-size:9px;line-height:1.6;color:var(--muted);margin:6px 0 10px}.prediction-hour{position:relative;height:8px;border-radius:4px;background:var(--surface);overflow:hidden}.prediction-hour span{position:absolute;height:100%;background:var(--cyan);border-radius:4px}.prediction-hour-labels{display:flex;justify-content:space-between;gap:8px;margin-top:6px;font:8px monospace;color:var(--muted)}#ticket-interval-timing{color:var(--text)}#ticket-comparison{font:10px monospace;line-height:1.5;margin:12px 0}.prediction-win-rules{display:grid;gap:6px;font:10px monospace;line-height:1.5}.prediction-win-rules span:first-child{color:var(--green)}.prediction-win-rules span:last-child{color:var(--red)}.prediction-context[data-side="up"] .prediction-win-rules span:first-child,.prediction-context[data-side="down"] .prediction-win-rules span:last-child{font-weight:700;text-decoration:underline;text-underline-offset:3px}.prediction-context-note{margin:10px 0 0}
+
+.ticket-title.sr-only{margin:0;padding:0;border:0}
+
+/* Compact prediction ticket: emphasize decisions, keep details within reach. */
+.workspace>.ticket{padding:14px;min-width:0}
+.ticket .ticket-market{position:relative;padding:0 0 10px}
+.ticket .ticket-status-line{position:absolute;right:0;top:2px}
+.ticket .ticket-coin{padding-right:54px;min-height:28px}
+.ticket .ticket-coin h3{font-size:17px;line-height:1.3}
+.ticket .ticket-selected-window{margin-top:7px;padding:7px 8px;gap:4px 8px}
+.ticket .ticket-selected-window strong,.ticket .ticket-selected-window span{font-size:10px}
+.ticket .benchmark{padding:10px;margin-bottom:8px}
+.ticket .benchmark>div:first-child{width:100%}
+.ticket .benchmark strong{font-size:20px;margin-top:4px}
+.ticket .benchmark-delta{display:none}
+.ticket .benchmark .eyebrow{font-size:8px;color:var(--muted)}
+.ticket .prediction-context{padding:9px 10px;margin:0 0 12px}
+.ticket .prediction-context-top strong{font-size:16px}
+.ticket .prediction-context-time{font-size:9px;line-height:1.4;margin:4px 0 8px}
+.ticket .prediction-hour{height:6px}
+.ticket #ticket-comparison{font-size:11px;line-height:1.4;margin:8px 0}
+.ticket .prediction-win-rules{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:10px}
+.ticket .prediction-context-note{display:none}
+.ticket .side-label{margin:8px 0 7px;font-size:11px}
+.ticket .outcomes{gap:8px;margin-bottom:10px}
+.ticket .outcome{padding:10px;min-height:84px}
+.ticket .outcome #up-chance,.ticket .outcome #down-chance{font-size:24px}
+.ticket .outcome .outcome-quote{margin-top:4px;font-size:10px}
+.ticket .outcome small:last-child{display:none}
+.ticket .budget-input{padding:8px 10px}
+.ticket .budget-input input{font-size:20px;min-width:0}
+.ticket .stake-presets{gap:4px;margin-top:6px}
+.ticket .stake-presets button{padding:8px 3px;font-size:10px;min-width:0}
+.ticket .order-math{margin:10px 0}
+.ticket .order-math>div{padding:4px 0;font-size:11px}
+.ticket .order-math strong{font-size:12px}
+.ticket .order-math .profit-row{padding-top:7px;margin-top:4px}
+.ticket .submit-prediction{padding:12px 10px;min-height:42px;font-size:12px}
+.ticket .ticket-note{font-size:9px;margin:6px 0 0}
+.ticket .ticket-rule{margin-top:10px;padding-top:8px}
+.ticket .ticket-rule>span{font-size:8px;letter-spacing:.4px}
+.ticket .ticket-rule p{font-size:10px;line-height:1.5}
+@media(min-width:851px){
+  .workspace>.ticket{position:sticky;top:12px;max-height:calc(100dvh - 24px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--muted) transparent}
+}
+@media(max-width:850px){
+  .workspace>.ticket{padding:16px}
+  .ticket .outcome{min-height:90px}
+  .ticket .stake-presets button{min-height:38px}
+  .ticket .budget-input input{font-size:22px}
+}
+
+/* Selected coin occupies the graph gutter beside the price plot. */
+.chart-coin-icon{position:absolute;left:0;top:35px;width:var(--tier-gutter);height:var(--chart-height);display:flex;align-items:center;justify-content:center;pointer-events:none}
+.chart-coin-icon img{width:32px;height:32px;object-fit:contain}
+@media(max-height:820px){.chart-coin-icon{top:30px}}
+@media(max-width:850px){.chart-coin-icon{top:35px}}
+
+/* Live wall-clock times remain readable alongside the spot price. */
+.price-clock{flex-wrap:wrap;gap:7px 10px}
+.price-clock strong{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.4}
+.price-clock .clock-divider{color:var(--muted);font-size:16px}
+@media(max-width:480px){.price-clock strong{font-size:16px}}
+
+/* A compact instrument header: price, live clocks, and market window. */
+.terminal-overview.overview{padding:16px 18px!important;border-radius:12px}
+.terminal-overview .overview-top{display:grid;grid-template-columns:minmax(130px,1fr) auto auto;gap:20px;align-items:center}
+.terminal-overview .price-heading{display:flex;align-items:center;flex-wrap:wrap;gap:6px 9px}
+.terminal-overview #coin-name{font-size:10px;font-weight:600;letter-spacing:1.2px;color:var(--text)}
+.terminal-overview .price-context{margin:0;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font:8px 'JetBrains Mono',monospace;color:var(--muted);letter-spacing:.5px}
+.terminal-overview .price-row{margin-top:8px}
+.terminal-overview .spot{display:flex;align-items:flex-start;flex-direction:column;gap:5px;font-size:26px;letter-spacing:-1px;line-height:1.15}
+.terminal-overview .spot>#btc-change{margin:0;font:9px 'JetBrains Mono',monospace;letter-spacing:0}
+.terminal-overview .price-clock{display:flex;align-items:center;white-space:nowrap}
+.terminal-overview .clock-face{flex-direction:column;gap:9px}
+.terminal-overview .clock-caption{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:9px}
+.terminal-overview .clock-caption .status-dot{width:5px;height:5px}
+.terminal-overview .price-clock strong{font:500 17px 'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;color:var(--text);letter-spacing:-.5px;line-height:1.3}
+.terminal-overview .hour-window{display:flex;flex-direction:column;gap:8px;text-align:left}
+.terminal-overview .window-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.terminal-overview .window-heading .eyebrow{letter-spacing:.5px}
+.terminal-overview .hour-time-navigation{display:flex;justify-content:space-between;border:1px solid var(--border);background:var(--bg)}
+.terminal-overview .hour-time-navigation>#hour-window-label{font:500 13px 'JetBrains Mono',monospace;color:var(--text)}
+.terminal-overview .hour-time-navigation button{border:0;background:var(--raised);color:var(--text)}
+.terminal-overview .hour-time-navigation button:hover:not(:disabled){background:var(--surface);color:var(--cyan)}
+.terminal-overview .hour-time-navigation button:disabled{cursor:default;opacity:.25}
+.terminal-overview .hour-window>#current-hour{align-self:flex-end;width:auto;height:auto;gap:6px;color:var(--green)}
+.terminal-overview .hour-window>#current-hour[hidden]{display:none}
+@media(min-width:851px) and (max-width:1250px){
+ .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto;gap:14px 20px}
+ .terminal-overview .price-clock{border:0}
+ .terminal-overview .clock-face{flex-direction:row;align-items:center;gap:10px}
+}
+@media(max-width:850px){
+ .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto;gap:16px}
+ .terminal-overview .price-clock{border:0}
+ .terminal-overview .clock-face{flex-direction:row;align-items:center;gap:10px}
+}
+@media(max-width:480px){
+ .terminal-overview.overview{padding:14px!important}
+ .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr);gap:14px}
+ .terminal-overview .hour-window{width:100%;grid-row:2}
+ .terminal-overview .clock-face{flex-direction:column;align-items:flex-start;gap:5px}
+ .terminal-overview .spot{flex-direction:row;align-items:baseline;gap:10px;flex-wrap:wrap}
+}
+
+/* Keep price, timezone-suffixed clocks, and navigation on a single desktop row. */
+.terminal-overview .overview-top{grid-template-columns:minmax(110px,1fr) auto auto;gap:14px}
+.terminal-overview .price-clock{grid-column:auto;grid-row:auto;flex-wrap:nowrap;border-top:0;border-left:1px solid var(--border);border-right:1px solid var(--border)}
+.terminal-overview .clock-face{display:block}
+.terminal-overview .price-clock strong{font-size:17px}
+@media(max-width:1050px) and (min-width:851px){
+ .terminal-overview.overview{padding:12px!important}
+ .terminal-overview .overview-top{gap:10px}
+ .terminal-overview .price-clock strong{font-size:15px}
+ .terminal-overview .spot{font-size:23px}
+}
+@media(max-width:650px){
+ .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto}
+ .terminal-overview .price-clock{grid-column:1/-1;grid-row:2;border:0;border-top:1px solid var(--border)}
+ .terminal-overview .hour-window{grid-row:1;width:auto}
+}
+@media(max-width:380px){
+ .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr)}
+ .terminal-overview .hour-window{grid-row:2;width:100%}
+ .terminal-overview .price-clock{grid-row:3}
+}
+
+.terminal-overview .price-clock .clock-divider{font-size:20px;font-weight:800;line-height:1;color:var(--text)}
+
+#review-dialog .review-close{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:44px;height:44px;padding:9px;border:1px solid var(--muted);border-radius:9px;background:var(--raised);color:var(--text)}
+#review-dialog .review-close svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round}
+#review-dialog .review-close:hover{background:var(--surface);border-color:var(--text)}
+
+#review-dialog .review-actions{display:flex;align-items:stretch;gap:10px;margin-top:16px}
+#review-dialog .review-cancel{min-height:44px;padding:12px 20px;border:1px solid var(--muted);border-radius:6px;background:var(--raised);color:var(--text);font-weight:600}
+#review-dialog .review-cancel:hover{border-color:var(--text);background:var(--surface)}
+#review-dialog .review-actions .submit-prediction{flex:1;min-width:0;min-height:44px}
+
+/* Center live clocks in the space between price and hour navigation. */
+.terminal-overview .overview-top{grid-template-columns:auto minmax(0,1fr) auto;gap:16px}
+.terminal-overview .price-clock{justify-self:stretch;justify-content:center;gap:12px;padding:0 12px}
+.terminal-overview .hour-window{min-width:244px}
+.terminal-overview .hour-time-navigation{gap:12px;padding:4px;border-radius:10px}
+.terminal-overview .hour-time-navigation button{width:40px;height:40px;flex-shrink:0;border-radius:7px;font-size:20px}
+.terminal-overview .hour-time-navigation svg{width:22px;height:22px;stroke-width:2.25}
+.terminal-overview .hour-time-navigation>#hour-window-label{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.terminal-overview .hour-window>#current-hour{min-height:36px;padding:6px 10px;font-size:12px;border:1px solid var(--border);border-radius:7px;background:var(--raised)}
+.terminal-overview .window-heading .eyebrow{font-size:9px}
+@media(min-width:851px) and (max-width:1150px){
+ .terminal-overview .overview-top{gap:8px}
+ .terminal-overview .price-clock{gap:8px;padding:0 8px}
+ .terminal-overview .hour-window{min-width:220px}
+ .terminal-overview .hour-time-navigation{gap:8px}
+ .terminal-overview .hour-time-navigation button{width:36px;height:40px}
+ .terminal-overview .hour-time-navigation>#hour-window-label{font-size:14px}
+}
+@media(max-width:720px){
+ .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto}
+ .terminal-overview .price-clock{grid-column:1/-1;grid-row:2;justify-content:center;border:0;border-top:1px solid var(--border);padding:12px 0 0}
+ .terminal-overview .hour-window{grid-column:2;grid-row:1;min-width:220px}
+ .terminal-overview .hour-time-navigation>#hour-window-label{font-size:14px}
+}
+@media(max-width:420px){
+ .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr)}
+ .terminal-overview .hour-window{grid-column:1;grid-row:2;min-width:0;width:100%}
+ .terminal-overview .price-clock{grid-row:3}
+}
+
+/* Only the banner fractional digits follow the latest one-second price move. */
+#btc-spot .spot-decimals[data-trend="up"]{color:var(--green)}
+#btc-spot .spot-decimals[data-trend="down"]{color:var(--red)}

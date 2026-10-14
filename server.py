@@ -1,5 +1,11 @@
 """Local BTC60 demo server: SQLite accounts, sessions, orders and settlements."""
+from concurrent.futures import ThreadPoolExecutor
+from decimal import Decimal, ROUND_CEILING
 import argparse
+import odds
+import simulated_prices
+import live_oil
+import oilprice_api
 import fcntl
 import hashlib
 import gzip
@@ -82,30 +88,118 @@ def initialize():
         ''')
         if seed_coins:
             for coin in json.loads((ROOT / 'coins.seed.json').read_text()):
-                conn.execute('INSERT INTO coins VALUES(?,?,?,?,?,?,?,?)', (coin['symbol'],coin['name'],coin['product'],coin['precision'],coin['demoBase'],coin['icon'],int(coin['enabled']),coin['sortOrder']))
+                conn.execute('INSERT INTO coins(symbol,name,product,precision,demo_base,icon,enabled,sort_order) VALUES(?,?,?,?,?,?,?,?)', (coin['symbol'],coin['name'],coin['product'],coin['precision'],coin['demoBase'],coin['icon'],int(coin['enabled']),coin['sortOrder']))
         if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=1').fetchone():
             # Add new catalog entries once, preserving administrator changes on restart.
             for coin in json.loads((ROOT / 'coins.seed.json').read_text())[5:]:
                 if conn.execute('SELECT 1 FROM coins WHERE symbol=?', (coin['symbol'],)).fetchone():
                     continue
                 room = conn.execute('SELECT count(*) FROM coins WHERE enabled=1').fetchone()[0] < 8
-                conn.execute('INSERT INTO coins VALUES(?,?,?,?,?,?,?,?)', (coin['symbol'],coin['name'],coin['product'],coin['precision'],coin['demoBase'],coin['icon'],int(coin['enabled'] and room),coin['sortOrder']))
+                conn.execute('INSERT INTO coins(symbol,name,product,precision,demo_base,icon,enabled,sort_order) VALUES(?,?,?,?,?,?,?,?)', (coin['symbol'],coin['name'],coin['product'],coin['precision'],coin['demoBase'],coin['icon'],int(coin['enabled'] and room),coin['sortOrder']))
             conn.execute('INSERT INTO catalog_migrations VALUES(1)')
         if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=2').fetchone():
             conn.execute("UPDATE coins SET enabled=0 WHERE symbol='LINK'")
             coin = next(c for c in json.loads((ROOT / 'coins.seed.json').read_text()) if c['symbol']=='LTC')
             room = conn.execute('SELECT count(*) FROM coins WHERE enabled=1').fetchone()[0] < 8
-            conn.execute('INSERT OR IGNORE INTO coins VALUES(?,?,?,?,?,?,?,?)', (coin['symbol'],coin['name'],coin['product'],coin['precision'],coin['demoBase'],coin['icon'],int(room),coin['sortOrder']))
+            conn.execute('INSERT OR IGNORE INTO coins(symbol,name,product,precision,demo_base,icon,enabled,sort_order) VALUES(?,?,?,?,?,?,?,?)', (coin['symbol'],coin['name'],coin['product'],coin['precision'],coin['demoBase'],coin['icon'],int(room),coin['sortOrder']))
             conn.execute('INSERT INTO catalog_migrations VALUES(2)')
+
+
+        # Add categories without rebuilding existing accounts or prediction tables.
+        conn.execute('CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL, icon TEXT NOT NULL, accent TEXT NOT NULL, background TEXT NOT NULL, unit TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0)')
+        for category in json.loads((ROOT / 'categories.seed.json').read_text()):
+            conn.execute('INSERT OR IGNORE INTO categories VALUES(?,?,?,?,?,?,?,?)', (category['id'],category['name'],category['description'],category['icon'],category['accent'],category['background'],category['unit'],category['sortOrder']))
+        columns = {row['name'] for row in conn.execute('PRAGMA table_info(coins)')}
+        for name, definition in [('category', "TEXT NOT NULL DEFAULT 'crypto'"), ('feed', "TEXT NOT NULL DEFAULT 'coinbase' CHECK(feed IN ('coinbase','simulated'))"), ('unit', "TEXT NOT NULL DEFAULT 'USD'")]:
+            if name not in columns:
+                conn.execute(f'ALTER TABLE coins ADD COLUMN {name} {definition}')
+        conn.executescript("""
+        DROP TRIGGER IF EXISTS max_enabled_coins_insert;
+        DROP TRIGGER IF EXISTS max_enabled_coins_update;
+        CREATE TRIGGER max_enabled_coins_insert BEFORE INSERT ON coins
+        WHEN NEW.enabled=1 AND (SELECT count(*) FROM coins WHERE enabled=1 AND category=NEW.category)>=8
+        BEGIN SELECT RAISE(ABORT,'Maximum 8 enabled instruments per category'); END;
+        CREATE TRIGGER max_enabled_coins_update BEFORE UPDATE OF enabled,category ON coins
+        WHEN NEW.enabled=1 AND (OLD.enabled=0 OR OLD.category<>NEW.category)
+          AND (SELECT count(*) FROM coins WHERE enabled=1 AND category=NEW.category)>=8
+        BEGIN SELECT RAISE(ABORT,'Maximum 8 enabled instruments per category'); END;
+        CREATE TRIGGER IF NOT EXISTS preserve_prediction_feed BEFORE UPDATE OF product,feed,category,demo_base ON coins
+        WHEN (NEW.product<>OLD.product OR NEW.feed<>OLD.feed OR NEW.category<>OLD.category OR NEW.demo_base<>OLD.demo_base)
+          AND EXISTS(SELECT 1 FROM predictions WHERE coin=OLD.symbol)
+        BEGIN SELECT RAISE(ABORT,'Instrument has predictions; preserve its price source'); END;
+        CREATE TRIGGER IF NOT EXISTS instrument_category_insert BEFORE INSERT ON coins
+        WHEN NOT EXISTS(SELECT 1 FROM categories WHERE id=NEW.category)
+        BEGIN SELECT RAISE(ABORT,'Unknown category'); END;
+        CREATE TRIGGER IF NOT EXISTS instrument_category_update BEFORE UPDATE OF category ON coins
+        WHEN NOT EXISTS(SELECT 1 FROM categories WHERE id=NEW.category)
+        BEGIN SELECT RAISE(ABORT,'Unknown category'); END;
+        CREATE TRIGGER IF NOT EXISTS preserve_instrument_category BEFORE DELETE ON categories
+        WHEN EXISTS(SELECT 1 FROM coins WHERE category=OLD.id)
+        BEGIN SELECT RAISE(ABORT,'Category has instruments'); END;
+        CREATE TRIGGER IF NOT EXISTS preserve_category_id BEFORE UPDATE OF id ON categories
+        WHEN EXISTS(SELECT 1 FROM coins WHERE category=OLD.id)
+        BEGIN SELECT RAISE(ABORT,'Category has instruments; preserve its id'); END;
+        CREATE INDEX IF NOT EXISTS coins_category ON coins(category,enabled,sort_order);
+        """)
+        if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=3').fetchone():
+            for instrument in json.loads((ROOT / 'oil.seed.json').read_text()):
+                conn.execute('INSERT INTO coins(symbol,name,product,precision,demo_base,icon,enabled,sort_order,category,feed,unit) VALUES(?,?,?,?,?,?,?,?,?,?,?)', (instrument['symbol'],instrument['name'],instrument['product'],instrument['precision'],instrument['demoBase'],instrument['icon'],int(instrument['enabled']),instrument['sortOrder'],instrument['category'],instrument['feed'],instrument['unit']))
+            conn.execute('INSERT INTO catalog_migrations VALUES(3)')
+
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS instrument_sources(
+          coin TEXT PRIMARY KEY REFERENCES coins(symbol), provider TEXT NOT NULL CHECK(provider='twelvedata'),
+          product TEXT NOT NULL DEFAULT '');
+        CREATE TABLE IF NOT EXISTS prediction_sources(
+          prediction_id TEXT PRIMARY KEY REFERENCES predictions(id), provider TEXT NOT NULL,
+          product TEXT NOT NULL);
+        """)
+        if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=4').fetchone():
+            for row in conn.execute("SELECT symbol FROM coins WHERE category='oil'").fetchall():
+                conn.execute('INSERT OR IGNORE INTO instrument_sources VALUES(?,?,?)',(row['symbol'],'twelvedata',live_oil.SYMBOLS.get(row['symbol'],'')))
+            conn.execute('INSERT INTO catalog_migrations VALUES(4)')
+
+        if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=5').fetchone():
+            conn.executescript("""
+            ALTER TABLE instrument_sources RENAME TO instrument_sources_v4;
+            CREATE TABLE instrument_sources(
+              coin TEXT PRIMARY KEY REFERENCES coins(symbol),
+              provider TEXT NOT NULL CHECK(provider IN ('twelvedata','oilpriceapi')),
+              product TEXT NOT NULL DEFAULT '');
+            INSERT INTO instrument_sources SELECT * FROM instrument_sources_v4;
+            DROP TABLE instrument_sources_v4;
+            INSERT INTO catalog_migrations VALUES(5);
+            """)
+        if oilprice_api.configured():
+            for symbol,product in oilprice_api.SYMBOLS.items():
+                conn.execute("UPDATE instrument_sources SET provider='oilpriceapi',product=? WHERE coin=?",(product,symbol))
 
     os.chmod(DB, 0o600)
 
 
-def candle_close(coin, boundary):
+def instrument_source(coin, legacy=False):
     with connect() as conn:
-        record = conn.execute('SELECT product FROM coins WHERE symbol=?', (coin,)).fetchone()
-    if not record:
-        raise ValueError('Unknown coin.')
+        row=conn.execute('SELECT symbol,product,feed,demo_base,category FROM coins WHERE symbol=?',(coin,)).fetchone()
+        override=None if legacy else conn.execute('SELECT provider,product FROM instrument_sources WHERE coin=?',(coin,)).fetchone()
+    if not row:
+        raise ValueError('Unknown instrument.')
+    source=dict(row)
+    if override:
+        source.update(feed=override['provider'],product=override['product'])
+    return source
+
+
+def candle_close(coin, boundary, source=None):
+    record=source or instrument_source(coin)
+    if record['feed']=='oilpriceapi':
+        raise ValueError('OilPriceAPI spot feed has no minute benchmark for this interval.')
+    if record['feed']=='twelvedata':
+        history=live_oil.candles(record['product'],boundary-60,boundary)
+        candle=next((c for c in history if c[0]==boundary-60),None)
+        if candle is None:raise ValueError('Exact oil settlement minute unavailable. Retry shortly.')
+        return candle[4]
+    if record['feed']=='simulated':
+        return simulated_prices.price(coin, record['demo_base'], boundary-1)
     product = urllib.parse.quote(record['product'], safe='')
     start = datetime.fromtimestamp(boundary - 60, timezone.utc).isoformat()
     end = datetime.fromtimestamp(boundary, timezone.utc).isoformat()
@@ -119,9 +213,15 @@ def candle_close(coin, boundary):
     raise ValueError('Benchmark history is unavailable. Try again shortly.')
 
 
-def fresh_spot(coin):
-    with connect() as conn:
-        product = conn.execute('SELECT product FROM coins WHERE symbol=?', (coin,)).fetchone()['product']
+def fresh_spot(coin, source=None):
+    record=source or instrument_source(coin)
+    if record['feed']=='oilpriceapi':
+        return oilprice_api.fresh_spot(record['product'])
+    if record['feed']=='twelvedata':
+        return live_oil.quote(record['product'])['price']
+    if record['feed']=='simulated':
+        return simulated_prices.price(coin, record['demo_base'], int(time.time()))
+    product = record['product']
     request = urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/ticker', headers={'User-Agent':'BTC60-local-demo/1.0'})
     try:
         with urllib.request.urlopen(request, timeout=8) as response:
@@ -137,28 +237,62 @@ def fresh_spot(coin):
         raise ValueError('Live price unavailable. Reconnect before predicting.')
 
 
-def estimated_up(strike, spot, now, start, end, volatility):
-    if now-start<1:
-        return 50
-    uncertainty=max(.0001, volatility)*math.sqrt(max(1/60, (end-now)/60))
-    z=math.log(spot/strike)/uncertainty
-    probability=100/(1+math.exp(max(-700,min(700,-1.7*z))))
-    return max(1,min(99,math.floor(probability+.5)))
+def estimated_up(strike, spot, now, start, end, volatility, calibration=None):
+    return max(1, min(99, math.floor(100*odds.probability(strike, spot, now, end, volatility, calibration)+.5)))
 
 
-def market_up(coin, strike, spot, now, start, end):
-    with connect() as conn:
-        product=conn.execute('SELECT product FROM coins WHERE symbol=?',(coin,)).fetchone()['product']
-    hour=now//3600*3600
-    query=urllib.parse.urlencode({'granularity':60,'start':datetime.fromtimestamp(hour-60,timezone.utc).isoformat(),'end':datetime.fromtimestamp(now,timezone.utc).isoformat()})
-    request=urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/candles?'+query,headers={'User-Agent':'BTC60-local-demo/1.0'})
-    try:
+HISTORY_CACHE = {}
+HISTORY_LOCK = threading.Lock()
+
+
+def pricing_history(product, now, instrument=None):
+    if instrument and instrument['feed']=='oilpriceapi':
+        return oilprice_api.candles(product,0,0)
+    if instrument and instrument['feed']=='twelvedata':
+        boundary=int(now)//60*60
+        return live_oil.candles(product,boundary-86400,boundary)
+    if instrument and instrument['feed']=='simulated':
+        boundary=int(now)//60*60
+        return simulated_prices.candles(instrument['symbol'],instrument['demo_base'],boundary-86400,boundary)
+    # Six requests stay below Coinbase's 300-candle limit per request.
+    boundary = int(now)//60*60
+    key = (product, boundary)
+    with HISTORY_LOCK:
+        cached = HISTORY_CACHE.get(key)
+    if cached is not None:
+        return cached
+    with HISTORY_LOCK:
+        previous = max((k for k in HISTORY_CACHE if k[0]==product and 0<boundary-k[1]<=300), default=None, key=lambda k:k[1])
+        previous_candles = list(HISTORY_CACHE[previous]) if previous else []
+    candles = {c[0]:c for c in previous_candles if boundary-86400<=c[0]<boundary}
+    ranges = [(previous[1]-60,boundary)] if previous else [(boundary-(i+1)*14400,boundary-i*14400) for i in range(6)]
+
+    def fetch_batch(interval):
+        start,end=interval
+        query=urllib.parse.urlencode({'granularity':60,'start':datetime.fromtimestamp(start,timezone.utc).isoformat(),'end':datetime.fromtimestamp(end,timezone.utc).isoformat()})
+        request=urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/candles?'+query,headers={'User-Agent':'BTC60-local-demo/1.0'})
         with urllib.request.urlopen(request,timeout=8) as response:
-            candles=json.load(response)
-        closed=sorted((c for c in candles if hour-60<=c[0] and c[0]+60<=now and math.isfinite(float(c[4])) and c[4]>0),key=lambda c:c[0])
-        returns=[math.log(b[4]/a[4]) for a,b in zip(closed,closed[1:]) if b[0]-a[0]==60]
-        volatility=max(.0001,math.sqrt(sum(r*r for r in returns)/len(returns))) if returns else .0001
-        return estimated_up(strike,spot,now,start,end,volatility)
+            batch=json.load(response)
+        if not isinstance(batch,list):raise ValueError('Invalid pricing history.')
+        return [c for c in batch if isinstance(c,list) and len(c)>=5 and all(isinstance(c[i],(int,float)) and math.isfinite(c[i]) for i in (0,4)) and c[4]>0 and start<=c[0]<end]
+
+    # A cold load takes two bounded waves; subsequent minutes fetch only the delta.
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        for batch in pool.map(fetch_batch,ranges):
+            candles.update({c[0]:c for c in batch})
+    result=sorted(candles.values())
+    with HISTORY_LOCK:
+        for old in list(HISTORY_CACHE):
+            if boundary-old[1]>600:del HISTORY_CACHE[old]
+        HISTORY_CACHE[key]=result
+    return result
+
+
+def market_up(coin, strike, spot, now, start, end, source=None):
+    instrument=source or instrument_source(coin)
+    try:
+        volatility = odds.minute_volatility(pricing_history(instrument['product'], now, instrument), now)
+        return estimated_up(strike, spot, now, start, end, volatility, odds.calibrations().get(coin))
     except Exception:
         raise ValueError('Pricing history unavailable. Review again shortly.')
 
@@ -168,18 +302,23 @@ def _settle_due(user_id=None):
         pending = conn.execute('SELECT p.* FROM predictions p LEFT JOIN settlements s ON s.prediction_id=p.id WHERE s.prediction_id IS NULL AND p.ends_at<=? AND (? IS NULL OR p.user_id=?)', (int(time.time()) - 5, user_id, user_id)).fetchall()
     prices = {}
     for p in pending:
-        key = (p['coin'], p['ends_at'])
+        with connect() as conn:
+            snapshot=conn.execute('SELECT provider,product FROM prediction_sources WHERE prediction_id=?',(p['id'],)).fetchone()
+        source=instrument_source(p['coin'],legacy=True)
+        if snapshot:source.update(feed=snapshot['provider'],product=snapshot['product'])
+        key = (p['coin'], p['ends_at'], source['feed'], source['product'])
         try:
             if key not in prices:
-                prices[key] = candle_close(*key)
+                prices[key] = candle_close(p['coin'],p['ends_at'],source=source)
             close = prices[key]
         except Exception:
             continue  # Keep pending and retry; never invent a settlement.
         outcome = 'up' if close >= p['strike'] else 'down'
-        payout = p['contracts'] * 100 if outcome == p['side'] else 0
+        payout = (p['cost_cents']*100+p['cents']-1)//p['cents'] if outcome == p['side'] else 0
         with connect() as conn:
             conn.execute('BEGIN IMMEDIATE')
-            inserted = conn.execute('INSERT OR IGNORE INTO settlements(prediction_id,close_price,outcome,payout_cents,settled_at) VALUES(?,?,?,?,?)', (p['id'], close, outcome, payout, int(time.time()))).rowcount
+            settlement_source='Twelve Data live oil minute close' if source['feed']=='twelvedata' else 'Simulated oil minute close · '+simulated_prices.VERSION if source['feed']=='simulated' else 'Coinbase minute-close proxy'
+            inserted = conn.execute('INSERT OR IGNORE INTO settlements(prediction_id,close_price,outcome,payout_cents,settled_at,source) VALUES(?,?,?,?,?,?)', (p['id'], close, outcome, payout, int(time.time()), settlement_source)).rowcount
             if inserted:
                 conn.execute('UPDATE users SET balance_cents=balance_cents+? WHERE id=?', (payout, p['user_id']))
 
@@ -236,15 +375,70 @@ class Handler(SimpleHTTPRequestHandler):
     def account(self, session):
         with connect() as conn:
             user = conn.execute('SELECT id,name,email,balance_cents FROM users WHERE id=?', (session['user_id'],)).fetchone()
-            positions = [dict(row) for row in conn.execute('SELECT p.*,s.close_price,s.outcome,s.payout_cents,s.settled_at,s.source FROM predictions p LEFT JOIN settlements s ON s.prediction_id=p.id WHERE p.user_id=? ORDER BY p.created_at DESC', (session['user_id'],))]
+            positions = [dict(row) for row in conn.execute('SELECT p.*,i.category,i.name AS instrument_name,i.unit,ps.provider AS pricing_source,s.close_price,s.outcome,s.payout_cents,s.settled_at,s.source FROM predictions p JOIN coins i ON i.symbol=p.coin LEFT JOIN prediction_sources ps ON ps.prediction_id=p.id LEFT JOIN settlements s ON s.prediction_id=p.id WHERE p.user_id=? ORDER BY p.created_at DESC', (session['user_id'],))]
         return {'user': dict(user), 'csrf': session['csrf'], 'predictions': positions}
 
     def do_GET(self):
         path = urllib.parse.urlsplit(self.path).path
+        if path == '/api/categories':
+            with connect() as conn:
+                categories = [dict(row) for row in conn.execute('SELECT c.*,count(i.symbol) AS instrumentCount FROM categories c JOIN coins i ON i.category=c.id AND i.enabled=1 GROUP BY c.id ORDER BY c.sort_order,c.id')]
+                for category in categories:
+                    instruments=[dict(row) for row in conn.execute('SELECT symbol,name,feed FROM coins WHERE category=? AND enabled=1 ORDER BY sort_order,symbol',(category['id'],))]
+                    overrides={row['coin']:row['product'] for row in conn.execute('SELECT * FROM instrument_sources')}
+                    category['instruments']=[{'symbol':i['symbol'],'name':i['name'],'liveSupported':bool(overrides.get(i['symbol'])) if i['symbol'] in overrides else True} for i in instruments]
+                    if any(i['symbol'] in overrides for i in instruments):
+                        category.update(provider=oilprice_api.PROVIDER if oilprice_api.configured() else 'Twelve Data',feedState='configured' if oilprice_api.configured() or live_oil.configured() else 'setup_required',supportedCount=sum(bool(overrides.get(i['symbol'])) for i in instruments),quoteCadence='Spot assessments · hourly predictions unavailable' if oilprice_api.configured() else 'Minute updates')
+                    else:category.update(provider='Coinbase',feedState='available',supportedCount=len(instruments),quoteCadence='Streaming prices')
+            return self.reply(200, {'categories':categories})
         if path == '/api/coins':
             with connect() as conn:
-                records = [dict(row) for row in conn.execute('SELECT symbol,name,product,precision,demo_base AS demoBase,icon,enabled,sort_order AS sortOrder FROM coins ORDER BY sort_order,symbol')]
-            return self.reply(200, {'coins': records, 'marketConfig': {'quotes': QUOTES, 'settlement': {'source':'Coinbase Exchange', 'method':'Minute candle close immediately before interval boundaries', 'version':'coinbase-minute-close-v1', 'tie':'up'}}})
+                records = [dict(row) for row in conn.execute('SELECT symbol,name,product,precision,demo_base AS demoBase,icon,enabled,sort_order AS sortOrder,category,feed,unit FROM coins ORDER BY category,sort_order,symbol')]
+                for instrument in records:
+                    override=conn.execute('SELECT * FROM instrument_sources WHERE coin=?',(instrument['symbol'],)).fetchone()
+                    if override:
+                        instrument.update(feed=override['provider'],product=override['product'],maxPriceAgeMs=live_oil.MAX_AGE*1000,feedState='unsupported' if not override['product'] else 'configured' if (oilprice_api.configured() if override['provider']=='oilpriceapi' else live_oil.configured()) else 'setup_required')
+            return self.reply(200, {'coins': records, 'marketConfig': {'quotes': QUOTES, 'oddsVersion': odds.VERSION, 'calibrations': odds.calibrations(), 'settlement': {'source':'Coinbase Exchange', 'method':'Minute candle close immediately before interval boundaries', 'version':'coinbase-minute-close-v1', 'tie':'up'}}})
+        if path in ('/api/spot','/api/candles'):
+            query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            coin=query.get('coin',[''])[0]
+            with connect() as conn:
+                record=conn.execute('SELECT * FROM coins WHERE symbol=? AND enabled=1',(coin,)).fetchone()
+            if not record:
+                return self.reply(400, {'error':'Unknown instrument.'})
+            record=instrument_source(coin)
+            if record['feed'] not in ('simulated','twelvedata','oilpriceapi'):
+                return self.reply(400, {'error':'Use the instrument price feed.'})
+            now=int(time.time())
+            if path=='/api/spot':
+                try:
+                    tick=oilprice_api.quote(record['product']) if record['feed']=='oilpriceapi' else live_oil.quote(record['product']) if record['feed']=='twelvedata' else {'price':simulated_prices.price(coin,record['demo_base'],now),'time':now*1000,'source':simulated_prices.VERSION}
+                    return self.reply(200,tick)
+                except ValueError as error:
+                    return self.reply(503,{'error':str(error)})
+            try:
+                start=int(query.get('start',[''])[0]);end=int(query.get('end',[''])[0])
+                if not now-86400*30<=start<end<=now or end-start>86400:
+                    raise ValueError()
+            except (ValueError,TypeError):
+                return self.reply(400, {'error':'Choose a candle range within the last 30 days, at most 24 hours long.'})
+            try:
+                candles=oilprice_api.candles(record['product'],start,end) if record['feed']=='oilpriceapi' else live_oil.candles(record['product'],start,end) if record['feed']=='twelvedata' else simulated_prices.candles(coin,record['demo_base'],start,end)
+                return self.reply(200,candles)
+            except ValueError as error:
+                return self.reply(503,{'error':str(error)})
+        if path == '/api/pricing-history':
+            query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            coin = query.get('coin', [''])[0]
+            with connect() as conn:
+                row = conn.execute('SELECT symbol,product,feed,demo_base FROM coins WHERE symbol=? AND enabled=1', (coin,)).fetchone()
+            if row is None:
+                return self.reply(400, {'error':'Unknown coin.'})
+            try:
+                source=instrument_source(coin)
+                return self.reply(200, {'candles':pricing_history(source['product'], time.time(), source)})
+            except Exception:
+                return self.reply(503, {'error':'Pricing history unavailable.'})
         if path == '/api/account':
             session = self.session()
             if not session:
@@ -253,7 +447,7 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith('/api/'):
             return self.reply(404, {'error': 'Unknown endpoint.'})
         # Serve only public application assets, never SQLite, source or dotfiles.
-        public = {'index.html', 'welcome.html', 'login.html', 'signup.html', 'styles.css', 'auth.css', 'auth.js', 'account.js', 'app.js', 'btc-chart.js', 'market-model.js', 'coins.js', 'bootstrap.js', 'splash.js', 'portfolio.html', 'portfolio.js', 'portfolio-model.js', 'portfolio.css', 'theme.js', 'theme.css', 'responsive.css'}
+        public = {'index.html', 'welcome.html', 'login.html', 'signup.html', 'styles.css', 'auth.css', 'auth.js', 'account.js', 'app.js', 'btc-chart.js', 'market-model.js', 'coins.js', 'bootstrap.js', 'splash.js', 'portfolio.html', 'portfolio.js', 'portfolio-model.js', 'portfolio.css', 'theme.js', 'theme.css', 'responsive.css', 'categories.js', 'categories.css'}
         relative = urllib.parse.unquote(path).lstrip('/')
         if not relative:
             self.path = '/welcome.html'
@@ -395,31 +589,33 @@ class Handler(SimpleHTTPRequestHandler):
         start = now // 3600 * 3600 + index * duration * 60
         end = start + duration * 60
         requested_start = data.get('startsAt')
-        if isinstance(requested_start, (int, float)) and now >= requested_start / 1000 + duration * 60:
-            raise ValueError('Too late to place. This interval has expired.')
-        if not start <= now < end or data.get('startsAt') != start * 1000:
+        if isinstance(requested_start, (int, float)) and time.time() >= requested_start / 1000 + duration * 60 - 30:
+            raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
+        if not start <= now < end - 30 or data.get('startsAt') != start * 1000:
             raise ValueError('This market is closed or changed. Review again.')
-        strike = candle_close(coin, start)
-        spot = fresh_spot(coin)
+        source=instrument_source(coin)
+        strike = candle_close(coin, start, source=source)
+        spot = fresh_spot(coin, source=source)
         # Execute at the authoritative live quote, even if the browser's
         # benchmark/history or displayed quote changed during confirmation.
-        up = market_up(coin, strike, spot, now, start, end)
+        up = market_up(coin, strike, spot, now, start, end, source=source)
         cents = up if side == 'up' else 100 - up
-        if not start <= time.time() < end:
-            raise ValueError('Too late to place. This interval has expired.')
-        contracts = math.floor(round(budget * 100) / cents)
-        cost = contracts * cents
+        if not start <= time.time() < end - 30:
+            raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
+        cost = int((Decimal(str(budget))*100).to_integral_value(rounding=ROUND_CEILING))
+        contracts = cost / cents
         with connect() as conn:
             conn.execute('BEGIN IMMEDIATE')
             if conn.execute('SELECT id FROM predictions WHERE user_id=? AND request_id=?', (session['user_id'], request_id)).fetchone():
                 pass
             else:
-                if time.time() >= end:
-                    raise ValueError('Too late to place. This interval has expired.')
-                changed = conn.execute('UPDATE users SET balance_cents=balance_cents-? WHERE id=? AND balance_cents>=?', (cost, session['user_id'], round(budget * 100))).rowcount
-                if not changed or contracts < 1:
+                if time.time() >= end - 30:
+                    raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
+                changed = conn.execute('UPDATE users SET balance_cents=balance_cents-? WHERE id=? AND balance_cents>=?', (cost, session['user_id'], cost)).rowcount
+                if not changed or contracts <= 0:
                     raise ValueError('Insufficient demo balance.')
                 conn.execute('INSERT INTO predictions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', (secrets.token_hex(16), session['user_id'], request_id, coin, market_id, side, start, end, strike, cents, contracts, cost, now))
+                conn.execute('INSERT INTO prediction_sources VALUES(?,?,?)',(conn.execute('SELECT id FROM predictions WHERE user_id=? AND request_id=?',(session['user_id'],request_id)).fetchone()['id'],source['feed'],source['product']))
         return self.reply(201, self.account(session))
 
 

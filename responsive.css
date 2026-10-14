@@ -7,3 +7,17 @@ button,a,input{touch-action:manipulation}
 @media(max-width:480px){.topbar{padding:9px 12px}.topbar .brand{font-size:16px}.brand small{font-size:7px}.topbar-right{gap:6px}.topbar-right>.muted,.account-name{display:none}.topbar-right strong{font-size:10px}.topbar .brand-mark{width:27px;height:30px;font-size:21px}.topbar .account-link{font-size:9px;padding:7px}.theme-toggle,.portfolio-icon{width:28px;height:28px}.workspace-label>.badge{display:none}.coin-picker{min-width:max-content}.overview-top{gap:12px}.price-row{gap:8px}.price-clock{padding-left:8px}.spot{font-size:22px}.spot>#btc-change{font-size:9px}.hour-window{width:100%;text-align:left;grid-template-columns:1fr auto}.selected-status{font-size:9px;gap:8px}.position-row{align-items:flex-start}.position-row>div:last-child{min-width:100px}.positions-heading h2{font-size:11px}.pending-history-link{font-size:8px}.rules-strip{align-items:flex-start;flex-wrap:wrap}.rules-strip p{flex:1;min-width:220px}.rules-strip button{margin-left:22px}.auth-nav{padding:18px 16px}.auth-nav nav{gap:8px;font-size:10px}.auth-nav .brand{font-size:17px}.auth-card{margin:20px 14px;padding:24px}.auth-card input{font-size:16px}.splash-actions{flex-wrap:wrap}.portfolio-heading{flex-wrap:wrap}.portfolio-stats{gap:8px}.portfolio-stats>.panel{padding:12px}.portfolio-stats strong{font-size:19px}.portfolio-stats span{font-size:8px}.history-filters{width:100%}.history-filters button{flex:1;padding:10px 8px}.history-scroll table{min-width:850px}dialog{padding:18px}footer>span:last-child{display:none}}
 
 .timeline-scroll,.topbar .workspace-label,.history-scroll{scrollbar-width:thin;scrollbar-color:var(--muted) transparent}
+
+/* Prominent instrument choices on prediction screens. */
+.topbar:has(.coin-picker){height:auto;min-height:76px;flex-wrap:wrap;padding-block:12px;gap:14px 24px}
+.topbar .workspace-label:has(.coin-picker){order:3;width:100%;overflow-x:auto;padding-bottom:3px}
+.topbar .coin-picker{display:flex;gap:8px}
+.topbar .coin-button{min-height:58px;padding:9px 14px;gap:10px;border-color:var(--border);background:var(--surface);border-radius:12px;font-size:13px;white-space:nowrap;color:var(--text)}
+.topbar .coin-button img{width:38px;height:38px;object-fit:contain;filter:drop-shadow(0 2px 4px #0003)}
+.topbar .coin-button:hover{background:var(--raised);border-color:var(--category-accent,var(--green))}
+.topbar .coin-button[aria-pressed="true"]{border-color:var(--category-accent,var(--green));color:var(--category-accent,var(--green));background:color-mix(in srgb,var(--category-accent,var(--green)) 12%,var(--surface));box-shadow:inset 0 0 0 1px var(--category-accent,var(--green))}
+.topbar .coin-button:focus-visible{outline:2px solid var(--category-accent,var(--green));outline-offset:3px}
+.ticket .ticket-coin{gap:12px}
+.ticket #ticket-coin-icon{width:44px;height:44px;object-fit:contain;flex-shrink:0}
+.chart-coin-icon img{width:42px;height:42px}
+@media(max-width:650px){.topbar .coin-button{min-height:54px;padding:8px 11px;font-size:12px}.topbar .coin-button img{width:34px;height:34px}.topbar .coin-picker{gap:7px}}

@@ -16,16 +16,18 @@ Each UTC hour shows one 60-minute interval, two 30-minute intervals, and four 15
 
 Up/Down percentages are heuristic model estimates, not calibrated odds. They also set simulated contract prices: 70% Up means an Up contract costs 70¢. Percentages and prices change with spot, time remaining, and recent volatility. Upcoming cards hide percentages; completed cards show results when candle history is available.
 
+The prediction pane shows the selected interval within its UTC hour, current spot and source time, distance from the benchmark, and the exact closing-price conditions for Up and Down. Completed intervals show their closing benchmark; upcoming intervals wait for their opening benchmark. Stale or disconnected prices hide the live comparison.
+
 ## Make a prediction
 
 1. Sign in, select an open interval, and check that the status strip says data is ready.
 2. Choose Up or Down and enter a budget of at least $1 within your available balance.
-3. Review the contract price, whole-contract count, exact cost, possible return, and potential profit.
-4. Confirm before the countdown expires.
+3. Review the contract price, fractional share count, exact cost, possible return, and potential profit.
+4. Confirm before the betting countdown expires. Bets close 30 seconds before the interval ends to allow final processing.
 
 Review updates live. Confirmation buys at the server's current model price within your budget, so the final contract count, cost, and possible return can differ from the displayed review. Check the saved prediction for executed terms. A prediction is saved only when the server accepts it; errors appear in the review.
 
-Only the exact contract cost is deducted. For example, a $10 budget at 70¢ buys 14 contracts for $9.80. A win returns $14, for $4.20 profit; a loss returns $0 and loses $9.80. There are no demo fees.
+The full bet amount is deducted. For example, $10 at 70¢ buys about 14.285714 shares. A win returns $14.29, for $4.29 profit; a loss returns $0 and loses $10. Winning payouts round up to the next cent. There are no demo fees.
 
 ## Results and portfolio
 
@@ -56,3 +58,23 @@ The sun/moon button switches themes and saves your preference across tabs. On sm
 | Awaiting settlement | Keep the server running with internet access; missing candles are retried automatically. |
 
 For setup and checks, see [README.md](../README.md). For backups and database maintenance, see [Database maintenance](DATABASE_MAINTENANCE.md). A database reset removes accounts and predictions; it is not a routine troubleshooting step.
+
+## Choose Oil or Crypto
+
+Open the entry screen and select the large **Oil** or **Crypto** button. Both use
+the same 60 minute playfield, with 15-, 30-, and 60-minute prediction intervals.
+Use **Categories** in the terminal header to switch markets.
+
+Oil has five crude types: WTI, Brent, Dubai, Oman, and Bonny Light. Its amber
+background distinguishes it from Crypto's green background. New oil predictions use **live Twelve Data spot prices**, quoted in USD per barrel.
+WTI and Brent have verified feed mappings. Dubai, Oman, and Bonny Light show
+unavailable until a matching feed is connected. The category screen displays
+connection readiness and real quotes when available. If the key or subscription
+is missing, oil prices remain unavailable. Quotes update minutely; closed sessions
+and stale quotes block predictions. Old simulated bets retain their original source. Crypto continues to use Coinbase prices when connected.
+
+Your account balance is shared. Portfolio history identifies the category of each
+prediction; choose a category to filter history and statistics. Log in or sign up,
+then choose the category you want to play. No real money is used.
+
+OilPriceAPI mode shows dated physical spot assessments for all five crudes. These series do not provide minute settlement benchmarks, so hourly oil predictions are unavailable; Crypto continues normally.
