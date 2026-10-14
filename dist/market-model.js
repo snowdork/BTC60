@@ -55,12 +55,13 @@
   }
   function dataStatus(model,market,now=Date.now()) {
     if(model.isHistorical)return {ready:false,reason:'Historical market',age:null};
+    if(model.coin?.feed==='oilpriceapi'&&model.feedMode!=='demo')return {ready:false,reason:'Spot assessments lack hourly benchmarks',age:Number.isFinite(model.priceUpdatedAt)?Math.max(0,Math.floor((now-model.priceUpdatedAt)/1000)):null};
     if(model.feedMode==='demo')return {ready:false,reason:'Synthetic preview only',age:null};
     const age=Number.isFinite(model.priceUpdatedAt)&&model.priceUpdatedAt>0?Math.max(0,Math.floor((now-model.priceUpdatedAt)/1000)):null;
     if(model.paused)return {ready:false,reason:'Chart paused',age};
     if(model.feedConnection!=='connected')return {ready:false,reason:'Price feed disconnected',age};
     if(age===null||!Number.isFinite(model.spot)||model.spot<=0)return {ready:false,reason:'Waiting for live price',age};
-    if(now-model.priceUpdatedAt>15000||model.priceUpdatedAt>now+5000)return {ready:false,reason:'Price feed stale',age};
+    if(now-model.priceUpdatedAt>(model.coin?.maxPriceAgeMs||15000)||model.priceUpdatedAt>now+5000)return {ready:false,reason:'Price feed stale',age};
     if(model.historyStatus==='error')return {ready:false,reason:'Benchmark history unavailable',age};
     if(model.pricingHistoryStatus==='error')return {ready:false,reason:'Odds history unavailable · reconnect',age};
     if(model.pricingHistoryStatus==='loading')return {ready:false,reason:'Loading odds history',age};
@@ -75,7 +76,7 @@
     markets.forEach(m=>{m.up=config.quotes[m.id];});model.quoteReady=true;model.settlement=config.settlement;model.calibrations=config.calibrations||{};
   }
   function outcome(start,close) { return close >= start ? 'up' : 'down'; }
-  const model={markets,quote,outcome,estimateChances,minuteVolatility,normalCDF,calibratedProbability,dataStatus,configure,quoteReady:false,initialBalance:14250,spot:67528.50,coin:typeof window!=='undefined'?window.RolrCoins.available[0]:null};
+  const model={markets,quote,outcome,estimateChances,minuteVolatility,normalCDF,calibratedProbability,dataStatus,configure,quoteReady:false,initialBalance:14250,spot:67528.50,coin:typeof window!=='undefined'?window.PredictCoins.available[0]:null};
   if (typeof module !== 'undefined' && module.exports) module.exports=model;
-  else root.RolrModel=model;
+  else root.PredictModel=model;
 })(typeof globalThis!=='undefined'?globalThis:this);

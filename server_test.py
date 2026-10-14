@@ -12,6 +12,8 @@ import server
 class AccountsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.oil_config=patch('oilprice_api.configured',return_value=False)
+        cls.oil_config.start()
         cls.temp = tempfile.TemporaryDirectory()
         server.DB = Path(cls.temp.name) / 'test.sqlite3'
         server.initialize()
@@ -23,6 +25,7 @@ class AccountsTest(unittest.TestCase):
         cls.http.shutdown()
         cls.http.server_close()
         cls.temp.cleanup()
+        cls.oil_config.stop()
 
     def request(self, method, path, data=None, cookie='', csrf=''):
         conn = http.client.HTTPConnection('127.0.0.1', self.http.server_port)
@@ -105,14 +108,71 @@ class AccountsTest(unittest.TestCase):
             self.assertEqual(status, 400)
             self.assertEqual(self.request('GET', '/api/account', cookie=cookie)[1]['user']['balance_cents'], balance)
 
+    def test_oil_categories_prices_orders_and_settlements(self):
+        categories = self.request('GET', '/api/categories')[1]['categories']
+        self.assertEqual({c['id'] for c in categories}, {'crypto', 'oil'})
+        self.assertEqual(next(c for c in categories if c['id'] == 'oil')['instrumentCount'], 5)
+        oil = [c for c in self.request('GET', '/api/coins')[1]['coins'] if c['category'] == 'oil']
+        self.assertEqual({c['symbol'] for c in oil}, {'WTI', 'BRENT', 'DUBAI', 'OMAN', 'BONNY'})
+        self.assertTrue(all(c['feed'] == 'twelvedata' and c['unit'] == 'USD/barrel' for c in oil))
+        now = int(server.time.time()) // 3600 * 3600 + 600
+        start = now // 3600 * 3600
+        def history(product,start,end):
+            return server.simulated_prices.candles('WTI',72,start,end)
+        def quote(product):
+            return {'price':server.simulated_prices.price('WTI',72,now),'time':now*1000,'source':'Twelve Data'}
+        with patch('server.time.time', return_value=now), patch('server.live_oil.quote',side_effect=quote), patch('server.live_oil.candles',side_effect=history), patch('server.urllib.request.urlopen', side_effect=AssertionError('Oil must not use Coinbase')):
+            spot = self.request('GET', '/api/spot?coin=WTI')[1]
+            self.assertEqual(spot['price'], server.fresh_spot('WTI'))
+            self.assertEqual(spot['source'], 'Twelve Data')
+            candles = self.request('GET', f'/api/candles?coin=WTI&start={start-60}&end={now}')[1]
+            self.assertEqual(candles[0][4], server.candle_close('WTI', start))
+            self.assertTrue(all(c[1] <= min(c[3], c[4]) <= max(c[3], c[4]) <= c[2] for c in candles))
+            self.assertEqual(self.request('GET', '/api/spot?coin=BTC')[0], 400)
+            self.assertEqual(self.request('GET', f'/api/candles?coin=WTI&start=0&end={now}')[0], 400)
+            _, _, cookie = self.request('POST', '/api/signup', {'name':'Oil player', 'email':'oil@example.com', 'password':'strong-password-oil'})
+            account = self.request('GET', '/api/account', cookie=cookie)[1]
+            user_id, csrf = account['user']['id'], account['csrf']
+            close, strike = server.candle_close('WTI', start+3600), server.candle_close('WTI', start)
+            side = 'up' if close >= strike else 'down'
+            order = {'coin':'WTI', 'marketId':'60-0', 'side':side, 'budget':50, 'requestId':'oil-test-request-0001', 'startsAt':start*1000}
+            status, account, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
+            self.assertEqual(status, 201, account)
+            self.assertEqual(account['predictions'][0]['category'], 'oil')
+            self.assertEqual(account['predictions'][0]['strike'], strike)
+            self.assertEqual(account['user']['balance_cents'], 1420000)
+            self.assertEqual(self.request('POST', '/api/predictions', order, cookie, csrf)[1]['user']['balance_cents'], 1420000)
+            with server.connect() as conn:
+                with self.assertRaises(sqlite3.IntegrityError):
+                    conn.execute("UPDATE coins SET demo_base=100 WHERE symbol='WTI'")
+        with patch('server.time.time', return_value=start+3606), patch('server.live_oil.candles',side_effect=history), patch('server.urllib.request.urlopen', side_effect=AssertionError('Oil settlement must use the selected provider')):
+            server.settle_due(user_id)
+            server.settle_due(user_id)
+            account = self.request('GET', '/api/account', cookie=cookie)[1]
+        settled = account['predictions'][0]
+        self.assertEqual(settled['close_price'], close)
+        self.assertIn('Twelve Data live oil', settled['source'])
+        self.assertEqual(account['user']['balance_cents'], 1420000+settled['payout_cents'])
+
+    def test_live_oil_missing_key_and_unavailable_grades_do_not_return_fake_prices(self):
+        with patch.dict(server.os.environ,{},clear=True),patch('server.urllib.request.urlopen') as network:
+            status,data,_=self.request('GET','/api/spot?coin=WTI')
+            self.assertEqual(status,503)
+            self.assertIn('API key',data['error'])
+            self.assertNotIn('price',data)
+            status,data,_=self.request('GET','/api/spot?coin=DUBAI')
+            self.assertEqual(status,503)
+            self.assertIn('no verified',data['error'])
+            network.assert_not_called()
+
     def test_database_coin_catalog(self):
         with server.connect() as conn:
             conn.execute("UPDATE coins SET enabled=1 WHERE symbol='AVAX'")
-            self.assertEqual(conn.execute('SELECT count(*) FROM coins WHERE enabled=1').fetchone()[0], 8)
+            self.assertEqual(conn.execute('SELECT count(*) FROM coins WHERE enabled=1 AND category="crypto"').fetchone()[0], 8)
             with self.assertRaises(sqlite3.IntegrityError):
                 conn.execute("UPDATE coins SET enabled=1 WHERE symbol='TRUMP'")
             conn.execute("UPDATE coins SET enabled=0 WHERE symbol='AVAX'")
-            conn.execute("INSERT INTO coins VALUES('TEST','Test coin','CUSTOM-USD',4,1.5,'',1,99)")
+            conn.execute("INSERT INTO coins(symbol,name,product,precision,demo_base,icon,enabled,sort_order) VALUES('TEST','Test coin','CUSTOM-USD',4,1.5,'',1,99)")
         status, catalog, _ = self.request('GET', '/api/coins')
         self.assertEqual(status, 200)
         added = next(c for c in catalog['coins'] if c['symbol'] == 'TEST')

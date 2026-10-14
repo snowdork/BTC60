@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 
-function chartHarness(){
+function chartHarness({oil=false,live=false,spotError=false}={}){
  const elements=new Map(),now=Date.UTC(2026,9,12,17,25,30),hour=Math.floor(now/3600000)*3600000;
  function element(id){
   if(!elements.has(id))elements.set(id,{textContent:'',hidden:false,dataset:{},style:{setProperty(){}},classList:{},listeners:{},
@@ -11,13 +11,17 @@ function chartHarness(){
    getBoundingClientRect(){return {left:0,width:1000};},replaceChildren(...children){this.children=children;}});
   return elements.get(id);
  }
- const coin={symbol:'BTC',name:'Bitcoin',product:'BTC-USD',icon:'btc.svg',demoBase:100};
+ const coin={symbol:oil?'WTI':'BTC',name:oil?'West Texas Intermediate':'Bitcoin',product:oil?'SIM-WTI':'BTC-USD',icon:'btc.svg',demoBase:100,category:oil?'oil':'crypto',feed:oil?(live?'twelvedata':'simulated'):'coinbase',maxPriceAgeMs:live?90000:15000};
  const model={...require('./market-model.js'),markets:require('./market-model.js').markets.map(m=>({...m})),coin};
- const pending=[],timers=[];let socket;
+ const pending=[],timers=[],requests=[];let socket;
  let frameStamp=0;
  const fetch=async url=>{
+  requests.push(url);
+  if(url.startsWith('/api/spot'))return spotError?{ok:false,json:async()=>({error:'Oil feed needs a Twelve Data API key on the server.'})}:{ok:true,json:async()=>({price:110.25,time:live?now-30000:now,source:live?'Twelve Data':'oil-simulation-v1'})};
+  if(oil&&url.startsWith('/api/pricing-history'))return {ok:true,json:async()=>({candles:Array.from({length:90},(_,i)=>[(hour/1000)-5400+i*60,99,102,100,100+i*.01,0])})};
   if(url.startsWith('/api/pricing-history'))return new Promise(resolve=>pending.push(resolve));
-  const start=Date.parse(new URL(url).searchParams.get('start'));
+  const query=new URL(url,'http://localhost').searchParams;
+  const start=oil?Number(query.get('start'))*1000:Date.parse(query.get('start'));
   const end=Math.min(now,start+3660000);
   const candles=[];
   for(let t=start;t<end;t+=60000) candles.push([t/1000,99,102,100,100+(t-start)/600000,1]);
@@ -25,10 +29,10 @@ function chartHarness(){
  };
  class FakeDate extends Date{static now(){return now;}}
  class Socket{constructor(){this.readyState=1;socket=this;}close(){}send(){}}
- const window={RolrModel:model,RolrCoins:{available:[coin],getCoin:()=>coin,formatPrice:v=>'$'+v.toFixed(2)},dispatchEvent(){},addEventListener(){}};
+ const window={PredictModel:model,PredictCoins:{available:[coin],getCoin:()=>coin,formatPrice:v=>'$'+v.toFixed(2)},dispatchEvent(){},addEventListener(){}};
  const context={window,document:{getElementById:element,querySelector:s=>s.startsWith('[data-remaining')?null:element(s),querySelectorAll:()=>[],addEventListener(){},createElement:()=>{const node={dataset:{}};return node;}},Date:FakeDate,Intl,URLSearchParams,fetch,AbortController,WebSocket:Socket,Event:class{},localStorage:{getItem(){return null;},setItem(){}},setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout(){},performance:{now:()=>frameStamp},console};
  vm.runInNewContext(fs.readFileSync('btc-chart.js','utf8'),context);
- return {element,pending,model,hour,tick(price){frameStamp+=1000;socket.onmessage({data:JSON.stringify({type:'ticker',product_id:'BTC-USD',price:String(price),time:new Date(now).toISOString()})});timers.at(-1)();}};
+ return {element,pending,model,hour,requests,step(){frameStamp+=1000;timers.at(-1)();},tick(price){frameStamp+=1000;socket.onmessage({data:JSON.stringify({type:'ticker',product_id:'BTC-USD',price:String(price),time:new Date(now).toISOString()})});timers.at(-1)();}};
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 
@@ -70,4 +74,38 @@ test('returning to current hour restores history and ignores old pricing respons
  assert.equal(digits(),unchangedDigits,'unchanged price preserves the existing DOM node');
  h.element('previous-hour').listeners.click();await flush();
  assert.equal(digits().dataset.trend,'');
+});
+
+test('oil uses server simulated prices and history through the shared chart',async()=>{
+ const h=chartHarness({oil:true});await flush();h.step();await flush();
+ assert.equal(h.model.spot,110.25);
+ assert.equal(h.model.historyStatus,'ready');
+ assert.equal(h.model.pricingHistoryStatus,'ready');
+ assert.equal(h.model.feedConnection,'connected');
+ assert.equal(h.element('feed-status').textContent,'SIMULATED OIL');
+ assert.match(h.element('price-context').textContent,/USD \/ BARREL/);
+ assert(h.requests.some(url=>url.startsWith('/api/spot?coin=WTI')));
+ assert(h.requests.some(url=>url.startsWith('/api/candles?coin=WTI')));
+ assert(h.requests.every(url=>!url.includes('coinbase')));
+ h.element('previous-hour').listeners.click();await flush();
+ assert.equal(h.model.isHistorical,true);
+ assert.equal(h.element('feed-status').textContent,'HISTORICAL');
+ h.element('current-hour').listeners.click();await flush();h.step();await flush();
+ assert.equal(h.model.feedConnection,'connected');
+});
+
+test('live oil uses provider timestamps and its minute quote freshness limit',async()=>{
+ const h=chartHarness({oil:true,live:true});await flush();h.step();await flush();
+ assert.equal(h.model.feedConnection,'connected');
+ assert.equal(h.element('feed-status').textContent,'LIVE OIL');
+ assert.equal(h.model.spot,110.25);
+ assert.equal(h.element('feed-message').hidden,true);
+ assert.match(h.element('settlement-source-detail').textContent,/Twelve Data live spot/);
+});
+test('missing oil credentials show an actionable error without simulated substitution',async()=>{
+ const h=chartHarness({oil:true,live:true,spotError:true});await flush();h.step();await flush();
+ assert.equal(h.model.feedConnection,'disconnected');
+ assert.equal(h.element('feed-message').hidden,false);
+ assert.match(h.element('feed-message').textContent,/API key/);
+ assert(!Number.isFinite(h.model.spot));
 });

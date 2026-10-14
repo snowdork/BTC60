@@ -56,9 +56,10 @@ def status(path):
     with readonly(path) as conn:
         integrity = conn.execute('PRAGMA integrity_check').fetchone()[0]
         print(f'Database: {path}\nIntegrity: {integrity}')
-        for table in ['users', 'sessions', 'coins', 'predictions', 'settlements']:
+        for table in ['users', 'sessions', 'categories', 'coins', 'instrument_sources', 'predictions', 'prediction_sources', 'settlements']:
             print(f'{table}: {conn.execute("SELECT count(*) FROM " + table).fetchone()[0]}')
-        print(f'Enabled coins: {conn.execute("SELECT count(*) FROM coins WHERE enabled=1").fetchone()[0]} / 8')
+        for category, count in conn.execute('SELECT category,count(*) FROM coins WHERE enabled=1 GROUP BY category ORDER BY category'):
+            print(f'Enabled {category} instruments: {count} / 8')
         if integrity != 'ok' or conn.execute('PRAGMA foreign_key_check').fetchone():
             raise ValueError('Database integrity or foreign-key check failed.')
 
@@ -80,7 +81,7 @@ def reset(path):
             with sqlite3.connect(fresh) as source, sqlite3.connect(path) as destination:
                 source.backup(destination)
             os.chmod(path, 0o600)
-    print('Database reset. Users, sessions, predictions, and settlements cleared; coin seed restored.')
+    print('Database reset. Users, sessions, predictions, and settlements cleared; category and instrument seeds restored.')
 
 
 def main():

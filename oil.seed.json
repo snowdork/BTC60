@@ -1,0 +1,67 @@
+[
+  {
+    "symbol": "WTI",
+    "name": "West Texas Intermediate",
+    "product": "SIM-WTI",
+    "precision": 2,
+    "demoBase": 72,
+    "icon": "assets/coins/oil-wti.svg",
+    "enabled": true,
+    "sortOrder": 0,
+    "category": "oil",
+    "feed": "simulated",
+    "unit": "USD/barrel"
+  },
+  {
+    "symbol": "BRENT",
+    "name": "Brent Crude",
+    "product": "SIM-BRENT",
+    "precision": 2,
+    "demoBase": 76,
+    "icon": "assets/coins/oil-brent.svg",
+    "enabled": true,
+    "sortOrder": 1,
+    "category": "oil",
+    "feed": "simulated",
+    "unit": "USD/barrel"
+  },
+  {
+    "symbol": "DUBAI",
+    "name": "Dubai Crude",
+    "product": "SIM-DUBAI",
+    "precision": 2,
+    "demoBase": 74,
+    "icon": "assets/coins/oil-dubai.svg",
+    "enabled": true,
+    "sortOrder": 2,
+    "category": "oil",
+    "feed": "simulated",
+    "unit": "USD/barrel"
+  },
+  {
+    "symbol": "OMAN",
+    "name": "Oman Crude",
+    "product": "SIM-OMAN",
+    "precision": 2,
+    "demoBase": 75,
+    "icon": "assets/coins/oil-oman.svg",
+    "enabled": true,
+    "sortOrder": 3,
+    "category": "oil",
+    "feed": "simulated",
+    "unit": "USD/barrel"
+  },
+  {
+    "symbol": "BONNY",
+    "name": "Bonny Light",
+    "product": "SIM-BONNY",
+    "precision": 2,
+    "demoBase": 78,
+    "icon": "assets/coins/oil-bonny.svg",
+    "enabled": true,
+    "sortOrder": 4,
+    "category": "oil",
+    "feed": "simulated",
+    "unit": "USD/barrel"
+  }
+]

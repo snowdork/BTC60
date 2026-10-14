@@ -58,3 +58,23 @@ The sun/moon button switches themes and saves your preference across tabs. On sm
 | Awaiting settlement | Keep the server running with internet access; missing candles are retried automatically. |
 
 For setup and checks, see [README.md](../README.md). For backups and database maintenance, see [Database maintenance](DATABASE_MAINTENANCE.md). A database reset removes accounts and predictions; it is not a routine troubleshooting step.
+
+## Choose Oil or Crypto
+
+Open the entry screen and select the large **Oil** or **Crypto** button. Both use
+the same 60 minute playfield, with 15-, 30-, and 60-minute prediction intervals.
+Use **Categories** in the terminal header to switch markets.
+
+Oil has five crude types: WTI, Brent, Dubai, Oman, and Bonny Light. Its amber
+background distinguishes it from Crypto's green background. New oil predictions use **live Twelve Data spot prices**, quoted in USD per barrel.
+WTI and Brent have verified feed mappings. Dubai, Oman, and Bonny Light show
+unavailable until a matching feed is connected. The category screen displays
+connection readiness and real quotes when available. If the key or subscription
+is missing, oil prices remain unavailable. Quotes update minutely; closed sessions
+and stale quotes block predictions. Old simulated bets retain their original source. Crypto continues to use Coinbase prices when connected.
+
+Your account balance is shared. Portfolio history identifies the category of each
+prediction; choose a category to filter history and statistics. Log in or sign up,
+then choose the category you want to play. No real money is used.
+
+OilPriceAPI mode shows dated physical spot assessments for all five crudes. These series do not provide minute settlement benchmarks, so hourly oil predictions are unavailable; Crypto continues normally.
