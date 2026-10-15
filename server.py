@@ -6,11 +6,14 @@ import odds
 import simulated_prices
 import live_oil
 import oilprice_api
+import weather
 import fcntl
 import hashlib
 import gzip
 import json
 import math
+import logging
+from btc60_logging import configure
 import os
 import re
 import secrets
@@ -31,6 +34,7 @@ AUTH_ATTEMPTS = {}
 AUTH_LOCK = threading.Lock()
 SETTLE_LOCK = threading.Lock()
 STATIC_CACHE = {}
+LOG = logging.getLogger(__name__)
 
 
 def connect():
@@ -312,6 +316,7 @@ def _settle_due(user_id=None):
                 prices[key] = candle_close(p['coin'],p['ends_at'],source=source)
             close = prices[key]
         except Exception:
+            LOG.debug('Settlement deferred prediction=%s', p['id'], exc_info=True)
             continue  # Keep pending and retry; never invent a settlement.
         outcome = 'up' if close >= p['strike'] else 'down'
         payout = (p['cost_cents']*100+p['cents']-1)//p['cents'] if outcome == p['side'] else 0
@@ -321,6 +326,9 @@ def _settle_due(user_id=None):
             inserted = conn.execute('INSERT OR IGNORE INTO settlements(prediction_id,close_price,outcome,payout_cents,settled_at,source) VALUES(?,?,?,?,?,?)', (p['id'], close, outcome, payout, int(time.time()), settlement_source)).rowcount
             if inserted:
                 conn.execute('UPDATE users SET balance_cents=balance_cents+? WHERE id=?', (payout, p['user_id']))
+        if inserted:
+            LOG.info('Settlement prediction=%s user=%s coin=%s outcome=%s payout_cents=%s',
+                     p['id'], p['user_id'], p['coin'], outcome, payout)
 
 
 def settle_due(user_id=None):
@@ -336,13 +344,26 @@ def settlement_worker():
         try:
             settle_due()
         except Exception:
-            pass
+            LOG.error('Settlement worker failed; retrying in 30 seconds')
+            LOG.debug('Settlement worker details', exc_info=True)
         time.sleep(30)
 
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
+
+    def log_message(self, format, *args):
+        # Preserve existing HTTP diagnostics in debug mode.
+        LOG.debug('%s %s', self.client_address[0], format % args)
+
+    def log_request(self, code='-', size='-'):
+        path = urllib.parse.urlsplit(self.path).path
+        if self.command == 'POST':
+            LOG.info('User action method=POST path=%s status=%s', path, code)
+        elif str(code).startswith('5'):
+            LOG.error('HTTP failure method=%s path=%s status=%s', self.command, path, code)
+        super().log_request(code, size)
 
     def end_headers(self):
         self.send_header('X-Content-Type-Options', 'nosniff')
@@ -382,8 +403,11 @@ class Handler(SimpleHTTPRequestHandler):
         path = urllib.parse.urlsplit(self.path).path
         if path == '/api/categories':
             with connect() as conn:
-                categories = [dict(row) for row in conn.execute('SELECT c.*,count(i.symbol) AS instrumentCount FROM categories c JOIN coins i ON i.category=c.id AND i.enabled=1 GROUP BY c.id ORDER BY c.sort_order,c.id')]
+                categories = [dict(row) for row in conn.execute('SELECT c.*,count(i.symbol) AS instrumentCount FROM categories c LEFT JOIN coins i ON i.category=c.id AND i.enabled=1 GROUP BY c.id ORDER BY c.sort_order,c.id')]
                 for category in categories:
+                    if category['id'] == 'weather':
+                        category.update(weather.catalog())
+                        continue
                     instruments=[dict(row) for row in conn.execute('SELECT symbol,name,feed FROM coins WHERE category=? AND enabled=1 ORDER BY sort_order,symbol',(category['id'],))]
                     overrides={row['coin']:row['product'] for row in conn.execute('SELECT * FROM instrument_sources')}
                     category['instruments']=[{'symbol':i['symbol'],'name':i['name'],'liveSupported':bool(overrides.get(i['symbol'])) if i['symbol'] in overrides else True} for i in instruments]
@@ -447,12 +471,26 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith('/api/'):
             return self.reply(404, {'error': 'Unknown endpoint.'})
         # Serve only public application assets, never SQLite, source or dotfiles.
-        public = {'index.html', 'welcome.html', 'login.html', 'signup.html', 'styles.css', 'auth.css', 'auth.js', 'account.js', 'app.js', 'btc-chart.js', 'market-model.js', 'coins.js', 'bootstrap.js', 'splash.js', 'portfolio.html', 'portfolio.js', 'portfolio-model.js', 'portfolio.css', 'theme.js', 'theme.css', 'responsive.css', 'categories.js', 'categories.css'}
+        public = {'index.html', 'categories.html', 'welcome.html', 'login.html', 'signup.html', 'styles.css', 'auth.css', 'auth.js', 'account.js', 'app.js', 'btc-chart.js', 'market-model.js', 'coins.js', 'bootstrap.js', 'splash.js', 'portfolio.html', 'portfolio.js', 'portfolio-model.js', 'portfolio.css', 'theme.js', 'theme.css', 'responsive.css', 'categories.js', 'categories.css', 'welcome.css'}
         relative = urllib.parse.unquote(path).lstrip('/')
         if not relative:
             self.path = '/welcome.html'
-        elif relative not in public and relative != 'assets/previews/prediction-playfield.png' and not (re.fullmatch(r'assets/coins/[a-zA-Z0-9_-]+\.svg', relative)):
+        elif relative not in public and relative not in {'assets/previews/prediction-playfield.png', 'assets/backgrounds/hourly-markets.webp'} and not (re.fullmatch(r'assets/coins/[a-zA-Z0-9_-]+\.svg', relative)):
             return self.reply(404, {'error': 'Not found.'})
+        if relative == 'index.html' and urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('category') == ['weather']:
+            self.send_response(302)
+            self.send_header('Location', '/welcome.html')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
+        if relative in {'index.html', 'categories.html'} and not self.session():
+            self.send_response(302)
+            self.send_header('Location', '/welcome.html')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
         self.serve_static()
 
     def serve_static(self):
@@ -477,7 +515,7 @@ class Handler(SimpleHTTPRequestHandler):
         body,etag = cached
         unchanged = self.headers.get('If-None-Match')==etag
         self.send_response(304 if unchanged else 200)
-        self.send_header('Cache-Control','public, max-age=0, must-revalidate')
+        self.send_header('Cache-Control','private, no-store' if relative in {'index.html', 'categories.html'} else 'public, max-age=0, must-revalidate')
         self.send_header('ETag',etag)
         self.send_header('Vary','Accept-Encoding')
         if not unchanged:
@@ -528,6 +566,8 @@ class Handler(SimpleHTTPRequestHandler):
         except sqlite3.IntegrityError:
             return self.reply(409, {'error': 'Account or request already exists.'})
         except Exception:
+            LOG.error('User action failed path=%s', urllib.parse.urlsplit(self.path).path)
+            LOG.debug('User action failure details', exc_info=True)
             return self.reply(503, {'error': 'Service unavailable. Please try again.'})
 
     def authenticate(self, path, data):
@@ -565,6 +605,7 @@ class Handler(SimpleHTTPRequestHandler):
             token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
             conn.execute('DELETE FROM sessions WHERE expires_at<=?', (int(time.time()),))
             conn.execute('INSERT INTO sessions VALUES(?,?,?,?)', (hashlib.sha256(token.encode()).hexdigest(), user_id, csrf, int(time.time()) + 604800))
+        LOG.info('Authentication action=%s user=%s', path.rsplit('/', 1)[-1], user_id)
         return self.reply(200, {'ok': True}, f'btc60_session={token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800')
 
     def predict(self, session, data):
@@ -604,6 +645,7 @@ class Handler(SimpleHTTPRequestHandler):
             raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
         cost = int((Decimal(str(budget))*100).to_integral_value(rounding=ROUND_CEILING))
         contracts = cost / cents
+        created = False
         with connect() as conn:
             conn.execute('BEGIN IMMEDIATE')
             if conn.execute('SELECT id FROM predictions WHERE user_id=? AND request_id=?', (session['user_id'], request_id)).fetchone():
@@ -616,13 +658,20 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError('Insufficient demo balance.')
                 conn.execute('INSERT INTO predictions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', (secrets.token_hex(16), session['user_id'], request_id, coin, market_id, side, start, end, strike, cents, contracts, cost, now))
                 conn.execute('INSERT INTO prediction_sources VALUES(?,?,?)',(conn.execute('SELECT id FROM predictions WHERE user_id=? AND request_id=?',(session['user_id'],request_id)).fetchone()['id'],source['feed'],source['product']))
+                created = True
+        if created:
+            LOG.info('Prediction created user=%s coin=%s market=%s side=%s cost_cents=%s',
+                     session['user_id'], coin, market_id, side, cost)
         return self.reply(201, self.account(session))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, default=8000)
+    parser.add_argument('--log-level', choices=('normal', 'debug', 'warning', 'error'),
+                        default=os.environ.get('BTC60_LOG_LEVEL', 'normal'))
     args = parser.parse_args()
+    configure(args.log_level)
     DB = DB.expanduser().resolve()
     DB.parent.mkdir(parents=True, exist_ok=True)
     with open(str(DB) + '.lock', 'a') as database_lock:
@@ -633,5 +682,5 @@ if __name__ == '__main__':
             raise SystemExit('Database is in use by a server or maintenance command. Stop it before starting another server.')
         initialize()
         threading.Thread(target=settlement_worker, daemon=True).start()
-        print(f'BTC60 local demo: http://127.0.0.1:{args.port}', flush=True)
+        LOG.info('BTC60 local demo: http://127.0.0.1:%s', args.port)
         ThreadingHTTPServer(('127.0.0.1', args.port), Handler).serve_forever()

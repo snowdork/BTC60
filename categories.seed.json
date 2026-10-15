@@ -1,4 +1,32 @@
 [
-  {"id":"crypto","name":"Crypto","description":"Digital assets. Every move counts.","icon":"crypto","accent":"#48dba5","background":"#0b1515","unit":"USD","sortOrder":1},
-  {"id":"oil","name":"Oil","description":"Five crude benchmarks. One shared playfield.","icon":"oil","accent":"#eeb967","background":"#1a1410","unit":"USD/barrel","sortOrder":0}
+  {
+    "id": "crypto",
+    "name": "Crypto",
+    "description": "Digital assets. Every move counts.",
+    "icon": "crypto",
+    "accent": "#48dba5",
+    "background": "#0b1515",
+    "unit": "USD",
+    "sortOrder": 1
+  },
+  {
+    "id": "oil",
+    "name": "Oil",
+    "description": "Five crude benchmarks. One shared playfield.",
+    "icon": "oil",
+    "accent": "#eeb967",
+    "background": "#1a1410",
+    "unit": "USD/barrel",
+    "sortOrder": 0
+  },
+  {
+    "id": "weather",
+    "name": "Weather",
+    "description": "Temperature and wind. Ten cities. One hour.",
+    "icon": "weather",
+    "accent": "#78bfff",
+    "background": "#101b2b",
+    "unit": "weather",
+    "sortOrder": 2
+  }
 ]

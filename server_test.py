@@ -110,7 +110,7 @@ class AccountsTest(unittest.TestCase):
 
     def test_oil_categories_prices_orders_and_settlements(self):
         categories = self.request('GET', '/api/categories')[1]['categories']
-        self.assertEqual({c['id'] for c in categories}, {'crypto', 'oil'})
+        self.assertEqual({c['id'] for c in categories}, {'crypto', 'oil', 'weather'})
         self.assertEqual(next(c for c in categories if c['id'] == 'oil')['instrumentCount'], 5)
         oil = [c for c in self.request('GET', '/api/coins')[1]['coins'] if c['category'] == 'oil']
         self.assertEqual({c['symbol'] for c in oil}, {'WTI', 'BRENT', 'DUBAI', 'OMAN', 'BONNY'})
@@ -263,10 +263,33 @@ class AccountsTest(unittest.TestCase):
         self.assertGreater(int(response.getheader('Content-Length')),0)
         conn.close()
 
+    def test_weather_is_coming_soon(self):
+        categories = self.request('GET', '/api/categories')[1]['categories']
+        weather = next(c for c in categories if c['id'] == 'weather')
+        self.assertEqual(weather['availability'], 'coming_soon')
+        self.assertEqual(weather['instrumentCount'], 20)
+        self.assertEqual(len(weather['cities']), 10)
+        self.assertFalse(weather['tradable'])
+        self.assertEqual(self.request('GET', '/index.html?category=weather')[0], 302)
+        coins = self.request('GET', '/api/coins')[1]['coins']
+        self.assertFalse(any(c['category'] == 'weather' and c['enabled'] for c in coins))
+
+    def test_markets_require_login(self):
+        self.assertEqual(self.request('GET', '/index.html?category=oil')[0], 302)
+        self.assertEqual(self.request('GET', '/categories.html')[0], 302)
+        _, account, cookie = self.request('POST', '/api/signup', {
+            'name': 'Market access', 'email': 'market-access@example.com',
+            'password': 'strong-password-123'})
+        self.assertEqual(self.request('GET', '/index.html?category=oil', cookie=cookie)[0], 200)
+        self.assertEqual(self.request('GET', '/categories.html', cookie=cookie)[0], 200)
+        _, account, _ = self.request('GET', '/api/account', cookie=cookie)
+        self.assertEqual(self.request('POST', '/api/logout', {}, cookie, account['csrf'])[0], 200)
+        self.assertEqual(self.request('GET', '/index.html', cookie=cookie)[0], 302)
+
     def test_private_files_not_served(self):
         for path in ['/data/btc60.sqlite3', '/server.py', '/.git/config', '/%2e%2e/server.py']:
             self.assertEqual(self.request('GET', path)[0], 404)
-        for path in ['/', '/login.html', '/signup.html', '/index.html', '/portfolio.html', '/portfolio.js', '/portfolio.css']:
+        for path in ['/', '/login.html', '/signup.html', '/portfolio.html', '/portfolio.js', '/portfolio.css']:
             self.assertEqual(self.request('GET', path)[0], 200)
 
 

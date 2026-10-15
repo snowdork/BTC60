@@ -297,13 +297,23 @@
     marketElements.forEach(({card},id)=>{const selected=id===market.id;card.classList.toggle('selected',selected);card.setAttribute('aria-pressed',String(selected));});
     renderTicket();
   });
-  sideButtons.forEach(button=>button.addEventListener('click',()=>{side=button.dataset.side;renderTicket();}));
+  let directionHintTimer;
+  function highlightDirections(){
+    clearTimeout(directionHintTimer);
+    sideButtons.forEach(button=>button.classList.remove('direction-hint'));
+    void sideButtons[0].offsetWidth;
+    sideButtons.forEach(button=>button.classList.add('direction-hint'));
+    sideButtons[0].scrollIntoView({block:'center',behavior:'auto'});
+    sideButtons[0].focus({preventScroll:true});
+    directionHintTimer=setTimeout(()=>sideButtons.forEach(button=>button.classList.remove('direction-hint')),1100);
+  }
+  sideButtons.forEach(button=>button.addEventListener('click',()=>{side=button.dataset.side;sideButtons.forEach(item=>item.classList.remove('direction-hint'));renderTicket();}));
   stakeButtons.forEach(button=>button.addEventListener('click',()=>{$('stake').value=button.dataset.stake==='max'?balance().toFixed(2):button.dataset.stake;renderTicket();}));
   $('stake').addEventListener('input',renderTicket);
   ['rules-open','rules-inline'].forEach(id=>$(id).addEventListener('click',()=>$('rules-dialog').showModal()));
   document.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',()=>$(button.dataset.close).close()));
   $('prediction-form').addEventListener('submit',event=>{
-    event.preventDefault();if(side===null){sideButtons[0].focus();notify('Choose Up or Down to review your prediction.');return;}if(!account.user){location.href='login.html';return;}if(!health().ready){notify(health().reason);return;}const q=currentQuote();if(!q)return;
+    event.preventDefault();if(side===null){highlightDirections();notify('Choose Up or Down to review your prediction.');return;}if(!account.user){location.href='login.html';return;}if(!health().ready){notify(health().reason);return;}const q=currentQuote();if(!q)return;
     review={requestId:crypto.randomUUID(),startsAt:market.startsAt,endsAt:market.endsAt,coin:window.PredictModel.coin.symbol,marketId:market.id,start:market.start,end:market.end,minutes:market.minutes,strike:market.strike,hour:window.PredictModel.hour,side,budget:Number($('stake').value),...q};
     const down=review.side==='down',arrow=down?'↓':'↑',direction=down?'Down':'Up';
     $('review-direction').classList.toggle('down',down);
@@ -340,7 +350,7 @@
     $('positions-storage').textContent=account.user?'Live orders only':'Log in to save predictions';
     renderSegmentPredictions();renderPositions();renderTicket();
   }
-  $('logout-button').addEventListener('click',()=>account.logout().catch(error=>notify(error.message)));
+  window.addEventListener('account-update',()=>{if(account.error)notify(account.error);});
   window.addEventListener('account-update',renderAccount);
   window.addEventListener('coin-change',()=>{initialMarketChosen=false;side=null;review=null;$('review-dialog').close();renderMarkets();renderTicket();});
   window.addEventListener('btc-market-update',()=>{if(!initialMarketChosen){const active=markets.find(m=>m.minutes===15&&m.status==='open'&&Number.isFinite(m.strike));if(active){market=active;initialMarketChosen=true;}}if(review&&review.hour!==window.PredictModel.hour&&!reviewExpired()){review=null;$('review-dialog').close();}renderMarkets();renderTicket();renderReviewChance();});

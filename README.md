@@ -46,8 +46,68 @@ python3 server.py
 
 Open http://127.0.0.1:8000 for the welcome page or http://127.0.0.1:8000/index.html for the terminal. Use `--port` to change the port. Internet access is required for live prices, benchmarks, and settlement. The terminal requires `/api/coins`; file previews and static hosting alone cannot initialize a working terminal or provide accounts.
 
+### Automatic crash recovery (Linux)
+
+Start or restart the server with a background watchdog:
+
+```bash
+python3 scripts/restart-server.py
+# Optional custom port:
+python3 scripts/restart-server.py --port 8080
+```
+
+The watchdog restarts the server three seconds after it exits. Both processes
+inherit your environment (including API keys and `BTC60_DB`), and append output to
+`/tmp/btc60/server.log`. Only one watchdog can run for this checkout.
+
+To stop intentionally:
+
+```bash
+python3 scripts/stop-server.py
+```
+
+This stops the watchdog and server and writes `data/server.stopped`, preventing
+automatic restarts. Run `restart-server.py` again to clear the marker and resume.
+These scripts manage this checkout's processes; they do not install boot-time
+startup or monitor HTTP health. Running `python3 server.py` directly bypasses the
+watchdog.
+
+### Logging and rotation
+
+`restart-server.py` initially defaults to `normal` and reuses the log level from
+the last successful start when `--log-level` is omitted. Normal logs record user
+POST actions, successful authentication and predictions, completed settlements,
+server/watchdog lifecycle events, and important failures. Routine GET requests
+and polling are omitted. Debug preserves HTTP request logging and adds diagnostic
+tracebacks; request bodies, passwords, and session cookies are not logged.
+
+```bash
+python3 scripts/restart-server.py --log-level debug
+python3 scripts/restart-server.py --log-level normal
+```
+
+`warning` and `error` levels are also available. The selected level survives
+watchdog restarts. Logs go to `/tmp/btc60/server.log`, with automatic rotation at
+10 MiB and five numbered backups (`server.log.1` is newest). The watchdog captures
+server stdout/stderr, so unexpected crashes are retained. Each write opens the
+current log under a shared lock, allowing safe rotation while the server runs.
+
+Apply the same policy manually, or force an immediate rotation:
+
+```bash
+python3 scripts/rotate-logs.py
+python3 scripts/rotate-logs.py --force
+```
+
+No scheduled job is needed: rotation runs as logs are written. On the next
+restart, the old `data/server.log` is imported under the same retention policy
+and removed. `/tmp` logs may be cleared on reboot; `BTC60_LOG_DIR` can override
+the directory when persistent storage is desired. Direct `server.py` runs log to
+the console and support the same `--log-level` option.
+
 ## Documentation
 
+- [Admin guide](doc/ADMIN_GUIDE.md): server scripts, log levels, rotation, maintenance, and troubleshooting.
 - [User guide](doc/USER_GUIDE.md): accounts, predictions, history, portfolio, and troubleshooting.
 - [Design](doc/DESIGN.md): interaction, pricing, settlement, architecture, and persistence.
 - [Database maintenance](doc/DATABASE_MAINTENANCE.md): initialization, inspection, backups, and explicit reset.

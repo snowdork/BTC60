@@ -47,3 +47,9 @@
 
 .submit-prediction.pick-direction,
 [data-theme="light"] .submit-prediction.pick-direction{background:#2563eb;color:#fff}
+
+/* One white pulse guides the Pick Up or Down action to its direction choices. */
+.outcome.direction-hint{position:relative;isolation:isolate}
+.outcome.direction-hint::after{content:'';position:absolute;inset:0;border-radius:inherit;background:#fff;pointer-events:none;opacity:0;animation:direction-hint-flash 1s ease-out}
+@keyframes direction-hint-flash{0%{opacity:0}25%{opacity:.8}100%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.outcome.direction-hint::after{animation:none;opacity:.18}.outcome.direction-hint{outline:2px solid #fff;outline-offset:3px}}

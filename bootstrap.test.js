@@ -7,7 +7,7 @@ async function run(protocol,fetch,category='crypto'){
  const elements=new Map(),loaded=[];
  const element=id=>{if(!elements.has(id))elements.set(id,{textContent:'Connecting…',hidden:true,addEventListener(){},append(){},replaceChildren(){},setAttribute(){},dataset:{}});return elements.get(id);};
  const document={body:{dataset:{},style:{setProperty(){}}},getElementById:element,querySelector:()=>element('picker'),createElement:()=>({dataset:{},setAttribute(){},addEventListener(){},append(){}}),head:{append(script){loaded.push(script.src);script.onload();}}};
- const context={document,location:{protocol,search:'?category='+category,reload(){}},window:{PredictCoinCatalog:{createCatalog},PredictModel:{configure(){}}},fetch:async(url,...args)=>url==='/api/categories'?{ok:true,json:async()=>({categories:[{id:'crypto',name:'Crypto'},{id:'oil',name:'Oil'}]})}:fetch(url,...args),URLSearchParams,AbortSignal,AbortController,setTimeout,clearTimeout,Error,TypeError,SyntaxError};
+ const context={document,location:{protocol,search:'?category='+category,reload(){}},window:{BTC60Account:{loaded:Promise.resolve(),user:{}},PredictCoinCatalog:{createCatalog},PredictModel:{configure(){}}},fetch:async(url,...args)=>url==='/api/categories'?{ok:true,json:async()=>({categories:[{id:'crypto',name:'Crypto'},{id:'oil',name:'Oil'}]})}:fetch(url,...args),URLSearchParams,AbortSignal,AbortController,setTimeout,clearTimeout,Error,TypeError,SyntaxError};
  await vm.runInNewContext(fs.readFileSync('bootstrap.js','utf8'),context);
  return {elements,loaded,window:context.window,document};
 }

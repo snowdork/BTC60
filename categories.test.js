@@ -3,13 +3,14 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 
-async function selection(feedState='setup_required',tick={price:72.25,time:Date.now()}){
+async function selection(feedState='setup_required',tick={price:72.25,time:Date.now()},override={}){
  const nodes=new Map(),calls=[];
- const node=()=>({children:[],dataset:{},style:{setProperty(){}},append(...children){this.children.push(...children);},replaceChildren(...children){this.children=children;},addEventListener(){},removeAttribute(name){delete this[name];}});
+ const node=()=>({children:[],dataset:{},style:{setProperty(){}},append(...children){this.children.push(...children);},replaceChildren(...children){this.children=children;},addEventListener(){},setAttribute(name,value){this[name]=value;},removeAttribute(name){delete this[name];}});
  const element=id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);};
  const category={id:'oil',name:'Oil',description:'Five crudes',provider:'Twelve Data',quoteCadence:'Minute updates',unit:'USD/barrel',feedState,instrumentCount:2,instruments:[{symbol:'WTI',name:'West Texas Intermediate',liveSupported:true},{symbol:'DUBAI',name:'Dubai',liveSupported:false}]};
+ Object.assign(category,override);
  const fetch=async url=>{calls.push(url);return {ok:true,json:async()=>url==='/api/categories'?{categories:[category]}:tick};};
- await vm.runInNewContext(fs.readFileSync('categories.js','utf8'),{document:{hidden:false,getElementById:element,createElement:node,addEventListener(){}},fetch,AbortSignal,Intl,Date,Map,Promise,Number,Error,encodeURIComponent,setInterval(){},location:{reload(){}}});
+ await vm.runInNewContext(fs.readFileSync('categories.js','utf8'),{window:{BTC60Account:{loaded:Promise.resolve(),user:{}}},document:{hidden:false,getElementById:element,createElement:node,addEventListener(){}},fetch,AbortSignal,Intl,Date,Map,Promise,Number,Error,encodeURIComponent,setInterval(){},location:{reload(){}}});
  await new Promise(resolve=>setImmediate(resolve));
  return {nodes,calls,card:element('category-options').children[0]};
 }
@@ -39,4 +40,21 @@ test('dated spot assessments remain visible without being labeled live ticks',as
  const price=card.children[5].children[0].children[1];
  assert.match(price.textContent,/\$72\.00 · \d{4}-\d{2}-\d{2}/);
  assert.equal(price.dataset.state,'assessment');
+});
+
+test('guests cannot load market choices or quotes',async()=>{
+ await vm.runInNewContext(fs.readFileSync('categories.js','utf8'),{
+  window:{BTC60Account:{loaded:Promise.resolve(),user:null}},
+  fetch(){assert.fail('Guest must not request markets');},
+  document:{getElementById(){assert.fail('Guest must not render markets');}}
+ });
+});
+
+test('weather coming soon card has no market link or quote requests',async()=>{
+ const {card,calls}=await selection('coming_soon',{}, {id:'weather',name:'Weather',availability:'coming_soon',cities:[{name:'New York'}],instruments:[]});
+ assert.equal(card.href,undefined);
+ assert.equal(card.dataset.availability,'coming_soon');
+ assert.equal(card.children.at(-1).textContent,'Coming soon');
+ assert.match(card.children[6].textContent,/Temperature/);
+ assert.deepEqual(calls,['/api/categories']);
 });

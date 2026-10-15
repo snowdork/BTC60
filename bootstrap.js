@@ -1,6 +1,8 @@
 (async()=>{
   const picker=document.querySelector('.coin-picker');
   try{
+    await window.BTC60Account.loaded;
+    if(!window.BTC60Account.user){location.replace('welcome.html');return;}
     if(location.protocol==='file:')throw Error('Open the terminal through python3 server.py, not a file preview.');
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);
     let response;try{response=await fetch('/api/coins',{signal:controller.signal,cache:'no-store'});}finally{clearTimeout(timeout);}
@@ -11,6 +13,7 @@
     if(!categoryResponse.ok)throw Error('Market categories unavailable. Restart python3 server.py.');
     const category=(await categoryResponse.json()).categories.find(item=>item.id===categoryId);
     if(!category)throw Error('This category is unavailable. Choose another market from the category screen.');
+    if(category.availability==='coming_soon'){location.replace('categories.html');return;}
     window.BTC60Category=category;
     document.body.dataset.category=category.id;
     document.body.style.setProperty('--category-accent',category.accent);
