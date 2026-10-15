@@ -1,6 +1,6 @@
 (() => {
   const account=window.BTC60Account,model=window.BTC60Portfolio,$=id=>document.getElementById(id);
-  let filter='all',category='all',coins=[],lastRender='';
+  let filter='all',category='all',coins=[],lastRender='',sortColumn='window',sortDirection='desc';
   const currency=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
   const shareFormatter=new Intl.NumberFormat('en-US',{maximumFractionDigits:2});
   const money=cents=>currency.format(cents/100);
@@ -14,14 +14,15 @@
     $('portfolio-content').hidden=!account.user;$('portfolio-login').hidden=!!account.user;$('portfolio-logout').hidden=!account.user;$('portfolio-refresh').disabled=!account.user;
     $('portfolio-user').textContent=account.user?.name||'';
     if(!account.user){$('portfolio-message').textContent=account.error||'';return;}
-    const signature=JSON.stringify([account.user,account.predictions,filter,category,coins,account.predictions.filter(p=>p.settled_at==null).map(p=>model.result(p))]);
+    const signature=JSON.stringify([account.user,account.predictions,filter,category,sortColumn,sortDirection,coins,account.predictions.filter(p=>p.settled_at==null).map(p=>model.result(p))]);
     if(signature===lastRender)return;lastRender=signature;
     const categoryPredictions=account.predictions.filter(p=>category==='all'||p.category===category);
     const stats=model.summary(categoryPredictions);
     $('portfolio-balance').textContent=money(account.user.balance_cents);$('portfolio-profit').textContent=signed(stats.profitCents);$('portfolio-profit').style.color=stats.profitCents>=0?'var(--green)':'var(--red)';
     $('portfolio-record').textContent=`${stats.wins} / ${stats.losses}`;$('portfolio-rate').textContent=stats.winRate==null?'No settled predictions':`${stats.winRate}% win rate`;
     $('portfolio-pending').textContent=stats.pending;$('portfolio-exposure').textContent=money(stats.pendingCostCents)+' committed';
-    const predictions=categoryPredictions.filter(p=>filter==='all'||(filter==='pending'?p.settled_at==null:model.result(p)===filter));
+    const predictions=model.sortPredictions(categoryPredictions.filter(p=>filter==='all'||(filter==='pending'?p.settled_at==null:model.result(p)===filter)),sortColumn,sortDirection);
+    document.querySelectorAll('[data-sort]').forEach(button=>{const active=button.dataset.sort===sortColumn;button.closest('th').setAttribute('aria-sort',active?(sortDirection==='asc'?'ascending':'descending'):'none');button.querySelector('.sort-indicator').textContent=active?(sortDirection==='asc'?'↑':'↓'):'↕';});
     $('history-count').textContent=`(${predictions.length})`;$('history-empty').hidden=predictions.length>0;
     $('history-empty').firstChild.textContent=account.predictions.length?'No predictions match this filter. ':'No predictions yet. ';
     $('history-rows').replaceChildren(...predictions.map(p=>{
@@ -39,8 +40,8 @@
   }
   window.addEventListener('account-update',()=>{render();$('portfolio-message').textContent=account.user?account.error||'Account history synced. Demo settlements update automatically.':account.error||'';});
   document.querySelectorAll('[data-filter]').forEach(button=>button.addEventListener('click',()=>{filter=button.dataset.filter;document.querySelectorAll('[data-filter]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));render();}));
+  document.querySelectorAll('[data-sort]').forEach(button=>button.addEventListener('click',()=>{const column=button.dataset.sort;sortDirection=column===sortColumn?(sortDirection==='asc'?'desc':'asc'):(['window','cost','return','profit','benchmark'].includes(column)?'desc':'asc');sortColumn=column;render();}));
   $('portfolio-refresh').addEventListener('click',async()=>{const button=$('portfolio-refresh');button.disabled=true;$('portfolio-message').textContent='Checking closed predictions…';try{await account.settle();}catch(error){$('portfolio-message').textContent=error.message;}finally{button.disabled=false;}});
-  $('portfolio-logout').addEventListener('click',()=>account.logout().catch(error=>{$('portfolio-message').textContent=error.message;}));
   $('portfolio-category').addEventListener('change',event=>{category=event.target.value;render();});
   Promise.all(['/api/coins','/api/categories'].map(async url=>{const response=await fetch(url);if(!response.ok)throw Error('Market catalog unavailable');return response.json();})).then(([catalog,data])=>{
     coins=catalog.coins;

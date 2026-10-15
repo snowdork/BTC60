@@ -21,3 +21,16 @@ button,a,input{touch-action:manipulation}
 .ticket #ticket-coin-icon{width:44px;height:44px;object-fit:contain;flex-shrink:0}
 .chart-coin-icon img{width:42px;height:42px}
 @media(max-width:650px){.topbar .coin-button{min-height:54px;padding:8px 11px;font-size:12px}.topbar .coin-button img{width:34px;height:34px}.topbar .coin-picker{gap:7px}}
+
+/* Pair pending and history actions with readable labels and distinct icons. */
+.prediction-label-icon{width:20px;height:20px;flex-shrink:0;vertical-align:middle}
+.positions-heading h2,.history-toolbar h2{display:flex;align-items:center;gap:9px}
+.positions-heading h2{font-size:14px}
+.positions-heading h2>.prediction-label-icon{color:var(--amber)}
+.topbar .portfolio-icon{width:auto;height:auto;min-height:40px;padding:9px 12px;gap:8px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
+.pending-history-link{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--raised);font-size:12px;font-weight:600;text-decoration:none}
+.pending-history-link:hover{border-color:var(--green)}
+.portfolio-icon:focus-visible,.pending-history-link:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+.history-filters button[data-filter="pending"]{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.history-filters .prediction-label-icon{width:16px;height:16px}
+@media(max-width:650px){.topbar-right{flex-wrap:wrap}.topbar .portfolio-icon{font-size:11px;padding:8px}.positions-heading h2{font-size:13px}.pending-history-link{font-size:11px}}

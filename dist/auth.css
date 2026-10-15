@@ -26,3 +26,11 @@
 /* Eight database-backed coin buttons fit across a laptop header. */
 @media(min-width:1000px){.topbar{gap:16px}.topbar .coin-picker{gap:2px}.topbar .coin-button{padding:6px;gap:5px;font-size:9px}.topbar .coin-button img{width:21px;height:21px}.topbar .brand{font-size:18px}}
 @media(max-width:1200px){.topbar .coin-button span{display:none}.topbar .coin-button{padding:7px}.topbar-right>.muted,.topbar-right>.account-name{display:none}}
+
+.logout-control{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;cursor:pointer;font-size:12px;white-space:nowrap}
+.logout-control svg{width:18px;height:18px;flex-shrink:0}
+.logout-control:hover{background:var(--raised);border-color:var(--green)}
+.logout-control:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+.logout-control:disabled{opacity:.6;cursor:wait}
+#account-status{color:var(--red);font-size:12px;text-align:center}
+#account-status:empty{display:none}

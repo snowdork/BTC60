@@ -9,10 +9,23 @@
   function update(data){const next=JSON.stringify(data),changed=next!==snapshot||!account.ready||account.error;snapshot=next;Object.assign(account,data,{ready:true,error:null});if(changed)window.dispatchEvent(new Event('account-update'));}
   account.place=async prediction=>{update(await request('predictions',prediction));};
   account.refresh=async()=>{update(await request('account'));};
-  account.logout=async()=>{await request('logout',{});location.href='welcome.html';};
+  account.logout=async()=>{await request('logout',{});update({user:null,csrf:null,predictions:[]});location.href='welcome.html';};
   let settling=false;
   account.settle=async()=>{if(!account.user||settling)return;settling=true;try{update(await request('settle',{}));}finally{settling=false;}};
   window.BTC60Account=account;
+  function renderAccountControls(){
+    document.querySelectorAll('[data-logout]').forEach(button=>{button.hidden=!account.user;});
+    document.querySelectorAll('[data-login]').forEach(link=>{link.hidden=!!account.user;});
+    const status=document.getElementById('account-status');if(status)status.textContent=account.error||'';
+  }
+  window.addEventListener('account-update',renderAccountControls);
+  document.querySelectorAll('[data-logout]').forEach(button=>button.addEventListener('click',async()=>{
+    button.disabled=true;
+    try{await account.logout();}
+    catch(error){account.error=error.message;window.dispatchEvent(new Event('account-update'));}
+    finally{button.disabled=false;}
+  }));
+  renderAccountControls();
   account.refresh().then(()=>account.settle()).catch(error=>{account.ready=true;account.error=error.message;window.dispatchEvent(new Event('account-update'));});
   const sync=()=>{if(document.hidden||!account.user)return;account.settle().catch(error=>{account.error=error.message;window.dispatchEvent(new Event('account-update'));});};
   setInterval(sync,15000);
