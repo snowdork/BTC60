@@ -10,6 +10,8 @@ STOP = DATA / 'server.stopped'
 
 
 def project_processes(script_name):
+    """Yield Python process IDs whose resolved script path belongs to this checkout."""
+    # Resolve executable and script paths so unrelated Python processes are never selected.
     for entry in Path('/proc').iterdir():
         if not entry.name.isdigit():
             continue
@@ -28,6 +30,7 @@ def project_processes(script_name):
 
 
 def stop_server():
+    """Disable supervision and terminate checkout processes, waiting up to fifteen seconds for shutdown."""
     DATA.mkdir(parents=True, exist_ok=True)
     STOP.touch(mode=0o600)
     # Disable supervision before stopping its child, including during retry delays.
@@ -38,6 +41,7 @@ def stop_server():
             except ProcessLookupError:
                 pass
     deadline = time.monotonic() + 15
+    # Wait for both supervisor and child to exit, but keep a bounded shutdown deadline.
     while any(list(project_processes(script)) for script in
               ('scripts/watchdog-server.py', 'server.py')):
         if time.monotonic() >= deadline:

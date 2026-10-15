@@ -15,6 +15,7 @@ from btc60_logging import configure, write_or_rotate
 
 
 def main():
+    """Supervise the child server and restart unexpected exits until an intentional stop is requested."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', type=int, default=8000)
     parser.add_argument('--log-level', choices=('normal', 'debug', 'warning', 'error'), default='normal')
@@ -41,6 +42,7 @@ def main():
                 env={**os.environ, 'BTC60_LOG_LEVEL': args.log_level},
             )
             def capture_output(stream):
+                """Forward supervised child output to the shared rotating log until its stream closes."""
                 with stream:
                     for line in stream:
                         # Child records already include their severity and timestamp.

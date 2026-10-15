@@ -5,6 +5,7 @@ from server_control import DATA, stop_server
 
 
 def main():
+    """Stop the checkout server and watchdog intentionally, preserving the stop marker."""
     DATA.mkdir(parents=True, exist_ok=True)
     with (DATA / 'server-control.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)

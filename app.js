@@ -1,32 +1,35 @@
+/** @module app
+ * Render prediction intervals, order review, live purchase quotes, and saved positions.
+ */
 (() => {
   'use strict';
   const {markets,quote,outcome,initialBalance}=window.PredictModel;
   const elements=new Map();
-  const $=id=>{if(!elements.has(id))elements.set(id,document.getElementById(id));return elements.get(id);};
+  const /** Find an interface element by its stable DOM identifier. */ $=id=>{if(!elements.has(id))elements.set(id,document.getElementById(id));return elements.get(id);};
   const sideButtons=[...document.querySelectorAll('[data-side]')];
   const stakeButtons=[...document.querySelectorAll('[data-stake]')];
   const marketElements=new Map();
-  const price=value=>window.PredictCoins.formatPrice(value,window.PredictModel.coin.symbol);
+  const /** Format an instrument price with the active or supplied instrument precision. */ price=value=>window.PredictCoins.formatPrice(value,window.PredictModel.coin.symbol);
   const currency=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
-  const money=value=>currency.format(value);
+  const /** Format a monetary display value using the module currency formatter. */ money=value=>currency.format(value);
   const shareFormatter=new Intl.NumberFormat('en-US',{maximumFractionDigits:2});
-  const shares=value=>shareFormatter.format(value);
+  const /** Format fractional prediction shares for display. */ shares=value=>shareFormatter.format(value);
   const account=window.BTC60Account;
   let positions=[];
   const predictionIndex=new Map();
-  const predictionKey=(coin,id,start)=>`${coin}:${id}:${start}`;
-  function segmentPredictions(selected){
+  const /** Build an instrument, interval, and start-time key to distinguish orders in repeated hours. */ predictionKey=(coin,id,start)=>`${coin}:${id}:${start}`;
+  /** Find saved predictions matching an instrument and exact interval start. */ function segmentPredictions(selected){
     const model=window.PredictModel;
     return account.user&&model.feedMode!=='demo'?predictionIndex.get(predictionKey(model.coin.symbol,selected.id,selected.startsAt))||[]:[];
   }
-  const setText=(element,value)=>{if(element.textContent!==value)element.textContent=value;};
-  let market=markets.find(m=>m.id==='15-2'),side=null,review=null,initialMarketChosen=false,submitting=false;
-  const balance=()=>account.user?account.user.balance_cents/100:initialBalance;
-  function notify(message) {
+  const /** Update a DOM text node only when the displayed value changes. */ setText=(element,value)=>{if(element.textContent!==value)element.textContent=value;};
+  let market=markets.find(m=>m.id==='15-2'),side=null,review=null,initialMarketChosen=false,submitting=false,budgetMarketKey=null;
+  const /** Return the signed-in account balance in dollars or the initial preview balance. */ balance=()=>account.user?account.user.balance_cents/100:initialBalance;
+  /** Show a transient accessible status message to the user. */ function notify(message) {
     $('notification').textContent=message;$('notification').classList.add('visible');
     clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('notification').classList.remove('visible'),4500);
   }
-  function renderStatusLine(){
+  /** Render status line from the latest account, market, and interface state. */ function renderStatusLine(){
     const open=market.status==='open',queued=market.status==='queued',model=window.PredictModel;
     $('selected-bet').textContent=`${model.coin.symbol} · ${market.minutes} MIN · ${side==='up'?'↗ Up':side==='down'?'↘ Down':'Pick Up or Down'}`;
     $('selected-bet').style.color=side==='up'?'var(--green)':side==='down'?'#ff6a84':'#3b82f6';
@@ -40,8 +43,8 @@
     }
     $('selected-countdown').textContent=label;
   }
-  function health(){return window.PredictModel.dataStatus(window.PredictModel,market);}
-  function renderPredictionContext(){
+  /** Read the market model readiness checks used to block invalid order submission. */ function health(){return window.PredictModel.dataStatus(window.PredictModel,market);}
+  /** Render prediction context from the latest account, market, and interface state. */ function renderPredictionContext(){
     const model=window.PredictModel,closed=market.status==='settled',queued=market.status==='queued';
     const benchmark=Number.isFinite(market.strike)?market.strike:null;
     const age=Date.now()-model.priceUpdatedAt;
@@ -54,7 +57,7 @@
     const start=market.startsAt,end=market.endsAt;
     if(Number.isFinite(start)&&Number.isFinite(end)){
       const hour=Math.floor(start/3600000)*3600000;
-      const utc=t=>new Date(t).toISOString().slice(11,16);
+      const /** Format an interval timestamp as UTC hour and minute. */ utc=t=>new Date(t).toISOString().slice(11,16);
       $('ticket-hour-selection').style.left=`${(start-hour)/3600000*100}%`;
       $('ticket-hour-selection').style.width=`${market.minutes/60*100}%`;
       $('ticket-hour-start').textContent=utc(hour);$('ticket-hour-end').textContent=utc(hour+3600000);
@@ -69,7 +72,7 @@
     const context=document.querySelector('.prediction-context');
     context.dataset.side=side||'';
   }
-  function renderExecutionState(){
+  /** Render execution state from the latest account, market, and interface state. */ function renderExecutionState(){
     renderPredictionContext();
     const model=window.PredictModel,state=health();
     const chance=market.status==='open'&&(state.ready||model.feedMode==='demo')?model.estimateChances(market,model.spot,model.now,model.volatility):null;
@@ -90,8 +93,8 @@
     $('ticket-delta').style.color=delta>=0?'var(--green)':'var(--red)';
     if(review&&!reviewExpired()&&!state.ready&&!submitting){review=null;$('review-dialog').close();notify('Data unavailable. Wait for reconnection and review again.');}
   }
-  function reviewExpired(){return !!review&&Date.now()>=review.endsAt-30000;}
-  function renderReviewTiming(){
+  /** Check whether the reviewed interval has reached its final thirty-second order cutoff. */ function reviewExpired(){return !!review&&Date.now()>=review.endsAt-30000;}
+  /** Render review timing from the latest account, market, and interface state. */ function renderReviewTiming(){
     if(!review)return;
     const seconds=Math.max(0,Math.ceil((review.endsAt-30000-Date.now())/1000));
     $('review-time').textContent=seconds?`${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s to betting cutoff`:'Betting closed · final 30 seconds';
@@ -99,13 +102,13 @@
     if(!seconds){$('confirm-prediction').disabled=true;if(!submitting)$('confirm-prediction').textContent='Too late to place';}
   }
   let reviewSummarySignature='';
-  function renderReviewSummary(q){
+  /** Render review summary from the latest account, market, and interface state. */ function renderReviewSummary(q){
     const signature=`${q.cents}:${q.contracts}`;
     if(signature===reviewSummarySignature)return;
     reviewSummarySignature=signature;
     $('review-summary').innerHTML=`<div><span>${shares(q.contracts)} shares at ${q.cents}¢</span><strong>${money(q.cost)}</strong></div><div><span>Return if correct</span><strong>${money(q.payout)}</strong></div><div class="profit-row"><span>Potential profit</span><strong>+${money(q.profit)}</strong></div>`;
   }
-  function renderReviewChance(){
+  /** Render review chance from the latest account, market, and interface state. */ function renderReviewChance(){
     if(!review)return;
     renderReviewTiming();
     if(reviewExpired())return;
@@ -123,7 +126,7 @@
     }
 
   }
-  function renderChances() {
+  /** Render chances from the latest account, market, and interface state. */ function renderChances() {
     const model=window.PredictModel;
     renderStatusLine();
     renderExecutionState();
@@ -151,7 +154,7 @@
       element.title=chance?.label==='ESTIMATE'?'Model probability based on adaptive 24-hour volatility and time to settlement. Historical calibration applies when validated for this coin; demo contract prices follow these percentages.':chance?.label==='BASELINE'?'Neutral baseline for an upcoming interval.':chance?.label==='RESULT'?'Completed demo result, not a forecast.':'Waiting for a fresh price and valid benchmark.';
     });
   }
-  function renderSegmentPredictions(){
+  /** Render segment predictions from the latest account, market, and interface state. */ function renderSegmentPredictions(){
     markets.forEach(m=>{
       const container=marketElements.get(m.id)?.predictions;if(!container)return;
       const saved=segmentPredictions(m);
@@ -187,7 +190,7 @@
       container.hidden=!saved.length;
     });
   }
-  function renderMarkets() {
+  /** Render markets from the latest account, market, and interface state. */ function renderMarkets() {
     $('market-grid').innerHTML=[60,30,15].map(minutes=>{
       const items=markets.filter(m=>m.minutes===minutes);
       return `<div class="tier" data-duration="${minutes}"><div class="tier-label">${minutes}<small>MINUTES</small></div><div class="tier-cards" style="--columns:${items.length}">${items.map(m=>{
@@ -202,10 +205,10 @@
     renderSegmentPredictions();
     renderChances();
   }
-  function liveChance(selected=market){const model=window.PredictModel;return model.estimateChances(selected,model.spot,model.now,model.volatility);}
-  function quoteFor(selected,direction,budget,chance=liveChance(selected)){return chance?quote({...selected,up:chance.up},direction,budget,balance()):null;}
-  function currentQuote() {return quoteFor(market,side,Number($('stake').value));}
-  function renderLivePricing(chance){
+  /** Estimate the selected interval probabilities from the current underlying observation. */ function liveChance(selected=market){const model=window.PredictModel;return model.estimateChances(selected,model.spot,model.now,model.volatility);}
+  /** Compute a budget-constrained order quote using live direction probabilities. */ function quoteFor(selected,direction,budget,chance=liveChance(selected)){return chance?quote({...selected,up:chance.up},direction,budget,balance()):null;}
+  /** Read the ticket stake and selected side to produce the current executable demo quote. */ function currentQuote() {return quoteFor(market,side,Number($('stake').value));}
+  /** Render live pricing from the latest account, market, and interface state. */ function renderLivePricing(chance){
     const open=market.status==='open',q=open?quoteFor(market,side,Number($('stake').value),chance):null;
     $('up-price').textContent=open&&chance?`${chance.up}¢`:'—';
     $('down-price').textContent=open&&chance?`${chance.down}¢`:'—';
@@ -214,7 +217,7 @@
     if(open)$('ticket-note').textContent=q?'Bets close 30s before interval end · No real money':(side===null?'Choose Up or Down to review your prediction.':'Enter a budget of at least $1 within your demo balance.');
     return q;
   }
-  function renderIntervalDetails(){
+  /** Render interval details from the latest account, market, and interface state. */ function renderIntervalDetails(){
     const model=window.PredictModel,queued=market.status==='queued';
     const result=!queued&&Number.isFinite(market.strike)&&Number.isFinite(market.close)?outcome(market.strike,market.close):null;
     $('interval-result').textContent=queued?'Upcoming interval':result?`${result==='up'?'↑ Up':'↓ Down'} settled`:'Awaiting settlement price';
@@ -234,7 +237,10 @@
     $('interval-facts').replaceChildren(...facts.flatMap(([label,value])=>{const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=label;detail.textContent=value;return [term,detail];}));
     $('interval-message').textContent=queued?'Predictions become available when this interval opens. Up includes an unchanged price.':result?'This interval is closed. Account settlements may remain pending until the closing candle is available.':'This interval is closed. Missing candle data keeps settlement pending.';
   }
-  function renderTicket() {
+  /** Render ticket from the latest account, market, and interface state. */ function renderTicket() {
+    const nextBudgetKey=predictionKey(window.PredictModel.coin.symbol,market.id,market.startsAt);
+    // A new instrument or interval requires a fresh budget, including on initial load.
+    if(nextBudgetKey!==budgetMarketKey){$('stake').value='';budgetMarketKey=nextBudgetKey;}
     renderStatusLine();
     const open=market.status==='open',queued=market.status==='queued';
     $('ticket-heading').textContent=open?'Make a prediction':queued?'Upcoming interval':'Settlement details';
@@ -265,7 +271,7 @@
     renderExecutionState();
   }
   let pendingSignature='';
-  function renderPendingTimes(){
+  /** Render pending times from the latest account, market, and interface state. */ function renderPendingTimes(){
     if(document.hidden)return;
     positions.filter(p=>p.settled_at==null).forEach(p=>{
       const label=document.getElementById(`pending-time-${p.id}`);if(!label)return;
@@ -274,7 +280,7 @@
       label.textContent=`${p.start}–${p.end} UTC · ${new Date(p.starts_at*1000).toISOString().slice(0,10)} · ${status}`;
     });
   }
-  function renderPositions() {
+  /** Render positions from the latest account, market, and interface state. */ function renderPositions() {
     const pending=positions.filter(p=>p.settled_at==null);
     const signature=JSON.stringify([!!account.user,pending.map(p=>p.id)]);
     if(signature===pendingSignature){renderPendingTimes();return;}pendingSignature=signature;
@@ -298,7 +304,7 @@
     renderTicket();
   });
   let directionHintTimer;
-  function highlightDirections(){
+  /** Highlight chosen direction controls consistently across interval cards. */ function highlightDirections(){
     clearTimeout(directionHintTimer);
     sideButtons.forEach(button=>button.classList.remove('direction-hint'));
     void sideButtons[0].offsetWidth;
@@ -336,17 +342,14 @@
     if(!q||review.coin!==window.PredictModel.coin.symbol||review.hour!==window.PredictModel.hour){$('review-dialog').close();review=null;notify('Market changed. Review your prediction again.');return;}
     Object.assign(review,q,{strike:m.strike});renderReviewSummary(q);
     const button=$('confirm-prediction'),buttonLabel=button.textContent;submitting=true;button.disabled=true;button.textContent='Saving prediction…';$('review-error').textContent='';
-    try{await account.place({...review});review=null;side=null;$('review-dialog').close();renderTicket();notify('Demo prediction saved to your account.');}
+    try{await account.place({...review});review=null;side=null;$('stake').value='';$('review-dialog').close();renderTicket();notify('Demo prediction saved to your account.');}
     catch(error){$('review-error').textContent=error.message;notify(error.message);}
     finally{submitting=false;button.textContent=buttonLabel;renderExecutionState();renderReviewChance();}
   });
-  function renderAccount(){
+  /** Render account from the latest account, market, and interface state. */ function renderAccount(){
     positions=account.predictions.map(p=>({...p,marketId:p.market_id,minutes:Number(p.market_id.split('-')[0]),start:new Date(p.starts_at*1000).toISOString().slice(11,16),end:new Date(p.ends_at*1000).toISOString().slice(11,16),cost:p.cost_cents/100}));
     predictionIndex.clear();
     positions.forEach(p=>{const key=predictionKey(p.coin,p.marketId,p.starts_at*1000);if(!predictionIndex.has(key))predictionIndex.set(key,[]);predictionIndex.get(key).push(p);});
-    $('account-name').textContent=account.user?.name||'';
-    $('account-name').hidden=!account.user;$('logout-button').hidden=!account.user;
-    $('login-link').hidden=!!account.user;$('signup-link').hidden=!!account.user;
     $('positions-storage').textContent=account.user?'Live orders only':'Log in to save predictions';
     renderSegmentPredictions();renderPositions();renderTicket();
   }

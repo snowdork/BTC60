@@ -10,6 +10,7 @@ from pathlib import Path
 
 
 def download(product,output,days=30):
+    """Download historical candles in resumable batches and persist progress for interrupted runs."""
     partial=output.with_suffix(output.suffix+'.partial')
     if partial.exists():
         state=json.loads(partial.read_text())
@@ -19,6 +20,7 @@ def download(product,output,days=30):
         end=int(time.time())//3600*3600
         state={'product':product,'start':end-days*86400,'end':end,'next':end-days*86400,'candles':[]}
     candles={c[0]:c for c in state['candles']}
+    # Persist batches as progress advances so interrupted downloads can resume.
     while state['next']<state['end']:
         start=state['next'];end=min(state['end'],start+240*60)
         query=urllib.parse.urlencode({'granularity':60,'start':datetime.fromtimestamp(start,timezone.utc).isoformat(),'end':datetime.fromtimestamp(end,timezone.utc).isoformat()})
@@ -49,6 +51,7 @@ def download(product,output,days=30):
 
 
 def main():
+    """Parse download options and resume the requested historical candle export."""
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('product',help='Coinbase product, for example BTC-USD')
     parser.add_argument('output',type=Path)

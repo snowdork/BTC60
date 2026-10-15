@@ -17,6 +17,7 @@ LOCK = threading.Lock()
 
 
 def credential():
+    """Resolve the provider key from the supported environment variables or private server-side key file."""
     key = os.environ.get('OILPRICE_API_KEY','').strip()
     if key:
         return key
@@ -27,10 +28,12 @@ def credential():
 
 
 def configured():
+    """Report whether server-side credentials are available without exposing their contents."""
     return bool(credential())
 
 
 def request(product):
+    """Fetch provider JSON with server-side authentication and convert provider failures to safe application errors."""
     key = credential()
     if not key:
         raise ValueError('Oil feed needs an OilPriceAPI key on the server.')
@@ -47,6 +50,7 @@ def request(product):
 
 
 def quote(product):
+    """Return a cached provider observation after checking instrument identity, units, and timestamp rules."""
     if product not in SYMBOLS.values():
         raise ValueError('This crude grade has no verified spot feed.')
     with LOCK:
@@ -83,8 +87,10 @@ def quote(product):
 
 
 def fresh_spot(product):
+    """Return a validated current quote; reject stale data and providers without tradable benchmarks."""
     raise ValueError('OilPriceAPI spot assessments cannot settle hourly predictions: minute benchmarks unavailable.')
 
 
 def candles(product,start,end):
+    """Reject minute-history requests because physical spot assessments cannot provide exact settlement candles."""
     raise ValueError('OilPriceAPI spot assessments do not provide exact minute candles. Hourly predictions unavailable.')

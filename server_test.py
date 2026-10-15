@@ -282,9 +282,39 @@ class AccountsTest(unittest.TestCase):
             'password': 'strong-password-123'})
         self.assertEqual(self.request('GET', '/index.html?category=oil', cookie=cookie)[0], 200)
         self.assertEqual(self.request('GET', '/categories.html', cookie=cookie)[0], 200)
+        for path in ['/', '/welcome.html']:
+            conn = http.client.HTTPConnection('127.0.0.1', self.http.server_port)
+            conn.request('GET', path, headers={'Cookie': cookie})
+            response = conn.getresponse()
+            response.read()
+            self.assertEqual(response.status, 302)
+            self.assertEqual(response.getheader('Location'), '/categories.html')
+            self.assertEqual(response.getheader('Cache-Control'), 'no-store')
+            conn.close()
         _, account, _ = self.request('GET', '/api/account', cookie=cookie)
         self.assertEqual(self.request('POST', '/api/logout', {}, cookie, account['csrf'])[0], 200)
         self.assertEqual(self.request('GET', '/index.html', cookie=cookie)[0], 302)
+        self.assertEqual(self.request('GET', '/welcome.html', cookie=cookie)[0], 200)
+
+    def test_community_counts_track_unique_recent_sessions(self):
+        before = self.request('GET', '/api/community')[1]
+        _, _, cookie = self.request('POST', '/api/signup', {
+            'name': 'Community member', 'email': 'community@example.com',
+            'password': 'strong-password-123'})
+        counts = self.request('GET', '/api/community', cookie=cookie)[1]
+        self.assertEqual(counts['users'], before['users'] + 1)
+        self.assertEqual(counts['activeUsers'], before['activeUsers'] + 1)
+        with server.connect() as conn:
+            user_id = conn.execute("SELECT id FROM users WHERE email='community@example.com'").fetchone()[0]
+            conn.execute("INSERT INTO sessions(token_hash,user_id,csrf,expires_at,last_seen_at) VALUES('second-community-session',?,'csrf',?,?)", (user_id, int(server.time.time())+600, int(server.time.time())))
+        self.assertEqual(self.request('GET', '/api/community')[1]['activeUsers'], counts['activeUsers'])
+        with server.connect() as conn:
+            conn.execute('UPDATE sessions SET last_seen_at=? WHERE user_id=?', (int(server.time.time())-301, user_id))
+        self.assertEqual(self.request('GET', '/api/community')[1]['activeUsers'], before['activeUsers'])
+        self.assertEqual(self.request('GET', '/api/community', cookie=cookie)[1]['activeUsers'], counts['activeUsers'])
+        _, account, _ = self.request('GET', '/api/account', cookie=cookie)
+        self.request('POST', '/api/logout', {}, cookie, account['csrf'])
+        self.assertEqual(self.request('GET', '/api/community')[1]['activeUsers'], before['activeUsers'])
 
     def test_private_files_not_served(self):
         for path in ['/data/btc60.sqlite3', '/server.py', '/.git/config', '/%2e%2e/server.py']:

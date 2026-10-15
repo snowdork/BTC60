@@ -16,10 +16,12 @@ LOCK = threading.Lock()
 
 
 def configured():
+    """Report whether server-side credentials are available without exposing their contents."""
     return bool(os.environ.get('TWELVE_DATA_API_KEY') or os.environ.get('TWELVEDATA_API_KEY'))
 
 
 def request(endpoint, params):
+    """Fetch provider JSON with server-side authentication and convert provider failures to safe application errors."""
     key = os.environ.get('TWELVE_DATA_API_KEY') or os.environ.get('TWELVEDATA_API_KEY')
     if not key:
         raise ValueError('Oil feed needs a Twelve Data API key on the server.')
@@ -37,6 +39,7 @@ def request(endpoint, params):
 
 
 def positive(value):
+    """Parse a finite positive price or reject the provider value."""
     try:
         result = float(value)
         if math.isfinite(result) and result > 0:
@@ -47,6 +50,8 @@ def positive(value):
 
 
 def quote(product):
+    """Return a cached provider observation after checking instrument identity, units, and timestamp rules."""
+    # Unverified crude mappings must fail instead of silently substituting another instrument.
     if not product:
         raise ValueError('This crude grade has no verified live spot feed.')
     if not configured():
@@ -78,6 +83,8 @@ def quote(product):
 
 
 def candles(product, start, end):
+    """Return validated minute OHLC rows in Coinbase order: time, low, high, open, close, volume."""
+    # Unverified crude mappings must fail instead of silently substituting another instrument.
     if not product:
         raise ValueError('This crude grade has no verified live spot feed.')
     boundary = int(time.time())//60*60
@@ -95,6 +102,7 @@ def candles(product, start, end):
     if not isinstance(data.get('values'),list):
         raise ValueError('Oil minute history unavailable.')
     result = {}
+    # Validate each provider candle independently before deduplicating by UTC minute.
     for row in data['values']:
         try:
             stamp = int(datetime.strptime(row['datetime'],'%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc).timestamp())

@@ -1,3 +1,6 @@
+/** @module categories
+ * Render available category cards and oil observations while keeping coming-soon markets disabled.
+ */
 (async()=>{
   'use strict';
   await window.BTC60Account.loaded;
@@ -9,7 +12,7 @@
   };
   const status=document.getElementById('category-status'),retry=document.getElementById('category-retry');
   const quoteRows=new Map();let quotesLoading=false;
-  async function refreshQuotes(){
+  /** Refresh configured oil observations with freshness checks and no overlapping polling. */ async function refreshQuotes(){
     if(quotesLoading||document.hidden||!quoteRows.size)return;
     quotesLoading=true;
     try{await Promise.all([...quoteRows].map(async([symbol,node])=>{
@@ -32,6 +35,7 @@
     document.getElementById('category-options').replaceChildren(...categories.map(category=>{
       const comingSoon=category.availability==='coming_soon';
       const link=document.createElement(comingSoon?'article':'a');link.className='category-card';link.dataset.category=category.id;
+      // Render a non-navigable article for dormant categories rather than a market link.
       if(comingSoon){link.dataset.availability='coming_soon';link.setAttribute('aria-label',`${category.name} — Coming soon`);}else link.href=`index.html?category=${encodeURIComponent(category.id)}`;
       link.style.setProperty('--category-accent',category.accent);link.style.setProperty('--category-background',category.background);
       const icon=document.createElement('span');icon.className='category-icon';icon.innerHTML=icons[category.icon]||'<span aria-hidden="true">↗</span>';
@@ -43,6 +47,7 @@
       const state=document.createElement('span');state.className='category-feed-state';state.dataset.state=category.feedState;
       state.textContent=comingSoon?'60-minute temperature & wind predictions':category.feedState==='setup_required'?'Live feed awaiting connection':category.feedState==='configured'?(category.provider==='OilPriceAPI'?'Spot assessments connected':'Live feed configured'):'Live feed available';
       const instruments=document.createElement('div');instruments.className='category-instruments';
+      // Show planned weather cities without fetching observations or enabling orders.
       for(const instrument of (comingSoon?category.cities.map(city=>({symbol:city.name,name:city.name})):category.instruments)||[]){
         const row=document.createElement('span');row.className='category-instrument';
         const label=document.createElement('span');label.textContent=instrument.symbol;label.title=instrument.name;row.append(label);

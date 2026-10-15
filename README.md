@@ -112,19 +112,36 @@ the console and support the same `--log-level` option.
 - [Design](doc/DESIGN.md): interaction, pricing, settlement, architecture, and persistence.
 - [Database maintenance](doc/DATABASE_MAINTENANCE.md): initialization, inspection, backups, and explicit reset.
 
+## Code documentation (Sphinx)
+
+Python modules and procedures have docstrings; named browser procedures have JSDoc.
+The Sphinx reference includes source listings, signatures, and branch/iteration
+inventories, plus an architecture guide. Build it without executing app modules:
+
+```bash
+python3 -m pip install -r docs/requirements.txt
+npm install --prefix docs
+python3 -m sphinx -W --keep-going -b html docs docs/_build/html
+```
+
+Open `docs/_build/html/index.html`. See [documentation maintenance](docs/contributing.rst).
+Sphinx requires Python 3.11+; runtime requirements for the app are unchanged.
+Node.js and the docs-only Acorn dependency parse browser source. Generated pages
+and rendered docs are ignored by Git and excluded from the static app build.
+
 ## Development and validation
 
 The root files are the application source. `bootstrap.js` loads the database coin catalog before loading the model, trading controller, and chart. `server.py` serves the interface and account API with SQLite persistence. Keep development on the `Phase1` branch.
 
 ```bash
 node --test *.test.js
-python3 -m unittest server_test.py
+python3 -m unittest discover -p '*_test.py'
 python3 -m unittest discover -s scripts -p '*_test.py'
 node --check app.js
 node --check btc-chart.js
 ```
 
-Tests cover market calculations, catalog/bootstrap behavior, portfolio summaries, account/order/settlement handling, and database maintenance. They do not establish live Coinbase availability.
+Tests cover market calculations, catalog/bootstrap behavior, portfolio summaries, restored and expired sessions, login/signup errors, logout and settlement retries, community polling, weather benchmark boundaries, static build isolation, account/order/settlement handling, and database maintenance. They do not establish live Coinbase availability.
 
 ## Data and catalog
 
@@ -145,7 +162,7 @@ Custom coins need a supported Coinbase USD product, display precision, positive 
 
 ## Static distribution and hosting
 
-`dist/` contains static copies, not a standalone account backend. After frontend changes, synchronize all root HTML, CSS, and browser JavaScript files plus `assets/` into `dist/`; exclude tests and backend scripts. Include portfolio, theme, and responsive assets. The welcome preview is `assets/previews/prediction-playfield.png`. `.openai/hosting.json` identifies the existing private Site.
+`dist/` contains static copies, not a standalone account backend. After frontend changes, run `python3 scripts/build-static.py` to refresh the public HTML, CSS, browser JavaScript, and artwork in `dist/`. The build uses the server’s public file list and excludes backend scripts, tests, credentials, and account data. The welcome preview is `assets/previews/prediction-playfield.png`. `.openai/hosting.json` identifies the existing private Site.
 
 The Python server binds to loopback for local development. Public account hosting requires a production server, HTTPS, Secure session cookies, and account recovery/email verification. Static hosting cannot replace the Python/SQLite API.
 
@@ -162,7 +179,7 @@ Both commands report progress. Rerun the download command after interruption to 
 
 ## Market categories: Oil and Crypto
 
-The entry screen at `/` (or `welcome.html`) loads category buttons from `/api/categories`.
+The entry screen at `/` (or `welcome.html`) offers login and signup. Signed-in visitors go directly to `categories.html`, which loads category buttons from `/api/categories`. Weather is visible as Coming soon with disabled instruments; see [weather preparation](doc/WEATHER.md).
 Choose **Oil** or **Crypto** to open the same one-hour playfield at
 `index.html?category=oil` or `index.html?category=crypto`. The existing 15-, 30-,
 and 60-minute intervals remain aligned inside that hour. Each category has its own

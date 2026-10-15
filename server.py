@@ -35,9 +35,37 @@ AUTH_LOCK = threading.Lock()
 SETTLE_LOCK = threading.Lock()
 STATIC_CACHE = {}
 LOG = logging.getLogger(__name__)
+PUBLIC_FILES = {
+    'account.js',
+    'app.js',
+    'auth.css',
+    'auth.js',
+    'bootstrap.js',
+    'btc-chart.js',
+    'categories.css',
+    'categories.html',
+    'categories.js',
+    'coins.js',
+    'community.js',
+    'index.html',
+    'login.html',
+    'market-model.js',
+    'portfolio-model.js',
+    'portfolio.css',
+    'portfolio.html',
+    'portfolio.js',
+    'responsive.css',
+    'signup.html',
+    'styles.css',
+    'theme.css',
+    'theme.js',
+    'welcome.css',
+    'welcome.html',
+}
 
 
 def connect():
+    """Open the configured SQLite database with foreign keys and a 15-second busy timeout."""
     conn = sqlite3.connect(DB, timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA foreign_keys=ON')
@@ -45,6 +73,7 @@ def connect():
 
 
 def initialize():
+    """Create missing tables and apply idempotent catalog migrations while preserving saved accounts and orders."""
     DB.parent.mkdir(parents=True, exist_ok=True)
     with connect() as conn:
         seed_coins = not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='coins'").fetchone()
@@ -90,9 +119,12 @@ def initialize():
         BEGIN SELECT RAISE(ABORT,'Coin has predictions; preserve its symbol'); END;
         CREATE INDEX IF NOT EXISTS predictions_user ON predictions(user_id,created_at);
         ''')
+        if 'last_seen_at' not in {row['name'] for row in conn.execute('PRAGMA table_info(sessions)')}:
+            conn.execute('ALTER TABLE sessions ADD COLUMN last_seen_at INTEGER NOT NULL DEFAULT 0')
         if seed_coins:
             for coin in json.loads((ROOT / 'coins.seed.json').read_text()):
                 conn.execute('INSERT INTO coins(symbol,name,product,precision,demo_base,icon,enabled,sort_order) VALUES(?,?,?,?,?,?,?,?)', (coin['symbol'],coin['name'],coin['product'],coin['precision'],coin['demoBase'],coin['icon'],int(coin['enabled']),coin['sortOrder']))
+        # Apply this migration once; saved prediction sources and account state must survive restarts.
         if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=1').fetchone():
             # Add new catalog entries once, preserving administrator changes on restart.
             for coin in json.loads((ROOT / 'coins.seed.json').read_text())[5:]:
@@ -101,6 +133,7 @@ def initialize():
                 room = conn.execute('SELECT count(*) FROM coins WHERE enabled=1').fetchone()[0] < 8
                 conn.execute('INSERT INTO coins(symbol,name,product,precision,demo_base,icon,enabled,sort_order) VALUES(?,?,?,?,?,?,?,?)', (coin['symbol'],coin['name'],coin['product'],coin['precision'],coin['demoBase'],coin['icon'],int(coin['enabled'] and room),coin['sortOrder']))
             conn.execute('INSERT INTO catalog_migrations VALUES(1)')
+        # Apply this migration once; saved prediction sources and account state must survive restarts.
         if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=2').fetchone():
             conn.execute("UPDATE coins SET enabled=0 WHERE symbol='LINK'")
             coin = next(c for c in json.loads((ROOT / 'coins.seed.json').read_text()) if c['symbol']=='LTC')
@@ -111,6 +144,7 @@ def initialize():
 
         # Add categories without rebuilding existing accounts or prediction tables.
         conn.execute('CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL, icon TEXT NOT NULL, accent TEXT NOT NULL, background TEXT NOT NULL, unit TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0)')
+        # Insert missing category metadata without overwriting administrator customizations.
         for category in json.loads((ROOT / 'categories.seed.json').read_text()):
             conn.execute('INSERT OR IGNORE INTO categories VALUES(?,?,?,?,?,?,?,?)', (category['id'],category['name'],category['description'],category['icon'],category['accent'],category['background'],category['unit'],category['sortOrder']))
         columns = {row['name'] for row in conn.execute('PRAGMA table_info(coins)')}
@@ -145,6 +179,7 @@ def initialize():
         BEGIN SELECT RAISE(ABORT,'Category has instruments; preserve its id'); END;
         CREATE INDEX IF NOT EXISTS coins_category ON coins(category,enabled,sort_order);
         """)
+        # Apply this migration once; saved prediction sources and account state must survive restarts.
         if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=3').fetchone():
             for instrument in json.loads((ROOT / 'oil.seed.json').read_text()):
                 conn.execute('INSERT INTO coins(symbol,name,product,precision,demo_base,icon,enabled,sort_order,category,feed,unit) VALUES(?,?,?,?,?,?,?,?,?,?,?)', (instrument['symbol'],instrument['name'],instrument['product'],instrument['precision'],instrument['demoBase'],instrument['icon'],int(instrument['enabled']),instrument['sortOrder'],instrument['category'],instrument['feed'],instrument['unit']))
@@ -158,11 +193,13 @@ def initialize():
           prediction_id TEXT PRIMARY KEY REFERENCES predictions(id), provider TEXT NOT NULL,
           product TEXT NOT NULL);
         """)
+        # Apply this migration once; saved prediction sources and account state must survive restarts.
         if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=4').fetchone():
             for row in conn.execute("SELECT symbol FROM coins WHERE category='oil'").fetchall():
                 conn.execute('INSERT OR IGNORE INTO instrument_sources VALUES(?,?,?)',(row['symbol'],'twelvedata',live_oil.SYMBOLS.get(row['symbol'],'')))
             conn.execute('INSERT INTO catalog_migrations VALUES(4)')
 
+        # Apply this migration once; saved prediction sources and account state must survive restarts.
         if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=5').fetchone():
             conn.executescript("""
             ALTER TABLE instrument_sources RENAME TO instrument_sources_v4;
@@ -182,6 +219,7 @@ def initialize():
 
 
 def instrument_source(coin, legacy=False):
+    """Resolve the authoritative feed and product, optionally retaining the legacy settlement source."""
     with connect() as conn:
         row=conn.execute('SELECT symbol,product,feed,demo_base,category FROM coins WHERE symbol=?',(coin,)).fetchone()
         override=None if legacy else conn.execute('SELECT provider,product FROM instrument_sources WHERE coin=?',(coin,)).fetchone()
@@ -194,6 +232,7 @@ def instrument_source(coin, legacy=False):
 
 
 def candle_close(coin, boundary, source=None):
+    """Fetch the exact closing benchmark immediately before a UTC interval boundary; fail if it is unavailable."""
     record=source or instrument_source(coin)
     if record['feed']=='oilpriceapi':
         raise ValueError('OilPriceAPI spot feed has no minute benchmark for this interval.')
@@ -218,6 +257,7 @@ def candle_close(coin, boundary, source=None):
 
 
 def fresh_spot(coin, source=None):
+    """Return a validated current quote; reject stale data and providers without tradable benchmarks."""
     record=source or instrument_source(coin)
     if record['feed']=='oilpriceapi':
         return oilprice_api.fresh_spot(record['product'])
@@ -242,6 +282,7 @@ def fresh_spot(coin, source=None):
 
 
 def estimated_up(strike, spot, now, start, end, volatility, calibration=None):
+    """Calculate the integer Up purchase probability from validated provider history and current price."""
     return max(1, min(99, math.floor(100*odds.probability(strike, spot, now, end, volatility, calibration)+.5)))
 
 
@@ -250,6 +291,7 @@ HISTORY_LOCK = threading.Lock()
 
 
 def pricing_history(product, now, instrument=None):
+    """Load and combine provider minute history for the trailing volatility window."""
     if instrument and instrument['feed']=='oilpriceapi':
         return oilprice_api.candles(product,0,0)
     if instrument and instrument['feed']=='twelvedata':
@@ -272,6 +314,7 @@ def pricing_history(product, now, instrument=None):
     ranges = [(previous[1]-60,boundary)] if previous else [(boundary-(i+1)*14400,boundary-i*14400) for i in range(6)]
 
     def fetch_batch(interval):
+        """Fetch one historical candle batch for the pricing-history aggregation."""
         start,end=interval
         query=urllib.parse.urlencode({'granularity':60,'start':datetime.fromtimestamp(start,timezone.utc).isoformat(),'end':datetime.fromtimestamp(end,timezone.utc).isoformat()})
         request=urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/candles?'+query,headers={'User-Agent':'BTC60-local-demo/1.0'})
@@ -293,6 +336,7 @@ def pricing_history(product, now, instrument=None):
 
 
 def market_up(coin, strike, spot, now, start, end, source=None):
+    """Compute the executable Up quote for an instrument and prediction interval."""
     instrument=source or instrument_source(coin)
     try:
         volatility = odds.minute_volatility(pricing_history(instrument['product'], now, instrument), now)
@@ -302,6 +346,7 @@ def market_up(coin, strike, spot, now, start, end, source=None):
 
 
 def _settle_due(user_id=None):
+    """Settle due orders from their frozen provider snapshots, crediting each winning payout only once."""
     with connect() as conn:
         pending = conn.execute('SELECT p.* FROM predictions p LEFT JOIN settlements s ON s.prediction_id=p.id WHERE s.prediction_id IS NULL AND p.ends_at<=? AND (? IS NULL OR p.user_id=?)', (int(time.time()) - 5, user_id, user_id)).fetchall()
     prices = {}
@@ -332,6 +377,7 @@ def _settle_due(user_id=None):
 
 
 def settle_due(user_id=None):
+    """Run settlement under a nonblocking process lock so concurrent requests cannot overlap."""
     if SETTLE_LOCK.acquire(blocking=False):
         try:
             _settle_due(user_id)
@@ -340,6 +386,7 @@ def settle_due(user_id=None):
 
 
 def settlement_worker():
+    """Retry pending settlements continuously, logging failures without terminating the worker."""
     while True:
         try:
             settle_due()
@@ -350,14 +397,18 @@ def settlement_worker():
 
 
 class Handler(SimpleHTTPRequestHandler):
+    """Serve allowlisted frontend assets and account, quote, prediction, and community HTTP endpoints."""
     def __init__(self, *args, **kwargs):
+        """Initialize the HTTP handler with this checkout as its static source directory."""
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
     def log_message(self, format, *args):
         # Preserve existing HTTP diagnostics in debug mode.
+        """Route HTTP diagnostics to debug logging without writing request bodies or credentials."""
         LOG.debug('%s %s', self.client_address[0], format % args)
 
     def log_request(self, code='-', size='-'):
+        """Record user actions and server failures while keeping routine polling out of normal logs."""
         path = urllib.parse.urlsplit(self.path).path
         if self.command == 'POST':
             LOG.info('User action method=POST path=%s status=%s', path, code)
@@ -366,12 +417,14 @@ class Handler(SimpleHTTPRequestHandler):
         super().log_request(code, size)
 
     def end_headers(self):
+        """Add browser security headers before completing an HTTP response."""
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'same-origin')
         self.send_header('X-Frame-Options', 'DENY')
         super().end_headers()
 
     def reply(self, status, payload, cookie=None):
+        """Send a JSON response with no-store caching and an optional session cookie; suppress bodies for HEAD."""
         body = json.dumps(payload).encode()
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
@@ -383,7 +436,16 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command!='HEAD':
             self.wfile.write(body)
 
+    def redirect(self, target):
+        """Send an uncached redirect with an empty response body."""
+        self.send_response(302)
+        self.send_header('Location', target)
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Content-Length', '0')
+        self.end_headers()
+
     def session(self):
+        """Validate the session cookie and expiry, then periodically refresh its activity timestamp."""
         jar = cookies.SimpleCookie()
         try:
             jar.load(self.headers.get('Cookie', ''))
@@ -391,16 +453,29 @@ class Handler(SimpleHTTPRequestHandler):
         except (KeyError, cookies.CookieError):
             return None
         with connect() as conn:
-            return conn.execute('SELECT s.*,u.name,u.email,u.balance_cents FROM sessions s JOIN users u ON u.id=s.user_id WHERE token_hash=? AND expires_at>?', (hashlib.sha256(token.encode()).hexdigest(), int(time.time()))).fetchone()
+            session = conn.execute('SELECT s.*,u.name,u.email,u.balance_cents FROM sessions s JOIN users u ON u.id=s.user_id WHERE token_hash=? AND expires_at>?', (hashlib.sha256(token.encode()).hexdigest(), int(time.time()))).fetchone()
+            if session and session['last_seen_at'] < int(time.time()) - 15:
+                conn.execute('UPDATE sessions SET last_seen_at=? WHERE token_hash=?', (int(time.time()), session['token_hash']))
+            return session
 
     def account(self, session):
+        """Build the signed-in account snapshot with saved predictions, settlement results, and CSRF token."""
         with connect() as conn:
             user = conn.execute('SELECT id,name,email,balance_cents FROM users WHERE id=?', (session['user_id'],)).fetchone()
             positions = [dict(row) for row in conn.execute('SELECT p.*,i.category,i.name AS instrument_name,i.unit,ps.provider AS pricing_source,s.close_price,s.outcome,s.payout_cents,s.settled_at,s.source FROM predictions p JOIN coins i ON i.symbol=p.coin LEFT JOIN prediction_sources ps ON ps.prediction_id=p.id LEFT JOIN settlements s ON s.prediction_id=p.id WHERE p.user_id=? ORDER BY p.created_at DESC', (session['user_id'],))]
         return {'user': dict(user), 'csrf': session['csrf'], 'predictions': positions}
 
     def do_GET(self):
+        """Dispatch read endpoints and enforce authentication and the static-file allowlist."""
         path = urllib.parse.urlsplit(self.path).path
+        # Heartbeat valid sessions before counting distinct accounts across tabs/devices.
+        if path == '/api/community':
+            self.session()  # Record this signed-in visitor's heartbeat.
+            now = int(time.time())
+            with connect() as conn:
+                total = conn.execute('SELECT count(*) FROM users').fetchone()[0]
+                active = conn.execute('SELECT count(DISTINCT user_id) FROM sessions WHERE expires_at>? AND last_seen_at>=?', (now, now - 300)).fetchone()[0]
+            return self.reply(200, {'users': total, 'activeUsers': active, 'activeWindowSeconds': 300})
         if path == '/api/categories':
             with connect() as conn:
                 categories = [dict(row) for row in conn.execute('SELECT c.*,count(i.symbol) AS instrumentCount FROM categories c LEFT JOIN coins i ON i.category=c.id AND i.enabled=1 GROUP BY c.id ORDER BY c.sort_order,c.id')]
@@ -471,29 +546,23 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith('/api/'):
             return self.reply(404, {'error': 'Unknown endpoint.'})
         # Serve only public application assets, never SQLite, source or dotfiles.
-        public = {'index.html', 'categories.html', 'welcome.html', 'login.html', 'signup.html', 'styles.css', 'auth.css', 'auth.js', 'account.js', 'app.js', 'btc-chart.js', 'market-model.js', 'coins.js', 'bootstrap.js', 'splash.js', 'portfolio.html', 'portfolio.js', 'portfolio-model.js', 'portfolio.css', 'theme.js', 'theme.css', 'responsive.css', 'categories.js', 'categories.css', 'welcome.css'}
         relative = urllib.parse.unquote(path).lstrip('/')
         if not relative:
             self.path = '/welcome.html'
-        elif relative not in public and relative not in {'assets/previews/prediction-playfield.png', 'assets/backgrounds/hourly-markets.webp'} and not (re.fullmatch(r'assets/coins/[a-zA-Z0-9_-]+\.svg', relative)):
+        elif relative not in PUBLIC_FILES and relative not in {'assets/previews/prediction-playfield.png', 'assets/backgrounds/hourly-markets.webp'} and not (re.fullmatch(r'assets/coins/[a-zA-Z0-9_-]+\.svg', relative)):
             return self.reply(404, {'error': 'Not found.'})
+        # Returning signed-in visitors enter categories without seeing the guest splash.
+        if relative in {'', 'welcome.html'} and self.session():
+            return self.redirect('/categories.html')
         if relative == 'index.html' and urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('category') == ['weather']:
-            self.send_response(302)
-            self.send_header('Location', '/welcome.html')
-            self.send_header('Cache-Control', 'no-store')
-            self.send_header('Content-Length', '0')
-            self.end_headers()
-            return
+            return self.redirect('/welcome.html')
+        # Protect direct terminal/category URLs independently of client-side navigation.
         if relative in {'index.html', 'categories.html'} and not self.session():
-            self.send_response(302)
-            self.send_header('Location', '/welcome.html')
-            self.send_header('Cache-Control', 'no-store')
-            self.send_header('Content-Length', '0')
-            self.end_headers()
-            return
+            return self.redirect('/welcome.html')
         self.serve_static()
 
     def serve_static(self):
+        """Serve an allowlisted file with gzip, ETag revalidation, and private caching for account entry pages."""
         relative = urllib.parse.unquote(urllib.parse.urlsplit(self.path).path).lstrip('/')
         path = ROOT / relative
         if not path.is_file():
@@ -515,7 +584,7 @@ class Handler(SimpleHTTPRequestHandler):
         body,etag = cached
         unchanged = self.headers.get('If-None-Match')==etag
         self.send_response(304 if unchanged else 200)
-        self.send_header('Cache-Control','private, no-store' if relative in {'index.html', 'categories.html'} else 'public, max-age=0, must-revalidate')
+        self.send_header('Cache-Control','private, no-store' if relative in {'index.html', 'categories.html', 'welcome.html'} else 'public, max-age=0, must-revalidate')
         self.send_header('ETag',etag)
         self.send_header('Vary','Accept-Encoding')
         if not unchanged:
@@ -528,9 +597,11 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
 
     def do_HEAD(self):
+        """Reuse GET routing and headers while suppressing response bodies."""
         self.do_GET()
 
     def do_POST(self):
+        """Validate request origin, JSON size, session, and CSRF token before routing account mutations."""
         origin = self.headers.get('Origin')
         if origin and origin != f'http://{self.headers.get("Host")}':
             return self.reply(403, {'error': 'Invalid request origin.'})
@@ -544,6 +615,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not isinstance(data, dict):
                 raise ValueError('Invalid request.')
             path = urllib.parse.urlsplit(self.path).path
+            # Authentication creates a session; all later mutations require that session and its CSRF token.
             if path in ('/api/signup', '/api/login'):
                 return self.authenticate(path, data)
             session = self.session()
@@ -571,6 +643,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(503, {'error': 'Service unavailable. Please try again.'})
 
     def authenticate(self, path, data):
+        """Validate credentials, throttle attempts, create or verify the account, and issue a session cookie."""
         with AUTH_LOCK:
             now = time.time()
             for address in list(AUTH_ATTEMPTS):
@@ -604,11 +677,12 @@ class Handler(SimpleHTTPRequestHandler):
                 user_id = user['id']
             token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
             conn.execute('DELETE FROM sessions WHERE expires_at<=?', (int(time.time()),))
-            conn.execute('INSERT INTO sessions VALUES(?,?,?,?)', (hashlib.sha256(token.encode()).hexdigest(), user_id, csrf, int(time.time()) + 604800))
+            conn.execute('INSERT INTO sessions(token_hash,user_id,csrf,expires_at,last_seen_at) VALUES(?,?,?,?,?)', (hashlib.sha256(token.encode()).hexdigest(), user_id, csrf, int(time.time()) + 604800, int(time.time())))
         LOG.info('Authentication action=%s user=%s', path.rsplit('/', 1)[-1], user_id)
         return self.reply(200, {'ok': True}, f'btc60_session={token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800')
 
     def predict(self, session, data):
+        """Validate order timing and budget, freeze the provider quote, and atomically debit and save an idempotent order."""
         coin, market_id, side = data.get('coin'), data.get('marketId'), data.get('side')
         budget, request_id = data.get('budget'), data.get('requestId')
         if not isinstance(coin, str) or not isinstance(market_id,str) or not isinstance(side,str):

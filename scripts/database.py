@@ -18,6 +18,7 @@ import server
 
 @contextmanager
 def maintenance_lock(path):
+    """Acquire an exclusive nonblocking database maintenance lock for the duration of the context."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(str(path) + '.lock', 'a') as lock:
         os.chmod(lock.name, 0o600)
@@ -32,12 +33,14 @@ def maintenance_lock(path):
 
 
 def readonly(path):
+    """Open an existing SQLite database in read-only mode for inspection or backup."""
     if not path.is_file():
         raise ValueError(f'Database does not exist: {path}. Run init first.')
     return sqlite3.connect(path.as_uri() + '?mode=ro', uri=True)
 
 
 def backup(path, directory=None):
+    """Create a consistent SQLite backup with private permissions without modifying the source database."""
     directory = directory or path.parent / 'backups'
     directory.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
@@ -53,6 +56,7 @@ def backup(path, directory=None):
 
 
 def status(path):
+    """Print database integrity, table counts, and enabled instruments for administrator inspection."""
     with readonly(path) as conn:
         integrity = conn.execute('PRAGMA integrity_check').fetchone()[0]
         print(f'Database: {path}\nIntegrity: {integrity}')
@@ -65,6 +69,7 @@ def status(path):
 
 
 def reset(path):
+    """Back up the database before clearing account state and restoring seeded catalogs."""
     with maintenance_lock(path):
         # Build and validate the replacement before touching the existing database.
         with tempfile.TemporaryDirectory(prefix='btc60-reset-', dir=path.parent) as folder:
@@ -85,6 +90,7 @@ def reset(path):
 
 
 def main():
+    """Parse maintenance commands and enforce locks and explicit reset confirmation."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['init', 'backup', 'status', 'reset'])
     parser.add_argument('--db', type=Path, default=server.DB, help='SQLite path (default: BTC60_DB or project data/btc60.sqlite3)')
@@ -94,6 +100,7 @@ def main():
     path = args.db.expanduser().resolve()
     server.DB = path
     try:
+        # Initialization is idempotent; destructive reset follows a separate explicit confirmation path.
         if args.command == 'init':
             with maintenance_lock(path):
                 server.initialize()

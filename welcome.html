@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en">
 <head><script src="theme.js"></script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BTC60 · The hourly prediction market</title><meta name="description" content="The hourly prediction market. Make your call on crypto and oil, with weather coming soon. Demo funds only."><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="auth.css"><link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="responsive.css"><link rel="stylesheet" href="categories.css"><link rel="stylesheet" href="welcome.css"><script defer src="account.js"></script></head>
-<body class="category-page welcome-page">
-<header class="auth-nav"><a class="brand" href="welcome.html"><span class="brand-mark">60</span><span>BTC60<small>ONE HOUR. YOUR CALL.</small></span></a><nav><button class="theme-toggle" data-theme-toggle type="button" aria-label="Switch to light mode">☼</button><a data-authenticated href="categories.html" hidden>Choose market →</a><a data-authenticated href="portfolio.html" hidden>Portfolio</a><a data-login href="login.html">Log in</a><button type="button" data-logout class="account-link logout-control" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H4v16h5M14 8l4 4-4 4M8 12h10"/></svg><span>Log out</span></button></nav></header>
+<body class="category-page welcome-page" data-redirect-authenticated>
+<header class="auth-nav"><a class="brand" href="welcome.html"><span class="brand-mark">60</span><span>BTC60<small>ONE HOUR. YOUR CALL.</small></span></a><nav><div class="community-counts" aria-label="Community statistics"><span><strong data-user-count>—</strong> Users</span><span title="Signed-in users active in the last 5 minutes"><i aria-hidden="true"></i><strong data-active-count>—</strong> Active</span></div><button class="theme-toggle" data-theme-toggle type="button" aria-label="Switch to light mode">☼</button><a data-authenticated href="categories.html" hidden>Choose market →</a><a data-authenticated href="portfolio.html" hidden>Portfolio</a><a data-login href="login.html">Log in</a><span class="account-identity"><span class="signed-in-name" data-account-name hidden></span><button type="button" data-logout class="account-link logout-control" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H4v16h5M14 8l4 4-4 4M8 12h10"/></svg><span>Log out</span></button></span></nav></header>
 <main class="category-main">
 <section class="hourly-hero" aria-labelledby="hourly-title">
 <div class="hero-art" aria-hidden="true"></div>
@@ -17,4 +17,4 @@
 <p class="hero-demo">[ DEMO MODE ] $14,250 in starting demo funds · No real money</p>
 </div></div></section>
 <p id="account-status" role="status"></p></main>
-</body></html>
+<script defer src="community.js"></script></body></html>

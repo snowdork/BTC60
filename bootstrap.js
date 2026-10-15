@@ -1,7 +1,11 @@
+/** @module bootstrap
+ * Load authenticated category and instrument configuration before starting the prediction terminal.
+ */
 (async()=>{
   const picker=document.querySelector('.coin-picker');
   try{
     await window.BTC60Account.loaded;
+    // Do not request market configuration until the restored account is authenticated.
     if(!window.BTC60Account.user){location.replace('welcome.html');return;}
     if(location.protocol==='file:')throw Error('Open the terminal through python3 server.py, not a file preview.');
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);
@@ -13,6 +17,7 @@
     if(!categoryResponse.ok)throw Error('Market categories unavailable. Restart python3 server.py.');
     const category=(await categoryResponse.json()).categories.find(item=>item.id===categoryId);
     if(!category)throw Error('This category is unavailable. Choose another market from the category screen.');
+    // Coming-soon categories never initialize a prediction terminal.
     if(category.availability==='coming_soon'){location.replace('categories.html');return;}
     window.BTC60Category=category;
     document.body.dataset.category=category.id;
@@ -30,7 +35,7 @@
       if(coin.icon){const icon=document.createElement('img');icon.src=coin.icon;icon.alt='';icon.width=24;icon.height=24;icon.addEventListener('error',()=>{icon.hidden=true;});button.append(icon);}
       const label=document.createElement('span');label.textContent=coin.symbol;button.append(label);return button;
     }));
-    for(const src of ['market-model.js','app.js','btc-chart.js'])await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=()=>{try{if(src==='market-model.js')window.PredictModel.configure(window.BTC60MarketConfig);resolve();}catch(error){reject(error);}};script.onerror=()=>reject(Error('Unable to load the terminal.'));document.head.append(script);});
+    for(const src of ['market-model.js','app.js','btc-chart.js'])await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=/** Handle the load event for the current transport or resource. */ ()=>{try{if(src==='market-model.js')window.PredictModel.configure(window.BTC60MarketConfig);resolve();}catch(error){reject(error);}};script.onerror=/** Handle the error event for the current transport or resource. */ ()=>reject(Error('Unable to load the terminal.'));document.head.append(script);});
   }catch(error){
     picker.textContent='Markets unavailable';
     const connectionError=error instanceof TypeError||error.name==='AbortError'||error instanceof SyntaxError;

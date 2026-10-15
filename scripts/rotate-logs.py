@@ -9,6 +9,7 @@ from btc60_logging import BACKUPS, LOG_PATH, MAX_BYTES, write_or_rotate
 
 
 def main():
+    """Parse rotation options and apply the shared log retention policy."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--force', action='store_true')
     args = parser.parse_args()

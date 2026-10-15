@@ -5,7 +5,7 @@
 [data-theme="light"] :is(.market-card,.market-card.settled,.coin-picker,.benchmark,.budget-input,.chart-plot,.auth-card input,.market-status-strip,.outcome,.history-filters button,.stake-presets button,dialog){background:var(--surface);color:var(--text);border-color:var(--border)}
 [data-theme="light"] .market-card:hover{background:#eef7f1}
 [data-theme="light"] .market-card.selected{background:#e6f7ed}
-[data-theme="light"] :is(.ticket-market p,.duration-label,.workspace-label,.card-time,.card-bottom,.rules-strip,.rules-strip strong,.rules-strip button,.side-label>span,.ticket-rule p,.empty-state strong,.order-math>div,.ticket-market>div,.chart-toolbar button,.account-name,dialog p,.snapshot strong,.positions-heading>.muted){color:var(--muted)}
+[data-theme="light"] :is(.ticket-market p,.duration-label,.workspace-label,.card-time,.card-bottom,.rules-strip,.rules-strip strong,.rules-strip button,.side-label>span,.ticket-rule p,.empty-state strong,.order-math>div,.ticket-market>div,.chart-toolbar button,dialog p,.snapshot strong,.positions-heading>.muted){color:var(--muted)}
 [data-theme="light"] :is(.order-math strong,.price-clock strong,#selected-time){color:var(--text)}
 [data-theme="light"] .chance-down{color:var(--red)}
 [data-theme="light"] .coin-button{color:var(--muted)}
@@ -24,8 +24,8 @@
 [data-theme="light"] :is(.submit-prediction,.primary-link){background:#007c40;color:white}
 [data-theme="light"] .submit-prediction.bear{background:var(--red)}
 [data-theme="light"] .submit-prediction:disabled{background:#dbe4de;color:#596e61}
-[data-theme="light"] :is(.secondary-link,.splash p,.thumbnail-caption,.splash-features p,.auth-card p,.portfolio-heading p,.portfolio-footnote){color:var(--muted);border-color:var(--border)}
-[data-theme="light"] :is(.thumbnail-bar,th){background:var(--raised);color:var(--muted)}
+[data-theme="light"] :is(.auth-card p,.portfolio-heading p,.portfolio-footnote){color:var(--muted);border-color:var(--border)}
+[data-theme="light"] :is(th){background:var(--raised);color:var(--muted)}
 [data-theme="light"] .floating-coin{background:#fff;border-color:var(--border);box-shadow:0 10px 30px #152b2122}
 [data-theme="light"] .playfield-thumbnail{box-shadow:0 24px 65px #152b2122,0 0 0 1px #007c4030}
 [data-theme="light"] .history-filters button[aria-pressed=true]{background:#e2f4e9;color:var(--green);border-color:var(--green)}
