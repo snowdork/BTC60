@@ -1,0 +1,90 @@
+{
+  "cities": [
+    {
+      "id": "NYC",
+      "name": "New York",
+      "timezone": "America/New_York",
+      "country": "US",
+      "stationId": null
+    },
+    {
+      "id": "LAX",
+      "name": "Los Angeles",
+      "timezone": "America/Los_Angeles",
+      "country": "US",
+      "stationId": null
+    },
+    {
+      "id": "CHI",
+      "name": "Chicago",
+      "timezone": "America/Chicago",
+      "country": "US",
+      "stationId": null
+    },
+    {
+      "id": "HOU",
+      "name": "Houston",
+      "timezone": "America/Chicago",
+      "country": "US",
+      "stationId": null
+    },
+    {
+      "id": "PHX",
+      "name": "Phoenix",
+      "timezone": "America/Phoenix",
+      "country": "US",
+      "stationId": null
+    },
+    {
+      "id": "MIA",
+      "name": "Miami",
+      "timezone": "America/New_York",
+      "country": "US",
+      "stationId": null
+    },
+    {
+      "id": "SEA",
+      "name": "Seattle",
+      "timezone": "America/Los_Angeles",
+      "country": "US",
+      "stationId": null
+    },
+    {
+      "id": "DEN",
+      "name": "Denver",
+      "timezone": "America/Denver",
+      "country": "US",
+      "stationId": null
+    },
+    {
+      "id": "BOS",
+      "name": "Boston",
+      "timezone": "America/New_York",
+      "country": "US",
+      "stationId": null
+    },
+    {
+      "id": "SFO",
+      "name": "San Francisco",
+      "timezone": "America/Los_Angeles",
+      "country": "US",
+      "stationId": null
+    }
+  ],
+  "metrics": [
+    {
+      "id": "temperature",
+      "name": "Temperature",
+      "unit": "\u00b0C",
+      "measurement": "Air temperature at 2 m",
+      "precision": 1
+    },
+    {
+      "id": "wind",
+      "name": "Wind speed",
+      "unit": "m/s",
+      "measurement": "Sustained wind speed at 10 m",
+      "precision": 1
+    }
+  ]
+}

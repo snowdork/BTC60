@@ -16,6 +16,8 @@
   function renderAccountControls(){
     document.querySelectorAll('[data-logout]').forEach(button=>{button.hidden=!account.user;});
     document.querySelectorAll('[data-login]').forEach(link=>{link.hidden=!!account.user;});
+    document.querySelectorAll('[data-authenticated]').forEach(element=>{element.hidden=!account.user;});
+    if(document.body.hasAttribute('data-requires-login')&&account.ready&&!account.user)location.replace('welcome.html');
     const status=document.getElementById('account-status');if(status)status.textContent=account.error||'';
   }
   window.addEventListener('account-update',renderAccountControls);
@@ -26,7 +28,7 @@
     finally{button.disabled=false;}
   }));
   renderAccountControls();
-  account.refresh().then(()=>account.settle()).catch(error=>{account.ready=true;account.error=error.message;window.dispatchEvent(new Event('account-update'));});
+  account.loaded=account.refresh().then(()=>account.settle()).catch(error=>{account.ready=true;account.error=error.message;window.dispatchEvent(new Event('account-update'));});
   const sync=()=>{if(document.hidden||!account.user)return;account.settle().catch(error=>{account.error=error.message;window.dispatchEvent(new Event('account-update'));});};
   setInterval(sync,15000);
   document.addEventListener('visibilitychange',sync);

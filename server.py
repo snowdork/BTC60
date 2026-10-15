@@ -6,6 +6,7 @@ import odds
 import simulated_prices
 import live_oil
 import oilprice_api
+import weather
 import fcntl
 import hashlib
 import gzip
@@ -402,8 +403,11 @@ class Handler(SimpleHTTPRequestHandler):
         path = urllib.parse.urlsplit(self.path).path
         if path == '/api/categories':
             with connect() as conn:
-                categories = [dict(row) for row in conn.execute('SELECT c.*,count(i.symbol) AS instrumentCount FROM categories c JOIN coins i ON i.category=c.id AND i.enabled=1 GROUP BY c.id ORDER BY c.sort_order,c.id')]
+                categories = [dict(row) for row in conn.execute('SELECT c.*,count(i.symbol) AS instrumentCount FROM categories c LEFT JOIN coins i ON i.category=c.id AND i.enabled=1 GROUP BY c.id ORDER BY c.sort_order,c.id')]
                 for category in categories:
+                    if category['id'] == 'weather':
+                        category.update(weather.catalog())
+                        continue
                     instruments=[dict(row) for row in conn.execute('SELECT symbol,name,feed FROM coins WHERE category=? AND enabled=1 ORDER BY sort_order,symbol',(category['id'],))]
                     overrides={row['coin']:row['product'] for row in conn.execute('SELECT * FROM instrument_sources')}
                     category['instruments']=[{'symbol':i['symbol'],'name':i['name'],'liveSupported':bool(overrides.get(i['symbol'])) if i['symbol'] in overrides else True} for i in instruments]
@@ -467,12 +471,26 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith('/api/'):
             return self.reply(404, {'error': 'Unknown endpoint.'})
         # Serve only public application assets, never SQLite, source or dotfiles.
-        public = {'index.html', 'welcome.html', 'login.html', 'signup.html', 'styles.css', 'auth.css', 'auth.js', 'account.js', 'app.js', 'btc-chart.js', 'market-model.js', 'coins.js', 'bootstrap.js', 'splash.js', 'portfolio.html', 'portfolio.js', 'portfolio-model.js', 'portfolio.css', 'theme.js', 'theme.css', 'responsive.css', 'categories.js', 'categories.css'}
+        public = {'index.html', 'categories.html', 'welcome.html', 'login.html', 'signup.html', 'styles.css', 'auth.css', 'auth.js', 'account.js', 'app.js', 'btc-chart.js', 'market-model.js', 'coins.js', 'bootstrap.js', 'splash.js', 'portfolio.html', 'portfolio.js', 'portfolio-model.js', 'portfolio.css', 'theme.js', 'theme.css', 'responsive.css', 'categories.js', 'categories.css', 'welcome.css'}
         relative = urllib.parse.unquote(path).lstrip('/')
         if not relative:
             self.path = '/welcome.html'
-        elif relative not in public and relative != 'assets/previews/prediction-playfield.png' and not (re.fullmatch(r'assets/coins/[a-zA-Z0-9_-]+\.svg', relative)):
+        elif relative not in public and relative not in {'assets/previews/prediction-playfield.png', 'assets/backgrounds/hourly-markets.webp'} and not (re.fullmatch(r'assets/coins/[a-zA-Z0-9_-]+\.svg', relative)):
             return self.reply(404, {'error': 'Not found.'})
+        if relative == 'index.html' and urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('category') == ['weather']:
+            self.send_response(302)
+            self.send_header('Location', '/welcome.html')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
+        if relative in {'index.html', 'categories.html'} and not self.session():
+            self.send_response(302)
+            self.send_header('Location', '/welcome.html')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
         self.serve_static()
 
     def serve_static(self):
@@ -497,7 +515,7 @@ class Handler(SimpleHTTPRequestHandler):
         body,etag = cached
         unchanged = self.headers.get('If-None-Match')==etag
         self.send_response(304 if unchanged else 200)
-        self.send_header('Cache-Control','public, max-age=0, must-revalidate')
+        self.send_header('Cache-Control','private, no-store' if relative in {'index.html', 'categories.html'} else 'public, max-age=0, must-revalidate')
         self.send_header('ETag',etag)
         self.send_header('Vary','Accept-Encoding')
         if not unchanged:
