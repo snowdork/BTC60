@@ -133,6 +133,7 @@ the console and support the same `--log-level` option.
 
 ## Documentation
 
+- [Project TODO](TODO.md): deferred launch work and prerequisites for re-enabling features.
 - [Admin guide](doc/ADMIN_GUIDE.md): server scripts, log levels, rotation, maintenance, and troubleshooting.
 - [User guide](doc/USER_GUIDE.md): accounts, predictions, history, portfolio, and troubleshooting.
 - [Design](doc/DESIGN.md): interaction, pricing, settlement, architecture, and persistence.
