@@ -96,8 +96,14 @@ checkouts using the same directory share one rotation policy; give them separate
 The restart command passes its environment to the watchdog and all replacement
 servers. Set `PREDICT60_DB`, `TWELVE_DATA_API_KEY` (or `TWELVEDATA_API_KEY`), and
 `OILPRICE_API_KEY` before starting when needed. OilPriceAPI also supports the
-server-side `data/oilpriceapi.key` file. See the [README](../README.md) for feed
+ignored server-side `data/oilpriceapi.key` file, but a protected service environment
+is preferred. Never commit credentials. See the [README](../README.md) for feed
 configuration. Restart after changing environment variables or credentials.
+
+Production proxy settings are `P60_HOST`, `P60_SECURE_COOKIES`, and
+`P60_TRUSTED_PROXIES`. Startup rejects malformed values. An HTTPS `P60_HOST`
+always enables Secure cookies. Trust forwarded addresses only from a proxy that
+overwrites `X-Forwarded-For`; the supplied Caddy configuration does so.
 
 | Path | Purpose |
 | --- | --- |

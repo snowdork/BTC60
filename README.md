@@ -46,6 +46,32 @@ python3 server.py
 
 Open http://127.0.0.1:8000 for the welcome page or http://127.0.0.1:8000/index.html for the terminal. Use `--port` to change the port. Internet access is required for live prices, benchmarks, and settlement. The terminal requires `/api/coins`; file previews and static hosting alone cannot initialize a working terminal or provide accounts.
 
+Behind an HTTPS reverse proxy, set `P60_HOST` to the exact public origin
+(scheme and hostname, optional port, no path or trailing slash):
+
+```bash
+P60_HOST=https://predict60.com python3 scripts/restart-server.py
+```
+
+POST requests with an `Origin` header must match this value exactly. If
+`P60_HOST` is unset or empty, the existing `http://<Host header>` check applies.
+Requests without an `Origin` header retain their existing behavior; authenticated
+mutations still require a valid session and CSRF token. Restart the server after
+changing the environment. An HTTPS origin automatically adds `Secure` to login
+and logout cookies and enables HSTS responses. Invalid origins fail startup.
+
+When a reverse proxy overwrites `X-Forwarded-For` with one client address, list
+only its direct IP in `P60_TRUSTED_PROXIES` so authentication throttling remains
+per-client. Never trust a public interface or arbitrary network range. The Caddy
+deployment uses:
+
+```bash
+P60_TRUSTED_PROXIES=127.0.0.1,::1
+```
+
+`P60_SECURE_COOKIES=true` can force HTTPS-only cookies independently, but cannot
+disable them for an HTTPS `P60_HOST`. See [the VPS deployment files](deploy/README.md).
+
 ### Automatic crash recovery (Linux)
 
 Start or restart the server with a background watchdog:
@@ -111,6 +137,7 @@ the console and support the same `--log-level` option.
 - [User guide](doc/USER_GUIDE.md): accounts, predictions, history, portfolio, and troubleshooting.
 - [Design](doc/DESIGN.md): interaction, pricing, settlement, architecture, and persistence.
 - [Database maintenance](doc/DATABASE_MAINTENANCE.md): initialization, inspection, backups, and explicit reset.
+- [VPS deployment](deploy/README.md): Caddy, systemd, secrets, backups, and cutover checks.
 
 ## Code documentation (Sphinx)
 

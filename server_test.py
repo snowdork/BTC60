@@ -17,7 +17,7 @@ class AccountsTest(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory()
         server.DB = Path(cls.temp.name) / 'test.sqlite3'
         server.initialize()
-        cls.http = server.ThreadingHTTPServer(('127.0.0.1', 0), server.Handler)
+        cls.http = server.Predict60HTTPServer(('127.0.0.1', 0), server.Handler)
         threading.Thread(target=cls.http.serve_forever, daemon=True).start()
 
     @classmethod
@@ -27,16 +27,120 @@ class AccountsTest(unittest.TestCase):
         cls.temp.cleanup()
         cls.oil_config.stop()
 
-    def request(self, method, path, data=None, cookie='', csrf=''):
+    def request(self, method, path, data=None, cookie='', csrf='', extra_headers=None):
         conn = http.client.HTTPConnection('127.0.0.1', self.http.server_port)
         headers = {'Content-Type': 'application/json', 'Cookie': cookie, 'X-CSRF-Token': csrf}
+        headers.update(extra_headers or {})
         conn.request(method, path, json.dumps(data) if data is not None else None, headers)
         response = conn.getresponse()
         raw = response.read()
+        self.last_headers = dict(response.getheaders())
         payload = json.loads(raw) if response.getheader('Content-Type', '').startswith('application/json') else raw
         result = response.status, payload, response.getheader('Set-Cookie', '').split(';')[0]
         conn.close()
         return result
+
+    def test_health_check_verifies_database(self):
+        status, payload, _ = self.request('GET', '/healthz')
+        self.assertEqual((status, payload), (200, {'ok': True}))
+        self.assertEqual(self.last_headers['Cache-Control'], 'no-store')
+
+    def test_https_origin_sets_matching_secure_login_and_logout_cookies(self):
+        with patch.dict(server.os.environ, {'P60_HOST': 'https://predict60.com'}, clear=True):
+            status, _, cookie = self.request('POST', '/api/signup', {
+                'name': 'Secure', 'email': 'secure@example.com', 'password': 'strong-password-secure',
+            })
+            self.assertEqual(status, 200)
+            login_cookie = self.last_headers['Set-Cookie']
+            for attribute in ('HttpOnly', 'SameSite=Lax', 'Path=/', 'Max-Age=604800', 'Secure'):
+                self.assertIn(attribute, login_cookie)
+            self.assertEqual(self.last_headers['Strict-Transport-Security'],
+                             'max-age=31536000')
+            csrf = self.request('GET', '/api/account', cookie=cookie)[1]['csrf']
+            self.assertEqual(self.request('POST', '/api/logout', {}, cookie, csrf)[0], 200)
+            logout_cookie = self.last_headers['Set-Cookie']
+            for attribute in ('HttpOnly', 'SameSite=Lax', 'Path=/', 'Max-Age=0', 'Secure'):
+                self.assertIn(attribute, logout_cookie)
+
+    def test_local_http_cookie_is_not_forced_secure(self):
+        with patch.dict(server.os.environ, {}, clear=True):
+            self.assertNotIn('Secure', server.session_cookie('token', 60))
+        with patch.dict(server.os.environ, {'P60_SECURE_COOKIES': 'true'}, clear=True):
+            self.assertIn('Secure', server.session_cookie('token', 60))
+
+    def test_deployment_environment_validation(self):
+        valid = {
+            'P60_HOST': 'https://predict60.com',
+            'P60_TRUSTED_PROXIES': '127.0.0.1,::1',
+            'P60_SECURE_COOKIES': 'true',
+        }
+        with patch.dict(server.os.environ, valid, clear=True):
+            server.validate_environment()
+        for variable, value in (
+            ('P60_HOST', 'https://predict60.com/path'),
+            ('P60_HOST', 'https://predict60.com/'),
+            ('P60_HOST', 'ftp://predict60.com'),
+            ('P60_TRUSTED_PROXIES', 'not-an-ip'),
+            ('P60_SECURE_COOKIES', 'sometimes'),
+        ):
+            with self.subTest(variable=variable, value=value), patch.dict(
+                    server.os.environ, {variable: value}, clear=True):
+                with self.assertRaises(ValueError):
+                    server.validate_environment()
+
+    def test_forwarded_client_is_used_only_from_a_trusted_proxy(self):
+        server.AUTH_ATTEMPTS.clear()
+        headers = {'X-Forwarded-For': '203.0.113.25'}
+        with patch.dict(server.os.environ, {'P60_TRUSTED_PROXIES': '127.0.0.1'}, clear=True):
+            self.request('POST', '/api/login', {
+                'email': 'missing@example.com', 'password': 'wrong-password',
+            }, extra_headers=headers)
+        self.assertIn('203.0.113.25', server.AUTH_ATTEMPTS)
+        self.assertNotIn('127.0.0.1', server.AUTH_ATTEMPTS)
+        server.AUTH_ATTEMPTS.clear()
+        with patch.dict(server.os.environ, {}, clear=True):
+            self.request('POST', '/api/login', {
+                'email': 'missing@example.com', 'password': 'wrong-password',
+            }, extra_headers=headers)
+        self.assertIn('127.0.0.1', server.AUTH_ATTEMPTS)
+
+    def test_public_origin_override_accepts_https_and_rejects_other_origins(self):
+        with patch.dict('os.environ', {'P60_HOST': 'https://predict60.com'}):
+            for path in ('/api/signup', '/api/login', '/api/logout', '/api/predictions'):
+                for origin, expected in (
+                    ('https://predict60.com', 415),
+                    ('http://predict60.com', 403),
+                    ('https://predict60.com.evil.example', 403),
+                    ('https://evil.example', 403),
+                    ('null', 403),
+                    (f'http://127.0.0.1:{self.http.server_port}', 403),
+                ):
+                    with self.subTest(path=path, origin=origin):
+                        # Unsupported content type proves accepted origins reach the next validation.
+                        status, _, _ = self.request('POST', path, {}, extra_headers={
+                            'Origin': origin, 'Content-Type': 'text/plain',
+                        })
+                        self.assertEqual(status, expected)
+
+    def test_origin_default_and_absent_origin_preserve_existing_behavior(self):
+        for configuration in (None, ''):
+            with patch.dict('os.environ'):
+                if configuration is None:
+                    server.os.environ.pop('P60_HOST', None)
+                else:
+                    server.os.environ['P60_HOST'] = configuration
+                for origin, expected in (
+                    (f'http://127.0.0.1:{self.http.server_port}', 415),
+                    ('https://predict60.com', 403),
+                    (None, 415),
+                ):
+                    with self.subTest(configuration=configuration, origin=origin):
+                        headers = {'Content-Type': 'text/plain'}
+                        if origin is not None:
+                            headers['Origin'] = origin
+                        self.assertEqual(self.request('POST', '/api/login', {}, extra_headers=headers)[0], expected)
+        with patch.dict('os.environ', {'P60_HOST': 'https://predict60.com'}):
+            self.assertEqual(self.request('POST', '/api/login', {}, extra_headers={'Content-Type': 'text/plain'})[0], 415)
 
     def test_account_prediction_settlement_lifecycle(self):
         status, _, cookie = self.request('POST', '/api/signup', {'name': '<Test>', 'email': 'one@example.com', 'password': 'strong-password-123'})

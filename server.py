@@ -2,6 +2,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal, ROUND_CEILING
 import argparse
+import ipaddress
 import odds
 import simulated_prices
 import live_oil
@@ -63,6 +64,71 @@ PUBLIC_FILES = {
     'welcome.css',
     'welcome.html',
 }
+
+
+def configured_public_origin():
+    """Return and validate the optional exact browser origin used behind a proxy."""
+    origin = os.environ.get('P60_HOST', '').strip()
+    if not origin:
+        return ''
+    try:
+        parsed = urllib.parse.urlsplit(origin)
+        port = parsed.port  # Force validation of malformed ports.
+    except ValueError as error:
+        raise ValueError(f'Invalid P60_HOST: {error}') from error
+    if (parsed.scheme not in ('http', 'https') or not parsed.hostname
+            or parsed.username or parsed.password or parsed.path
+            or parsed.query or parsed.fragment):
+        raise ValueError('P60_HOST must be an exact http(s) origin with no path, credentials, query, or fragment.')
+    default_port = 443 if parsed.scheme == 'https' else 80
+    expected_netloc = parsed.hostname if port in (None, default_port) else f'{parsed.hostname}:{port}'
+    if ':' in parsed.hostname:
+        expected_netloc = f'[{parsed.hostname}]' if port in (None, default_port) else f'[{parsed.hostname}]:{port}'
+    normalized = f'{parsed.scheme}://{expected_netloc}'
+    if origin != normalized:
+        raise ValueError(f'P60_HOST must use its normalized form: {normalized}')
+    return origin
+
+
+def trusted_proxies():
+    """Parse explicitly trusted reverse-proxy addresses from the environment."""
+    configured = os.environ.get('P60_TRUSTED_PROXIES', '').strip()
+    if not configured:
+        return set()
+    try:
+        return {str(ipaddress.ip_address(value.strip())) for value in configured.split(',') if value.strip()}
+    except ValueError as error:
+        raise ValueError(f'Invalid P60_TRUSTED_PROXIES: {error}') from error
+
+
+def secure_session_cookies():
+    """Require HTTPS-only cookies whenever the configured public origin uses HTTPS."""
+    override = os.environ.get('P60_SECURE_COOKIES', '').strip().lower()
+    if override not in ('', '0', '1', 'false', 'true', 'no', 'yes'):
+        raise ValueError('P60_SECURE_COOKIES must be true/false or 1/0.')
+    return configured_public_origin().startswith('https://') or override in ('1', 'true', 'yes')
+
+
+def session_cookie(value, max_age):
+    """Build matching login/logout cookie attributes for the current deployment."""
+    attributes = [f'btc60_session={value}', 'HttpOnly', 'SameSite=Lax', 'Path=/', f'Max-Age={max_age}']
+    if secure_session_cookies():
+        attributes.append('Secure')
+    return '; '.join(attributes)
+
+
+def validate_environment():
+    """Fail startup before binding when deployment security settings are malformed."""
+    configured_public_origin()
+    trusted_proxies()
+    secure_session_cookies()
+
+
+class Predict60HTTPServer(ThreadingHTTPServer):
+    """Bounded, promptly terminating HTTP server intended for loopback proxying."""
+    daemon_threads = True
+    request_queue_size = 128
+    allow_reuse_address = True
 
 
 def connect():
@@ -403,10 +469,29 @@ class Handler(SimpleHTTPRequestHandler):
         """Initialize the HTTP handler with this checkout as its static source directory."""
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
+    def setup(self):
+        """Bound the lifetime of stalled backend connections from the local proxy."""
+        super().setup()
+        self.connection.settimeout(30)
+
+    def client_ip(self):
+        """Return a proxy-provided client IP only when the direct peer is trusted."""
+        peer = str(ipaddress.ip_address(self.client_address[0]))
+        if peer not in trusted_proxies():
+            return peer
+        forwarded = self.headers.get('X-Forwarded-For', '').strip()
+        # The deployment proxy overwrites this header with exactly one address.
+        if not forwarded or ',' in forwarded:
+            return peer
+        try:
+            return str(ipaddress.ip_address(forwarded))
+        except ValueError:
+            return peer
+
     def log_message(self, format, *args):
         # Preserve existing HTTP diagnostics in debug mode.
         """Route HTTP diagnostics to debug logging without writing request bodies or credentials."""
-        LOG.debug('%s %s', self.client_address[0], format % args)
+        LOG.debug('%s %s', self.client_ip(), format % args)
 
     def log_request(self, code='-', size='-'):
         """Record user actions and server failures while keeping routine polling out of normal logs."""
@@ -422,6 +507,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'same-origin')
         self.send_header('X-Frame-Options', 'DENY')
+        if secure_session_cookies():
+            self.send_header('Strict-Transport-Security', 'max-age=31536000')
         super().end_headers()
 
     def reply(self, status, payload, cookie=None):
@@ -469,6 +556,13 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         """Dispatch read endpoints and enforce authentication and the static-file allowlist."""
         path = urllib.parse.urlsplit(self.path).path
+        if path == '/healthz':
+            try:
+                with connect() as conn:
+                    conn.execute('SELECT 1').fetchone()
+                return self.reply(200, {'ok': True})
+            except (OSError, sqlite3.Error):
+                return self.reply(503, {'ok': False})
         # Heartbeat valid sessions before counting distinct accounts across tabs/devices.
         if path == '/api/community':
             self.session()  # Record this signed-in visitor's heartbeat.
@@ -606,7 +700,9 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         """Validate request origin, JSON size, session, and CSRF token before routing account mutations."""
         origin = self.headers.get('Origin')
-        if origin and origin != f'http://{self.headers.get("Host")}':
+        # Pin the public origin behind HTTPS proxies; retain local behavior without an override.
+        allowed_origin = configured_public_origin() or f'http://{self.headers.get("Host")}'
+        if origin and origin != allowed_origin:
             return self.reply(403, {'error': 'Invalid request origin.'})
         if self.headers.get('Content-Type', '').split(';')[0] != 'application/json':
             return self.reply(415, {'error': 'JSON required.'})
@@ -629,7 +725,7 @@ class Handler(SimpleHTTPRequestHandler):
             if path == '/api/logout':
                 with connect() as conn:
                     conn.execute('DELETE FROM sessions WHERE token_hash=?', (session['token_hash'],))
-                return self.reply(200, {'ok': True}, 'btc60_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0')
+                return self.reply(200, {'ok': True}, session_cookie('', 0))
             if path == '/api/settle':
                 settle_due(session['user_id'])
                 return self.reply(200, self.account(session))
@@ -653,7 +749,7 @@ class Handler(SimpleHTTPRequestHandler):
                 AUTH_ATTEMPTS[address] = [t for t in AUTH_ATTEMPTS[address] if t > now - 60]
                 if not AUTH_ATTEMPTS[address]:
                     del AUTH_ATTEMPTS[address]
-            attempts = AUTH_ATTEMPTS.setdefault(self.client_address[0], [])
+            attempts = AUTH_ATTEMPTS.setdefault(self.client_ip(), [])
             if len(attempts) >= 20:
                 return self.reply(429, {'error': 'Too many attempts. Try again in a minute.'})
             attempts.append(now)
@@ -682,7 +778,7 @@ class Handler(SimpleHTTPRequestHandler):
             conn.execute('DELETE FROM sessions WHERE expires_at<=?', (int(time.time()),))
             conn.execute('INSERT INTO sessions(token_hash,user_id,csrf,expires_at,last_seen_at) VALUES(?,?,?,?,?)', (hashlib.sha256(token.encode()).hexdigest(), user_id, csrf, int(time.time()) + 604800, int(time.time())))
         LOG.info('Authentication action=%s user=%s', path.rsplit('/', 1)[-1], user_id)
-        return self.reply(200, {'ok': True}, f'btc60_session={token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800')
+        return self.reply(200, {'ok': True}, session_cookie(token, 604800))
 
     def predict(self, session, data):
         """Validate order timing and budget, freeze the provider quote, and atomically debit and save an idempotent order."""
@@ -750,6 +846,10 @@ if __name__ == '__main__':
     parser.add_argument('--log-level', choices=('normal', 'debug', 'warning', 'error'),
                         default=os.environ.get('PREDICT60_LOG_LEVEL') or os.environ.get('BTC60_LOG_LEVEL', 'normal'))
     args = parser.parse_args()
+    try:
+        validate_environment()
+    except ValueError as error:
+        parser.error(str(error))
     configure(args.log_level)
     DB = DB.expanduser().resolve()
     DB.parent.mkdir(parents=True, exist_ok=True)
@@ -762,4 +862,4 @@ if __name__ == '__main__':
         initialize()
         threading.Thread(target=settlement_worker, daemon=True).start()
         LOG.info('Predict60 local demo: http://127.0.0.1:%s', args.port)
-        ThreadingHTTPServer(('127.0.0.1', args.port), Handler).serve_forever()
+        Predict60HTTPServer(('127.0.0.1', args.port), Handler).serve_forever()
