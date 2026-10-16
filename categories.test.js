@@ -10,7 +10,7 @@ async function selection(feedState='setup_required',tick={price:72.25,time:Date.
  const category={id:'oil',name:'Oil',description:'Five crudes',provider:'Twelve Data',quoteCadence:'Minute updates',unit:'USD/barrel',feedState,instrumentCount:2,instruments:[{symbol:'WTI',name:'West Texas Intermediate',liveSupported:true},{symbol:'DUBAI',name:'Dubai',liveSupported:false}]};
  Object.assign(category,override);
  const fetch=async url=>{calls.push(url);return {ok:true,json:async()=>url==='/api/categories'?{categories:[category]}:tick};};
- await vm.runInNewContext(fs.readFileSync('categories.js','utf8'),{window:{BTC60Account:{loaded:Promise.resolve(),user:{}}},document:{hidden:false,getElementById:element,createElement:node,addEventListener(){}},fetch,AbortSignal,Intl,Date,Map,Promise,Number,Error,encodeURIComponent,setInterval(){},location:{reload(){}}});
+ await vm.runInNewContext(fs.readFileSync('categories.js','utf8'),{window:{Predict60Account:{loaded:Promise.resolve(),user:{}}},document:{hidden:false,getElementById:element,createElement:node,addEventListener(){}},fetch,AbortSignal,Intl,Date,Map,Promise,Number,Error,encodeURIComponent,setInterval(){},location:{reload(){}}});
  await new Promise(resolve=>setImmediate(resolve));
  return {nodes,calls,card:element('category-options').children[0]};
 }
@@ -44,7 +44,7 @@ test('dated spot assessments remain visible without being labeled live ticks',as
 
 test('guests cannot load market choices or quotes',async()=>{
  await vm.runInNewContext(fs.readFileSync('categories.js','utf8'),{
-  window:{BTC60Account:{loaded:Promise.resolve(),user:null}},
+  window:{Predict60Account:{loaded:Promise.resolve(),user:null}},
   fetch(){assert.fail('Guest must not request markets');},
   document:{getElementById(){assert.fail('Guest must not render markets');}}
  });
@@ -56,5 +56,15 @@ test('weather coming soon card has no market link or quote requests',async()=>{
  assert.equal(card.dataset.availability,'coming_soon');
  assert.equal(card.children.at(-1).textContent,'Coming soon');
  assert.match(card.children[6].textContent,/Temperature/);
+ assert.deepEqual(calls,['/api/categories']);
+});
+
+test('oil coming soon card has no market link or quote requests',async()=>{
+ const {card,calls}=await selection('configured',{}, {availability:'coming_soon',tradable:false});
+ assert.equal(card.href,undefined);
+ assert.equal(card.dataset.availability,'coming_soon');
+ assert.equal(card.children.at(-1).textContent,'Coming soon');
+ assert.match(card.children[4].textContent,/paused until the data feed is ready/);
+ assert.match(card.children[6].textContent,/data feed integration in progress/);
  assert.deepEqual(calls,['/api/categories']);
 });

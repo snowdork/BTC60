@@ -15,7 +15,7 @@
   account.logout=/** Invalidate the server session, clear account state, and return to the welcome screen. */ async()=>{await request('logout',{});update({user:null,csrf:null,predictions:[]});location.href='welcome.html';};
   let settling=false;
   account.settle=/** Retry due settlements for signed-in users under an in-flight request guard. */ async()=>{if(!account.user||settling)return;settling=true;try{update(await request('settle',{}));}finally{settling=false;}};
-  window.BTC60Account=account;
+  window.Predict60Account=account;
   /** Render account controls from the latest account, market, and interface state. */ function renderAccountControls(){
     document.querySelectorAll('[data-account-name]').forEach(label=>{
       label.hidden=!account.user;

@@ -108,10 +108,13 @@ class AccountsTest(unittest.TestCase):
             self.assertEqual(status, 400)
             self.assertEqual(self.request('GET', '/api/account', cookie=cookie)[1]['user']['balance_cents'], balance)
 
-    def test_oil_categories_prices_orders_and_settlements(self):
+    def test_oil_is_coming_soon_while_feed_diagnostics_remain_available(self):
         categories = self.request('GET', '/api/categories')[1]['categories']
         self.assertEqual({c['id'] for c in categories}, {'crypto', 'oil', 'weather'})
-        self.assertEqual(next(c for c in categories if c['id'] == 'oil')['instrumentCount'], 5)
+        oil_category = next(c for c in categories if c['id'] == 'oil')
+        self.assertEqual(oil_category['instrumentCount'], 5)
+        self.assertEqual(oil_category['availability'], 'coming_soon')
+        self.assertFalse(oil_category['tradable'])
         oil = [c for c in self.request('GET', '/api/coins')[1]['coins'] if c['category'] == 'oil']
         self.assertEqual({c['symbol'] for c in oil}, {'WTI', 'BRENT', 'DUBAI', 'OMAN', 'BONNY'})
         self.assertTrue(all(c['feed'] == 'twelvedata' and c['unit'] == 'USD/barrel' for c in oil))
@@ -132,27 +135,14 @@ class AccountsTest(unittest.TestCase):
             self.assertEqual(self.request('GET', f'/api/candles?coin=WTI&start=0&end={now}')[0], 400)
             _, _, cookie = self.request('POST', '/api/signup', {'name':'Oil player', 'email':'oil@example.com', 'password':'strong-password-oil'})
             account = self.request('GET', '/api/account', cookie=cookie)[1]
-            user_id, csrf = account['user']['id'], account['csrf']
-            close, strike = server.candle_close('WTI', start+3600), server.candle_close('WTI', start)
-            side = 'up' if close >= strike else 'down'
-            order = {'coin':'WTI', 'marketId':'60-0', 'side':side, 'budget':50, 'requestId':'oil-test-request-0001', 'startsAt':start*1000}
-            status, account, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
-            self.assertEqual(status, 201, account)
-            self.assertEqual(account['predictions'][0]['category'], 'oil')
-            self.assertEqual(account['predictions'][0]['strike'], strike)
-            self.assertEqual(account['user']['balance_cents'], 1420000)
-            self.assertEqual(self.request('POST', '/api/predictions', order, cookie, csrf)[1]['user']['balance_cents'], 1420000)
-            with server.connect() as conn:
-                with self.assertRaises(sqlite3.IntegrityError):
-                    conn.execute("UPDATE coins SET demo_base=100 WHERE symbol='WTI'")
-        with patch('server.time.time', return_value=start+3606), patch('server.live_oil.candles',side_effect=history), patch('server.urllib.request.urlopen', side_effect=AssertionError('Oil settlement must use the selected provider')):
-            server.settle_due(user_id)
-            server.settle_due(user_id)
+            csrf = account['csrf']
+            order = {'coin':'WTI', 'marketId':'60-0', 'side':'up', 'budget':50, 'requestId':'oil-test-request-0001', 'startsAt':start*1000}
+            status, error, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
+            self.assertEqual(status, 400)
+            self.assertEqual(error['error'], 'Oil predictions are coming soon.')
             account = self.request('GET', '/api/account', cookie=cookie)[1]
-        settled = account['predictions'][0]
-        self.assertEqual(settled['close_price'], close)
-        self.assertIn('Twelve Data live oil', settled['source'])
-        self.assertEqual(account['user']['balance_cents'], 1420000+settled['payout_cents'])
+            self.assertEqual(account['user']['balance_cents'], 1425000)
+            self.assertEqual(account['predictions'], [])
 
     def test_live_oil_missing_key_and_unavailable_grades_do_not_return_fake_prices(self):
         with patch.dict(server.os.environ,{},clear=True),patch('server.urllib.request.urlopen') as network:
@@ -280,7 +270,7 @@ class AccountsTest(unittest.TestCase):
         _, account, cookie = self.request('POST', '/api/signup', {
             'name': 'Market access', 'email': 'market-access@example.com',
             'password': 'strong-password-123'})
-        self.assertEqual(self.request('GET', '/index.html?category=oil', cookie=cookie)[0], 200)
+        self.assertEqual(self.request('GET', '/index.html?category=oil', cookie=cookie)[0], 302)
         self.assertEqual(self.request('GET', '/categories.html', cookie=cookie)[0], 200)
         for path in ['/', '/welcome.html']:
             conn = http.client.HTTPConnection('127.0.0.1', self.http.server_port)

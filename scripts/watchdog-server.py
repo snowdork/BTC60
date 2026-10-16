@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Supervise BTC60; use restart-server.py to start and stop-server.py to stop."""
+"""Supervise Predict60; use restart-server.py to start and stop-server.py to stop."""
 import argparse
 import fcntl
 import logging
@@ -31,7 +31,7 @@ def main():
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise SystemExit('A BTC60 watchdog is already running.')
+            raise SystemExit('A Predict60 watchdog is already running.')
         logging.info('Watchdog started; log level=%s', args.log_level)
         while not stopped.is_set() and not STOP.exists():
             child = subprocess.Popen(
@@ -39,7 +39,7 @@ def main():
                 cwd=ROOT, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT, text=True, errors='replace',
                 # Apply the original selection to every replacement child.
-                env={**os.environ, 'BTC60_LOG_LEVEL': args.log_level},
+                env={**os.environ, 'PREDICT60_LOG_LEVEL': args.log_level},
             )
             def capture_output(stream):
                 """Forward supervised child output to the shared rotating log until its stream closes."""

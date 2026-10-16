@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply BTC60's 10 MiB / five-backup log policy; --force rotates immediately."""
+"""Apply Predict60's 10 MiB / five-backup log policy; --force rotates immediately."""
 import argparse
 from pathlib import Path
 import sys

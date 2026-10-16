@@ -32,5 +32,5 @@
       return direction==='desc'?-comparison:comparison;
     });
   }
-  const api={result,summary,sortPredictions};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.BTC60Portfolio=api;
+  const api={result,summary,sortPredictions};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Predict60Portfolio=api;
 })(globalThis);

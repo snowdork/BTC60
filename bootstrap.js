@@ -4,9 +4,9 @@
 (async()=>{
   const picker=document.querySelector('.coin-picker');
   try{
-    await window.BTC60Account.loaded;
+    await window.Predict60Account.loaded;
     // Do not request market configuration until the restored account is authenticated.
-    if(!window.BTC60Account.user){location.replace('welcome.html');return;}
+    if(!window.Predict60Account.user){location.replace('welcome.html');return;}
     if(location.protocol==='file:')throw Error('Open the terminal through python3 server.py, not a file preview.');
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);
     let response;try{response=await fetch('/api/coins',{signal:controller.signal,cache:'no-store'});}finally{clearTimeout(timeout);}
@@ -19,7 +19,7 @@
     if(!category)throw Error('This category is unavailable. Choose another market from the category screen.');
     // Coming-soon categories never initialize a prediction terminal.
     if(category.availability==='coming_soon'){location.replace('categories.html');return;}
-    window.BTC60Category=category;
+    window.Predict60Category=category;
     document.body.dataset.category=category.id;
     document.body.style.setProperty('--category-accent',category.accent);
     document.body.style.setProperty('--category-background',category.background);
@@ -27,7 +27,7 @@
     categoryLink.textContent=`← ${category.name} / Categories`;
     picker.setAttribute('aria-label',`Choose ${category.name} instrument`);
     document.querySelector('.market-workspace').setAttribute('aria-label',`${category.name} markets`);
-    window.BTC60MarketConfig=data.marketConfig;
+    window.Predict60MarketConfig=data.marketConfig;
     window.PredictCoins=window.PredictCoinCatalog.createCatalog(data.coins,category.id);
     if(!window.PredictCoins.available.length)throw Error('No instruments are currently available for predictions.');
     picker.replaceChildren(...window.PredictCoins.available.map(coin=>{
@@ -35,7 +35,7 @@
       if(coin.icon){const icon=document.createElement('img');icon.src=coin.icon;icon.alt='';icon.width=24;icon.height=24;icon.addEventListener('error',()=>{icon.hidden=true;});button.append(icon);}
       const label=document.createElement('span');label.textContent=coin.symbol;button.append(label);return button;
     }));
-    for(const src of ['market-model.js','app.js','btc-chart.js'])await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=/** Handle the load event for the current transport or resource. */ ()=>{try{if(src==='market-model.js')window.PredictModel.configure(window.BTC60MarketConfig);resolve();}catch(error){reject(error);}};script.onerror=/** Handle the error event for the current transport or resource. */ ()=>reject(Error('Unable to load the terminal.'));document.head.append(script);});
+    for(const src of ['market-model.js','app.js','btc-chart.js'])await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=/** Handle the load event for the current transport or resource. */ ()=>{try{if(src==='market-model.js')window.PredictModel.configure(window.Predict60MarketConfig);resolve();}catch(error){reject(error);}};script.onerror=/** Handle the error event for the current transport or resource. */ ()=>reject(Error('Unable to load the terminal.'));document.head.append(script);});
   }catch(error){
     picker.textContent='Markets unavailable';
     const connectionError=error instanceof TypeError||error.name==='AbortError'||error instanceof SyntaxError;

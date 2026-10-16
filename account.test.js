@@ -13,7 +13,7 @@ function setup(fetch,attributes=[]){
  const document={hidden:false,body:{hasAttribute:key=>attributes.includes(key)},querySelectorAll:key=>nodes[key]||[],getElementById:()=>status,addEventListener(){}};
  const location={href:'',replace:url=>redirects.push(url)};
  vm.runInNewContext(fs.readFileSync('account.js','utf8'),{window,document,location,Event,setInterval:fn=>intervals.push(fn),fetch:async(url,options)=>{calls.push({url,options});return fetch(url,options);}});
- return {account:window.BTC60Account,name,logout,login,content,status,redirects,location,calls,document,intervals};
+ return {account:window.Predict60Account,name,logout,login,content,status,redirects,location,calls,document,intervals};
 }
 test('restored session renders a plain-text name and skips welcome',async()=>{
  const s=setup(()=>response(signedIn),['data-redirect-authenticated']);

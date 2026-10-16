@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Restart this checkout's BTC60 server with a background watchdog on Linux."""
+"""Restart this checkout's Predict60 server with a background watchdog on Linux."""
 import argparse
 import os
 from pathlib import Path

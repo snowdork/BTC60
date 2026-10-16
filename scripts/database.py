@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""BTC60 SQLite maintenance. Run with --help for commands."""
+"""Predict60 SQLite maintenance. Run with --help for commands."""
 import argparse
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -25,7 +25,7 @@ def maintenance_lock(path):
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise ValueError('The BTC60 server or another maintenance command is running. Stop it before init/reset.')
+            raise ValueError('The Predict60 server or another maintenance command is running. Stop it before init/reset.')
         try:
             yield
         finally:
@@ -93,7 +93,7 @@ def main():
     """Parse maintenance commands and enforce locks and explicit reset confirmation."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['init', 'backup', 'status', 'reset'])
-    parser.add_argument('--db', type=Path, default=server.DB, help='SQLite path (default: BTC60_DB or project data/btc60.sqlite3)')
+    parser.add_argument('--db', type=Path, default=server.DB, help='SQLite path (default: PREDICT60_DB or project data/btc60.sqlite3)')
     parser.add_argument('--confirm-reset', action='store_true', help='Required for reset; clears all account/order data after backup')
     parser.add_argument('--backup-dir', type=Path, help='Optional destination for the backup command')
     args = parser.parse_args()

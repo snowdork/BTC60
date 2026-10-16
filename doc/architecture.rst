@@ -34,7 +34,9 @@ concurrent settlement passes; persisted settlement rows prevent duplicate credit
 No synthetic preview price can execute a new order. OilPriceAPI physical spot
 assessments lack the exact minute benchmarks required by existing orders.
 
-Weather remains dormant. ``weather.py`` uses signed temperatures and nonnegative
+Oil and Weather remain dormant: their category cards cannot open a terminal and
+server-side validation rejects new orders. Oil adapters remain available for feed
+diagnostics. ``weather.py`` uses signed temperatures and nonnegative
 wind, UTC hourly boundaries, pinned stations, and actual observations no older
 than ten minutes. Missing or conflicting latest observations defer settlement.
 The positive-price financial log-return model cannot be applied to weather.

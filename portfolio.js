@@ -2,7 +2,7 @@
  * Render authenticated portfolio statistics, category filters, and prediction history.
  */
 (() => {
-  const account=window.BTC60Account,model=window.BTC60Portfolio,/** Find an interface element by its stable DOM identifier. */ $=id=>document.getElementById(id);
+  const account=window.Predict60Account,model=window.Predict60Portfolio,/** Find an interface element by its stable DOM identifier. */ $=id=>document.getElementById(id);
   let filter='all',category='all',coins=[],lastRender='',sortColumn='window',sortDirection='desc';
   const currency=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
   const shareFormatter=new Intl.NumberFormat('en-US',{maximumFractionDigits:2});

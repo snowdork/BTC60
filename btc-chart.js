@@ -216,6 +216,32 @@
     if(historical){status('HISTORICAL','neutral');$('chart-source').textContent=mode==='demo'?'Simulated history · demo settlements':`${sourceLabel()} history · demo settlements`;}
     draw(currentTime());
   }
+  /** Render sixty minute direction cells from exact candle opens and closes. */
+  function renderMinuteHeatmap(displayTime){
+    const map=$('minute-heatmap'),currentMinute=Math.max(0,Math.min(59,Math.floor((displayTime-hour)/60000)));
+    const minuteCandles=new Map(candles.filter(c=>c[0]*1000>=hour&&c[0]*1000<hour+3600000).map(c=>[Math.floor((c[0]*1000-hour)/60000),c]));
+    const moves=[...minuteCandles.values()].map(c=>Math.abs((Number(c[4])-Number(c[3]))/Number(c[3]))).filter(Number.isFinite);
+    const scale=Math.max(...moves,0.000001);
+    const dots=Array.from({length:60},(_,minute)=>{
+      const dot=document.createElement('span'),candle=minuteCandles.get(minute),start=hour+minute*60000;
+      dot.className='minute-dot';
+      if(candle&&start+60000<=displayTime){
+        const open=Number(candle[3]),close=Number(candle[4]),move=(close-open)/open,direction=move>=0?'up':'down';
+        const heat=Math.max(.15,Math.min(1,Math.abs(move)/scale));
+        dot.className+=` ${direction}`;dot.style.setProperty('--heat-glow',`${2+heat*5}px`);dot.style.setProperty('--heat-opacity',String(.45+heat*.55));
+        dot.title=`${time(start)}–${time(start+60000)} UTC · ${direction==='up'?'Up':'Down'} ${Math.abs(move*100).toFixed(3)}%`;
+        dot.setAttribute('aria-label',dot.title);
+      }else if(!historical&&minute===currentMinute){
+        dot.className+=' current';dot.title=`${time(start)} UTC · Current minute`;dot.setAttribute('aria-label',dot.title);
+      }else{
+        dot.title=`${time(start)} UTC · ${start>=displayTime?'Upcoming':'No minute data'}`;dot.setAttribute('aria-label',dot.title);
+      }
+      return dot;
+    });
+    map.replaceChildren(...dots);
+    const up=dots.filter(dot=>dot.className.includes(' up')).length,down=dots.filter(dot=>dot.className.includes(' down')).length;
+    map.setAttribute('aria-label',`Minute-by-minute direction for this hour: ${up} up, ${down} down, ${60-up-down} pending or unavailable`);
+  }
   /** Project valid price points into SVG coordinates and update chart and benchmark labels. */ function draw(now,force=false) {
     const displayTime=historical?hour+3600000:now;
     $('time-cursor').hidden=historical;
@@ -240,6 +266,7 @@
     lastPlotAt=plotTime;
     const valid=points.filter(p=>p.t>=hour&&p.t<=displayTime);
     const hasPoints=valid.length>0;
+    renderMinuteHeatmap(displayTime);
     $('chart-empty').hidden=hasPoints;
     $('chart-empty').textContent=coin.feed==='oilpriceapi'&&mode==='live'?'Checking latest spot assessment every 5 seconds…':historical?(historyFailed?'History unavailable. Select Reconnect to retry.':'Loading the selected hour…'):mode==='demo'?'Starting demo…':lastPriceAt?'Waiting for history…':`Waiting for live ${coin.symbol}/USD · use Demo preview if unavailable`;
     const opening=candles.find(c=>c[0]*1000===hour-60000)?.[4];
@@ -296,7 +323,7 @@
     $('chart-pair-label').textContent=`${coin.symbol} / USD · 1H`;
     $('chart-title').textContent=`${coin.name} hourly price`;
     document.querySelector('.hour-chart').setAttribute('aria-label',`${coin.name} price for the current hour`);
-    document.title=`${coin.name} · ${window.BTC60Category?.name||'Crypto'} · BTC60`;
+    document.title=`${coin.name} · ${window.Predict60Category?.name||'Crypto'} · Predict60`;
     const description=coin.feed==='oilpriceapi'?'OilPriceAPI physical spot assessments with original source dates. These feeds do not supply the exact minute benchmarks required by this hourly game. Predictions remain unavailable.':coin.feed==='twelvedata'?'Twelve Data live spot prices in USD per barrel, updated minutely. Benchmarks use the exact completed one-minute candle before each interval boundary. Closed markets, stale quotes, and missing benchmark candles block new orders. No simulated substitute is used.':simulated()?'Simulated oil prices in USD per barrel. Opening and closing benchmarks use the simulated minute close immediately before each interval boundary. These are illustrative prices, not exchange quotes.':'Coinbase Exchange USD prices. Opening and closing benchmarks use the minute candle close immediately before each interval boundary. These are proxy demo settlements, not official exchange contracts or averaged prices.';
     $('settlement-source').textContent=coin.feed==='oilpriceapi'?'HOURLY PREDICTIONS UNAVAILABLE':coin.feed==='twelvedata'?'DEMO SETTLEMENT · LIVE OIL MINUTE CLOSE':simulated()?'DEMO SETTLEMENT · SIMULATED OIL':'DEMO SETTLEMENT · COINBASE MINUTE CLOSE';
     $('settlement-source-detail').textContent=description;
@@ -309,6 +336,6 @@
   $('next-hour').addEventListener('click',()=>navigateHour(hour+3600000));
   $('current-hour').addEventListener('click',()=>navigateHour(hourOf(currentTime())));
   document.querySelectorAll('[data-coin]').forEach(button=>button.addEventListener('click',()=>{if(button.dataset.coin!==coin.symbol)selectCoin(button.dataset.coin);}));
-  let savedCoin=window.PredictCoins.available[0].symbol;try{const preference=localStorage.getItem(`predict_selected_coin_${window.BTC60Category?.id||'crypto'}`)||localStorage.getItem('predict_selected_coin');if(window.PredictCoins.available.some(coin=>coin.symbol===preference))savedCoin=preference;}catch{}
+  let savedCoin=window.PredictCoins.available[0].symbol;try{const preference=localStorage.getItem(`predict_selected_coin_${window.Predict60Category?.id||'crypto'}`)||localStorage.getItem('predict_selected_coin');if(window.PredictCoins.available.some(coin=>coin.symbol===preference))savedCoin=preference;}catch{}
   selectCoin(savedCoin);frameId=setTimeout(()=>frame(performance.now()),1000);
 })();

@@ -7,7 +7,7 @@ import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parent
-SPEC = importlib.util.spec_from_file_location('doc_reference', ROOT / 'docs/_ext/reference.py')
+SPEC = importlib.util.spec_from_file_location('doc_reference', ROOT / 'doc/_ext/reference.py')
 reference = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(reference)
 
@@ -18,7 +18,7 @@ class DocumentationTest(unittest.TestCase):
     def test_python_modules_classes_and_procedures_have_docstrings(self):
         """Require source documentation for production Python and documentation tooling."""
         paths = [*ROOT.glob('*.py'), *ROOT.joinpath('scripts').glob('*.py'),
-                 ROOT / 'docs/conf.py', *ROOT.joinpath('docs/_ext').glob('*.py')]
+                 ROOT / 'doc/conf.py', *ROOT.joinpath('doc/_ext').glob('*.py')]
         for path in paths:
             if 'test' in path.name:
                 continue
@@ -32,11 +32,11 @@ class DocumentationTest(unittest.TestCase):
 
     def test_browser_modules_and_named_procedures_have_jsdoc(self):
         """Check real JavaScript syntax trees rather than matching function text with regex."""
-        for path in [*ROOT.glob('*.js'), *ROOT.joinpath('docs/_ext').glob('*.cjs')]:
+        for path in [*ROOT.glob('*.js'), *ROOT.joinpath('doc/_ext').glob('*.cjs')]:
             if '.test.' in path.name:
                 continue
             inventory = json.loads(subprocess.check_output([
-                'node', str(ROOT / 'docs/_ext/js_inventory.cjs'), str(path)], text=True))
+                'node', str(ROOT / 'doc/_ext/js_inventory.cjs'), str(path)], text=True))
             with self.subTest(module=path.name):
                 self.assertTrue(inventory['module'])
             for procedure in inventory['functions']:

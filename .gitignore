@@ -1,6 +1,6 @@
 data/
 __pycache__/
 *.pyc
-docs/_build/
-docs/_generated/
-docs/node_modules/
+doc/_build/
+doc/_generated/
+doc/node_modules/

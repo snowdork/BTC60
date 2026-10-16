@@ -26,7 +26,7 @@ def download(product,output,days=30):
         query=urllib.parse.urlencode({'granularity':60,'start':datetime.fromtimestamp(start,timezone.utc).isoformat(),'end':datetime.fromtimestamp(end,timezone.utc).isoformat()})
         url='https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/candles?'+query
         print(f"Downloading {datetime.fromtimestamp(start,timezone.utc).isoformat()} · {100*(start-state['start'])/(state['end']-state['start']):.1f}%",flush=True)
-        request=urllib.request.Request(url,headers={'User-Agent':'BTC60-local-demo/1.0'})
+        request=urllib.request.Request(url,headers={'User-Agent':'Predict60-local-demo/1.0'})
         for attempt in range(3):
             try:
                 with urllib.request.urlopen(request,timeout=10) as response:batch=json.load(response)

@@ -1,4 +1,4 @@
-# BTC60 administrator guide
+# Predict60 administrator guide
 
 Run commands below from the checkout root, using Python 3.10+ on Linux.
 The lifecycle scripts require `/proc` and manage only this checkout's Python
@@ -78,30 +78,30 @@ python3 scripts/rotate-logs.py --force
 
 The next restart imports the legacy `data/server.log` under the same retention
 policy and removes the old file after its writers have stopped. `/tmp` may be
-cleared on reboot. To use another directory, set `BTC60_LOG_DIR` consistently
+cleared on reboot. To use another directory, set `PREDICT60_LOG_DIR` consistently
 for restart and rotation commands:
 
 ```bash
-export BTC60_LOG_DIR=/tmp/btc60
+export PREDICT60_LOG_DIR=/tmp/btc60
 python3 scripts/restart-server.py
 python3 scripts/rotate-logs.py --force
 ```
 
 Check the printed log path when diagnosing startup failures. Logs from multiple
 checkouts using the same directory share one rotation policy; give them separate
-`BTC60_LOG_DIR` values if needed.
+`PREDICT60_LOG_DIR` values if needed.
 
 ## Environment and state
 
 The restart command passes its environment to the watchdog and all replacement
-servers. Set `BTC60_DB`, `TWELVE_DATA_API_KEY` (or `TWELVEDATA_API_KEY`), and
+servers. Set `PREDICT60_DB`, `TWELVE_DATA_API_KEY` (or `TWELVEDATA_API_KEY`), and
 `OILPRICE_API_KEY` before starting when needed. OilPriceAPI also supports the
 server-side `data/oilpriceapi.key` file. See the [README](../README.md) for feed
 configuration. Restart after changing environment variables or credentials.
 
 | Path | Purpose |
 | --- | --- |
-| `data/btc60.sqlite3` | Default application database; override with `BTC60_DB`. |
+| `data/btc60.sqlite3` | Compatibility-preserving default database; override with `PREDICT60_DB`. |
 | `data/server.stopped` | Intentional-stop marker. |
 | `data/server-log-level` | Log level selected by the last successful manual start. |
 | `data/server-control.lock` | Serializes manual start/stop operations. |
@@ -129,7 +129,7 @@ destination is a `backups` folder beside the database. `init` creates or migrate
 the database without deleting existing account data and requires a stopped server.
 
 Options include `--db PATH` and, for backup, `--backup-dir PATH`. Use the same
-database path in maintenance commands and `BTC60_DB` for server startup.
+database path in maintenance commands and `PREDICT60_DB` for server startup.
 
 `database.py reset --confirm-reset` is destructive: it backs up an existing
 database, clears accounts, sessions, predictions, and settlements, and restores

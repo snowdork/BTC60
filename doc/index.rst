@@ -1,7 +1,7 @@
-BTC60 code documentation
-========================
+Predict60 code documentation
+============================
 
-BTC60 is a buildless demo prediction application with a Python/SQLite backend,
+Predict60 is a buildless demo prediction application with a Python/SQLite backend,
 plain JavaScript frontend, and provider-specific quote and settlement adapters.
 This reference documents production modules, command-line procedures, nested
 helpers, and regression-test modules. It is generated directly from source

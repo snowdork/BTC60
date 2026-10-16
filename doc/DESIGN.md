@@ -1,4 +1,4 @@
-# BTC60 design
+# Predict60 design
 
 ## Workspace and visual language
 
@@ -11,6 +11,11 @@ Dark surfaces use near-black tones with emerald Up/selection, crimson Down, ambe
 ## Market state and navigation
 
 Selecting a card changes the ticket without rebuilding the playfield. Open intervals support orders when data is ready; upcoming and completed intervals support inspection. UTC dates distinguish midnight boundaries. Previous hour, Next, and Current hour navigate history; switching coins preserves the selected hour. Historical charts cover the full hour, label the close, and hide the live cursor. Missing candles leave affected benchmarks or results unavailable.
+
+Crypto is the only active category. Oil and Weather render as non-navigable
+**Coming soon** cards. Direct Oil/Weather terminal requests are redirected, and
+server-side validation rejects their orders. Oil feed adapters remain available
+for diagnostics until a verified feed can support prediction settlement.
 
 The database catalog supplies selectable coins, Coinbase products, precision, icons, and synthetic base prices. The default seed enables BTC, ETH, SOL, XRP, DOGE, ADA, and LTC. Up to eight coins may be enabled. Predictions retain their original coin independently of current selection; account balance is shared across coins.
 

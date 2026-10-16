@@ -1,4 +1,4 @@
-"""Local BTC60 demo server: SQLite accounts, sessions, orders and settlements."""
+"""Local Predict60 demo server: SQLite accounts, sessions, orders and settlements."""
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal, ROUND_CEILING
 import argparse
@@ -28,8 +28,9 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-DB = Path(os.environ.get('BTC60_DB', str(ROOT / 'data' / 'btc60.sqlite3')))
+DB = Path(os.environ.get('PREDICT60_DB') or os.environ.get('BTC60_DB') or ROOT / 'data' / 'btc60.sqlite3')
 QUOTES = {'60-0': 68, '30-0': 54, '30-1': 58, '15-0': 49, '15-1': 57, '15-2': 62, '15-3': 50}
+COMING_SOON_CATEGORIES = {'oil', 'weather'}
 AUTH_ATTEMPTS = {}
 AUTH_LOCK = threading.Lock()
 SETTLE_LOCK = threading.Lock()
@@ -247,7 +248,7 @@ def candle_close(coin, boundary, source=None):
     start = datetime.fromtimestamp(boundary - 60, timezone.utc).isoformat()
     end = datetime.fromtimestamp(boundary, timezone.utc).isoformat()
     query = urllib.parse.urlencode({'granularity': 60, 'start': start, 'end': end})
-    request = urllib.request.Request(f'https://api.exchange.coinbase.com/products/{product}/candles?{query}', headers={'User-Agent': 'BTC60-local-demo/1.0'})
+    request = urllib.request.Request(f'https://api.exchange.coinbase.com/products/{product}/candles?{query}', headers={'User-Agent': 'Predict60-local-demo/1.0'})
     with urllib.request.urlopen(request, timeout=8) as response:
         candles = json.load(response)
     for candle in candles:
@@ -266,7 +267,7 @@ def fresh_spot(coin, source=None):
     if record['feed']=='simulated':
         return simulated_prices.price(coin, record['demo_base'], int(time.time()))
     product = record['product']
-    request = urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/ticker', headers={'User-Agent':'BTC60-local-demo/1.0'})
+    request = urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/ticker', headers={'User-Agent':'Predict60-local-demo/1.0'})
     try:
         with urllib.request.urlopen(request, timeout=8) as response:
             ticker = json.load(response)
@@ -317,7 +318,7 @@ def pricing_history(product, now, instrument=None):
         """Fetch one historical candle batch for the pricing-history aggregation."""
         start,end=interval
         query=urllib.parse.urlencode({'granularity':60,'start':datetime.fromtimestamp(start,timezone.utc).isoformat(),'end':datetime.fromtimestamp(end,timezone.utc).isoformat()})
-        request=urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/candles?'+query,headers={'User-Agent':'BTC60-local-demo/1.0'})
+        request=urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/candles?'+query,headers={'User-Agent':'Predict60-local-demo/1.0'})
         with urllib.request.urlopen(request,timeout=8) as response:
             batch=json.load(response)
         if not isinstance(batch,list):raise ValueError('Invalid pricing history.')
@@ -489,6 +490,8 @@ class Handler(SimpleHTTPRequestHandler):
                     if any(i['symbol'] in overrides for i in instruments):
                         category.update(provider=oilprice_api.PROVIDER if oilprice_api.configured() else 'Twelve Data',feedState='configured' if oilprice_api.configured() or live_oil.configured() else 'setup_required',supportedCount=sum(bool(overrides.get(i['symbol'])) for i in instruments),quoteCadence='Spot assessments · hourly predictions unavailable' if oilprice_api.configured() else 'Minute updates')
                     else:category.update(provider='Coinbase',feedState='available',supportedCount=len(instruments),quoteCadence='Streaming prices')
+                    if category['id'] in COMING_SOON_CATEGORIES:
+                        category.update(availability='coming_soon', tradable=False)
             return self.reply(200, {'categories':categories})
         if path == '/api/coins':
             with connect() as conn:
@@ -554,7 +557,7 @@ class Handler(SimpleHTTPRequestHandler):
         # Returning signed-in visitors enter categories without seeing the guest splash.
         if relative in {'', 'welcome.html'} and self.session():
             return self.redirect('/categories.html')
-        if relative == 'index.html' and urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('category') == ['weather']:
+        if relative == 'index.html' and set(urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('category', [])) & COMING_SOON_CATEGORIES:
             return self.redirect('/welcome.html')
         # Protect direct terminal/category URLs independently of client-side navigation.
         if relative in {'index.html', 'categories.html'} and not self.session():
@@ -688,9 +691,11 @@ class Handler(SimpleHTTPRequestHandler):
         if not isinstance(coin, str) or not isinstance(market_id,str) or not isinstance(side,str):
             raise ValueError('Invalid market or prediction.')
         with connect() as conn:
-            available_coin = conn.execute('SELECT 1 FROM coins WHERE symbol=? AND enabled=1', (coin,)).fetchone()
+            available_coin = conn.execute('SELECT category FROM coins WHERE symbol=? AND enabled=1', (coin,)).fetchone()
         if not available_coin or market_id not in QUOTES or side not in ('up', 'down'):
             raise ValueError('Invalid market or prediction.')
+        if available_coin['category'] in COMING_SOON_CATEGORIES:
+            raise ValueError(f"{available_coin['category'].title()} predictions are coming soon.")
         if isinstance(budget, bool) or not isinstance(budget, (int, float)) or not math.isfinite(budget) or not 1 <= budget <= 1000000:
             raise ValueError('Enter a valid budget.')
         if not isinstance(request_id, str) or not re.fullmatch(r'[a-zA-Z0-9-]{16,80}', request_id):
@@ -743,7 +748,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, default=8000)
     parser.add_argument('--log-level', choices=('normal', 'debug', 'warning', 'error'),
-                        default=os.environ.get('BTC60_LOG_LEVEL', 'normal'))
+                        default=os.environ.get('PREDICT60_LOG_LEVEL') or os.environ.get('BTC60_LOG_LEVEL', 'normal'))
     args = parser.parse_args()
     configure(args.log_level)
     DB = DB.expanduser().resolve()
@@ -756,5 +761,5 @@ if __name__ == '__main__':
             raise SystemExit('Database is in use by a server or maintenance command. Stop it before starting another server.')
         initialize()
         threading.Thread(target=settlement_worker, daemon=True).start()
-        LOG.info('BTC60 local demo: http://127.0.0.1:%s', args.port)
+        LOG.info('Predict60 local demo: http://127.0.0.1:%s', args.port)
         ThreadingHTTPServer(('127.0.0.1', args.port), Handler).serve_forever()

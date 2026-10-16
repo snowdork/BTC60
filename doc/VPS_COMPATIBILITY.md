@@ -19,7 +19,7 @@ Apache reverse proxy reference: https://httpd.apache.org/docs/2.4/howto/reverse_
 
 ## Deployment requirements
 
-Keep database, keys, and backups outside Apache's document root. Set BTC60_DB to a writable persistent local path for the backend service user. Supply provider keys through server-only configuration. Allow outbound provider connections. Test provider subscriptions on the VPS: OilPriceAPI assessments do not support hourly prediction settlement; unsupported Twelve Data grades remain unavailable.
+Keep database, keys, and backups outside Apache's document root. Set PREDICT60_DB to a writable persistent local path for the backend service user. Supply provider keys through server-only configuration. Allow outbound provider connections. Test provider subscriptions on the VPS: OilPriceAPI assessments do not support hourly prediction settlement; unsupported Twelve Data grades remain unavailable.
 
 After HTTPS configuration, verify signup, login, logout, session invalidation, predictions, filters/sorting, settlement after restart, and backup/restore through the public domain. No VPS or Apache instance was available in the local environment for an end-to-end deployment check.
 

@@ -26,7 +26,7 @@ def request(endpoint, params):
     if not key:
         raise ValueError('Oil feed needs a Twelve Data API key on the server.')
     url = 'https://api.twelvedata.com/' + endpoint + '?' + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={'Authorization':'apikey '+key, 'User-Agent':'BTC60/1.0'})
+    req = urllib.request.Request(url, headers={'Authorization':'apikey '+key, 'User-Agent':'Predict60/1.0'})
     try:
         with urllib.request.urlopen(req, timeout=8) as response:
             data = json.load(response)

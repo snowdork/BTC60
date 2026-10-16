@@ -14,7 +14,7 @@
   const /** Format a monetary display value using the module currency formatter. */ money=value=>currency.format(value);
   const shareFormatter=new Intl.NumberFormat('en-US',{maximumFractionDigits:2});
   const /** Format fractional prediction shares for display. */ shares=value=>shareFormatter.format(value);
-  const account=window.BTC60Account;
+  const account=window.Predict60Account;
   let positions=[];
   const predictionIndex=new Map();
   const /** Build an instrument, interval, and start-time key to distinguish orders in repeated hours. */ predictionKey=(coin,id,start)=>`${coin}:${id}:${start}`;
@@ -53,7 +53,8 @@
     const available=Number.isFinite(value)&&benchmark!==null;
     $('ticket-spot-label').textContent=model.coin.feed==='oilpriceapi'?'SPOT ASSESSMENT · USD / BARREL':closed?'CLOSING BENCHMARK':model.feedMode==='demo'?'SYNTHETIC SPOT':model.coin.feed==='simulated'?'SIMULATED · USD / BARREL':model.coin.feed==='twelvedata'?'LIVE SPOT · USD / BARREL':'LIVE SPOT';
     $('ticket-spot').textContent=Number.isFinite(value)?price(value):'—';
-    $('ticket-price-time').textContent=closed?'Minute candle immediately before interval close':queued?'Starting benchmark is set when this interval opens':model.feedMode==='demo'?'Synthetic preview · no account orders':fresh?`Source update ${new Date(model.priceUpdatedAt).toISOString().slice(11,19)} UTC`: 'Waiting for a connected, fresh price';
+    $('ticket-price-time').hidden=closed;
+    $('ticket-price-time').textContent=closed?'':queued?'Starting benchmark is set when this interval opens':model.feedMode==='demo'?'Synthetic preview · no account orders':fresh?`Source update ${new Date(model.priceUpdatedAt).toISOString().slice(11,19)} UTC`: 'Waiting for a connected, fresh price';
     const start=market.startsAt,end=market.endsAt;
     if(Number.isFinite(start)&&Number.isFinite(end)){
       const hour=Math.floor(start/3600000)*3600000;
@@ -65,6 +66,7 @@
       $('ticket-interval-timing').textContent=closed?'Interval complete':queued?`Opens ${utc(start)} UTC`:`${market.remaining} left`;
     }
     const delta=available?value-benchmark:null;
+    $('ticket-spot').style.color=closed&&delta!==null?(delta>=0?'var(--green)':'var(--red)'):'';
     $('ticket-comparison').textContent=queued?'Benchmark available at open':!available?'Comparison unavailable':`${delta===0?'At the benchmark':`${price(Math.abs(delta))} ${delta>0?'above':'below'} benchmark`} (${delta>=0?'+':''}${(delta/benchmark*100).toFixed(3)}%)`;
     $('ticket-comparison').style.color=delta===null?'var(--muted)':delta>=0?'var(--green)':'var(--red)';
     $('ticket-up-rule').textContent=benchmark===null?'↗ Up: close ≥ benchmark':`↗ Up: close ≥ ${price(benchmark)}`;

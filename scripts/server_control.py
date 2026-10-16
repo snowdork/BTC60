@@ -11,7 +11,10 @@ STOP = DATA / 'server.stopped'
 
 def project_processes(script_name):
     """Yield Python process IDs whose resolved script path belongs to this checkout."""
-    # Resolve executable and script paths so unrelated Python processes are never selected.
+    expected_suffix = Path(script_name).parts
+    # Resolve executable, script, and cwd paths so unrelated Python processes are never selected.
+    # The cwd check also recognizes this checkout's processes after its directory is renamed:
+    # Linux updates /proc/<pid>/cwd, while the already-started argv keeps the old absolute path.
     for entry in Path('/proc').iterdir():
         if not entry.name.isdigit():
             continue
@@ -23,7 +26,12 @@ def project_processes(script_name):
             script = Path(os.fsdecode(args[index]))
             if not script.is_absolute():
                 script = (entry / 'cwd').resolve() / script
-            if script.resolve() == ROOT / script_name:
+            script_matches = script.resolve() == ROOT / script_name
+            renamed_checkout_matches = (
+                (entry / 'cwd').resolve() == ROOT
+                and script.parts[-len(expected_suffix):] == expected_suffix
+            )
+            if script_matches or renamed_checkout_matches:
                 yield int(entry.name)
         except (OSError, IndexError, ValueError):
             continue
@@ -45,5 +53,5 @@ def stop_server():
     while any(list(project_processes(script)) for script in
               ('scripts/watchdog-server.py', 'server.py')):
         if time.monotonic() >= deadline:
-            raise SystemExit('BTC60 did not stop within 15 seconds; stop marker retained.')
+            raise SystemExit('Predict60 did not stop within 15 seconds; stop marker retained.')
         time.sleep(0.1)
