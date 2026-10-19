@@ -208,7 +208,7 @@ def initialize():
         CREATE TABLE IF NOT EXISTS users (
           id INTEGER PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL,
           password_hash TEXT NOT NULL, salt TEXT NOT NULL,
-          balance_cents INTEGER NOT NULL DEFAULT 1425000 CHECK(balance_cents>=0), created_at INTEGER NOT NULL);
+          balance_cents INTEGER NOT NULL DEFAULT 1000000 CHECK(balance_cents>=0), created_at INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS sessions (
           token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
           csrf TEXT NOT NULL, expires_at INTEGER NOT NULL);
@@ -863,7 +863,7 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError('Enter your name (up to 60 characters).')
                 salt = secrets.token_hex(16)
                 digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
-                user_id = conn.execute('INSERT INTO users(name,email,password_hash,salt,created_at) VALUES(?,?,?,?,?)', (name.strip(), email, digest, salt, int(time.time()))).lastrowid
+                user_id = conn.execute('INSERT INTO users(name,email,password_hash,salt,created_at,balance_cents) VALUES(?,?,?,?,?,?)', (name.strip(), email, digest, salt, int(time.time()), 1000000)).lastrowid
             else:
                 user = conn.execute('SELECT * FROM users WHERE email=?', (email,)).fetchone()
                 salt = user['salt'] if user else '0' * 32

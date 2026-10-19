@@ -221,7 +221,7 @@ class AccountsTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(self.request('GET', '/api/account')[0], 401)
         status, account, _ = self.request('GET', '/api/account', cookie=cookie)
-        self.assertEqual(account['user']['balance_cents'], 1425000)
+        self.assertEqual(account['user']['balance_cents'], 1000000)
         csrf = account['csrf']
         self.assertEqual(self.request('POST', '/api/predictions', {}, cookie)[0], 403)
         self.assertEqual(self.request('POST', '/api/login', {'email': 'one@example.com', 'password': 'wrong-password'})[0], 401)
@@ -233,12 +233,12 @@ class AccountsTest(unittest.TestCase):
         with patch('server.time.time', return_value=now), patch('server.candle_close', return_value=100), patch('server.fresh_spot', side_effect=ValueError('Price feed stale')):
             self.assertEqual(self.request('POST', '/api/predictions', order, cookie, csrf)[0], 400)
             unchanged = self.request('GET', '/api/account', cookie=cookie)[1]
-            self.assertEqual(unchanged['user']['balance_cents'], 1425000)
+            self.assertEqual(unchanged['user']['balance_cents'], 1000000)
             self.assertEqual(unchanged['predictions'], [])
         with patch('server.time.time', return_value=now), patch('server.candle_close', return_value=100), patch('server.fresh_spot',return_value=101), patch('server.market_up',return_value=68):
             status, account, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
             self.assertEqual(status, 201, account)
-            self.assertEqual(account['user']['balance_cents'], 1425000 - 5000)
+            self.assertEqual(account['user']['balance_cents'], 1000000 - 5000)
             self.assertEqual(len(account['predictions']), 1)
             status, replay, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
             self.assertEqual(replay['user']['balance_cents'], account['user']['balance_cents'])
@@ -254,7 +254,7 @@ class AccountsTest(unittest.TestCase):
             server.settle_due()
             server.settle_due()
         _, settled, _ = self.request('GET', '/api/account', cookie=cookie)
-        self.assertEqual(settled['user']['balance_cents'], 1425000 - 5000 + 7353)
+        self.assertEqual(settled['user']['balance_cents'], 1000000 - 5000 + 7353)
         self.assertEqual(settled['predictions'][0]['outcome'], 'up')
         status, _, other_cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-456', 'signupCode': '777', 'name': 'Other', 'email': 'other@example.com', 'password': 'pass-456'})
         self.assertEqual(status, 200)
@@ -319,7 +319,7 @@ class AccountsTest(unittest.TestCase):
             self.assertEqual(status, 400)
             self.assertEqual(error['error'], 'Oil predictions are coming soon.')
             account = self.request('GET', '/api/account', cookie=cookie)[1]
-            self.assertEqual(account['user']['balance_cents'], 1425000)
+            self.assertEqual(account['user']['balance_cents'], 1000000)
             self.assertEqual(account['predictions'], [])
 
     def test_live_oil_missing_key_and_unavailable_grades_do_not_return_fake_prices(self):
@@ -389,7 +389,7 @@ class AccountsTest(unittest.TestCase):
         self.assertEqual(up['payout_cents'],(up['cost_cents']*100+up['cents']-1)//up['cents'])
         self.assertEqual(down['payout_cents'],0)
         self.assertIsNotNone(down['settled_at'])
-        self.assertEqual(settled['user']['balance_cents'],1425000-cost+up['payout_cents'])
+        self.assertEqual(settled['user']['balance_cents'],1000000-cost+up['payout_cents'])
         with server.connect() as conn:
             self.assertEqual(conn.execute('SELECT count(*) FROM settlements s JOIN predictions p ON p.id=s.prediction_id WHERE p.user_id=?',(user_id,)).fetchone()[0],2)
 

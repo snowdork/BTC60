@@ -80,7 +80,7 @@ The terminal lists unsettled predictions with countdowns and marks account wager
 | `server.py` | Static serving, catalog/account API, orders, settlements |
 | `scripts/database.py` | Explicit initialization, status, backup, reset |
 
-SQLite stores users, hashed sessions, predictions, settlements, coins, and migration versions. Each account starts with $14,250. Passwords use salted scrypt; sessions use HttpOnly/SameSite cookies and CSRF tokens. Account data persists across browser sessions and server restarts. Local storage holds presentation preferences rather than balances or saved orders.
+SQLite stores users, hashed sessions, predictions, settlements, coins, and migration versions. Each account starts with 10,000 credits. Passwords use salted scrypt; sessions use HttpOnly/SameSite cookies and CSRF tokens. Account data persists across browser sessions and server restarts. Local storage holds presentation preferences rather than balances or saved orders.
 
 UI/chart updates run once per second; incoming prices update the model immediately. The controller caches controls, delegates market selection, and avoids rebuilding unchanged rows and totals. Volatility is cached until candles change or a minute closes. Hidden tabs skip rendering and account polling. Static text assets support gzip and ETag revalidation; account/API responses are uncached.
 

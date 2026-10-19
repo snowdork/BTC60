@@ -9,7 +9,7 @@ You do not need to install Python or Docker on your own computer. New signups
 require the secret signup code provided by the organizer, an 8–16-character
 password, and a matching verification password. Show/Hide controls reveal or
 conceal the signup code and password fields. Existing accounts can
-log in without the code. Sign up or log in, then choose **Crypto** from the category screen. New accounts receive 14,250
+log in without the code. Sign up or log in, then choose **Crypto** from the category screen. New accounts receive 10,000
 credits. Accounts and saved predictions belong to that installation;
 a separate local installation does not automatically share them.
 

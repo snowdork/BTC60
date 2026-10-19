@@ -83,7 +83,7 @@
     markets.forEach(m=>{m.up=config.quotes[m.id];});model.quoteReady=true;model.settlement=config.settlement;model.calibrations=config.calibrations||{};
   }
   /** Resolve equal or rising benchmark values as Up and falling values as Down. */ function outcome(start,close) { return close >= start ? 'up' : 'down'; }
-  const model={maxPredictionCredits,markets,quote,outcome,estimateChances,minuteVolatility,normalCDF,calibratedProbability,dataStatus,configure,quoteReady:false,initialBalance:14250,spot:67528.50,coin:typeof window!=='undefined'?window.PredictCoins.available[0]:null};
+  const model={maxPredictionCredits,markets,quote,outcome,estimateChances,minuteVolatility,normalCDF,calibratedProbability,dataStatus,configure,quoteReady:false,initialBalance:10000,spot:67528.50,coin:typeof window!=='undefined'?window.PredictCoins.available[0]:null};
   if (typeof module !== 'undefined' && module.exports) module.exports=model;
   else root.PredictModel=model;
 })(typeof globalThis!=='undefined'?globalThis:this);
