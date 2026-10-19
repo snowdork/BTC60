@@ -96,3 +96,15 @@ by default. Docker rebuilds must include the new contest module and admin script
 Overload returns HTTP 503 with Retry-After. Raise the limit only after measuring
 VPS memory, latency, and provider limits. The app tmpfs is capped at 64 MiB.
 See the [performance review](../doc/VPS_PERFORMANCE.md) for measurements and limits.
+
+## Signup code configuration
+
+Set `P60_SIGNUP_CODE` in the private environment file. There is no built-in
+default: unset or empty values disable new signups with HTTP 503; existing users
+can still log in. The code is checked server-side and is not included in public
+assets or API responses.
+
+For Docker, edit the root `.env` and run `docker compose up -d` to recreate the
+app with the new environment. For systemd, edit `/etc/predict60/predict60.env`
+and restart `predict60.service`. A local `python3 server.py` process needs the
+variable exported in its shell; it does not automatically load `.env`.

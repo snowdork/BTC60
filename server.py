@@ -839,8 +839,11 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(429, {'error': 'Too many attempts. Try again in a minute.'})
             attempts.append(now)
         if path == '/api/signup':
+            expected_code = os.environ.get('P60_SIGNUP_CODE', '')
+            if not expected_code:
+                return self.reply(503, {'error': 'Signup is currently unavailable.'})
             signup_code = data.get('signupCode')
-            if not isinstance(signup_code, str) or not secrets.compare_digest(signup_code.encode('utf-8'), b'777'):
+            if not isinstance(signup_code, str) or not secrets.compare_digest(signup_code.encode('utf-8'), expected_code.encode('utf-8')):
                 return self.reply(403, {'error': 'Invalid signup code.'})
         email, password = data.get('email', ''), data.get('password', '')
         if not isinstance(email, str) or not isinstance(password, str):

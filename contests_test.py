@@ -158,6 +158,9 @@ class ContestHTTPTest(unittest.TestCase):
     request = server_test.AccountsTest.request
 
     def setUp(self):
+        signup_environment = patch.dict(server.os.environ, {'P60_SIGNUP_CODE': '777'})
+        signup_environment.start()
+        self.addCleanup(signup_environment.stop)
         self.original_db = server.DB
         self.temp = tempfile.TemporaryDirectory()
         server.DB = Path(self.temp.name) / 'api.sqlite3'

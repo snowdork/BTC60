@@ -160,3 +160,6 @@ passwords can still log in; login requires neither confirmation nor signup code.
 contest polling under a writer lock, concurrent history request sharing, failed
 settlement deduplication, and HTTP overload recovery. These use temporary data
 and mocked providers; see [local performance measurements](VPS_PERFORMANCE.md).
+
+Signup tests configure `P60_SIGNUP_CODE` explicitly, verify code changes, and
+verify that missing/empty configuration disables signup without blocking login.

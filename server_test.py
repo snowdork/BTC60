@@ -10,6 +10,11 @@ import server
 
 
 class AccountsTest(unittest.TestCase):
+    def setUp(self):
+        self.signup_environment = patch.dict(server.os.environ, {'P60_SIGNUP_CODE': '777'})
+        self.signup_environment.start()
+        self.addCleanup(self.signup_environment.stop)
+
     @classmethod
     def setUpClass(cls):
         cls.oil_config=patch('oilprice_api.configured',return_value=False)
@@ -112,6 +117,24 @@ class AccountsTest(unittest.TestCase):
         self.assertEqual(self.request('POST', '/api/login', {'email': 'password-16@example.com', 'password': legacy})[0], 200)
         server.AUTH_ATTEMPTS.clear()
 
+    def test_signup_uses_environment_and_unconfigured_signup_does_not_block_login(self):
+        server.AUTH_ATTEMPTS.clear()
+        payload = {'name': 'Configured', 'email': 'env-code@example.com', 'password': 'pass-env', 'confirmPassword': 'pass-env', 'signupCode': '777'}
+        with patch.dict(server.os.environ, {'P60_SIGNUP_CODE': 'different-code'}):
+            self.assertEqual(self.request('POST', '/api/signup', payload)[0], 403)
+            status, _, _ = self.request('POST', '/api/signup', dict(payload, signupCode='different-code'))
+            self.assertEqual(status, 200)
+        for settings in ({}, {'P60_SIGNUP_CODE': ''}):
+            with patch.dict(server.os.environ, settings, clear=True):
+                status, response, cookie = self.request('POST', '/api/signup', dict(payload, email='blocked@example.com', signupCode=''))
+                self.assertEqual(status, 503)
+                self.assertEqual(response, {'error': 'Signup is currently unavailable.'})
+                self.assertEqual(cookie, '')
+                self.assertEqual(self.request('POST', '/api/login', {'email': payload['email'], 'password': payload['password']})[0], 200)
+        with server.connect() as conn:
+            self.assertIsNone(conn.execute('SELECT id FROM users WHERE email=?', ('blocked@example.com',)).fetchone())
+        server.AUTH_ATTEMPTS.clear()
+
     def test_health_check_verifies_database(self):
         status, payload, _ = self.request('GET', '/healthz')
         self.assertEqual((status, payload), (200, {'ok': True}))
@@ -120,7 +143,7 @@ class AccountsTest(unittest.TestCase):
             self.assertEqual(self.request('GET', '/healthz')[0], 503)
 
     def test_https_origin_sets_matching_secure_login_and_logout_cookies(self):
-        with patch.dict(server.os.environ, {'P60_HOST': 'https://predict60.com'}, clear=True):
+        with patch.dict(server.os.environ, {'P60_HOST': 'https://predict60.com', 'P60_SIGNUP_CODE': '777'}, clear=True):
             status, _, cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-secure', 'signupCode': '777',
                 'name': 'Secure', 'email': 'secure@example.com', 'password': 'pass-secure',
             })

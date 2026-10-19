@@ -6,6 +6,7 @@ services:
     restart: unless-stopped
     environment:
       PREDICT60_DB: /app/data/p60.sqlite3
+      P60_SIGNUP_CODE: ${P60_SIGNUP_CODE:-}
       P60_HOST: https://${P60_DOMAIN:?Set P60_DOMAIN in .env}
       P60_TRUSTED_PROXIES: 172.30.60.2
       P60_MAX_REQUESTS: ${P60_MAX_REQUESTS:-32}
