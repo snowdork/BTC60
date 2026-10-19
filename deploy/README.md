@@ -14,9 +14,7 @@ cp deploy/docker.env.example .env
 chmod 600 .env
 # Edit .env: set P60_DOMAIN to your domain, without https:// or a path.
 sudo systemctl enable --now docker
-docker compose config --quiet
-docker compose up -d --build
-docker compose ps
+bash deploy/start-docker.sh
 ```
 
 Point DNS at the VPS and make ports 80/443 available to Caddy. If Apache or a host
@@ -46,6 +44,48 @@ alongside the container against the same database.
 
 Predict60 runs on loopback behind Caddy. Systemd replaces the development
 watchdog, restarts the process, and captures stdout/stderr in the journal.
+
+## Enable HTTPS for an existing checkout
+
+For an existing checkout on an apt-based Linux VPS with systemd, the helper
+below installs Caddy and enables app startup at boot:
+
+```bash
+sudo bash deploy/enable-vps.sh
+```
+
+The checkout must belong to an unprivileged user and its path must contain no
+spaces or `%` characters. The helper targets **predict60.com**: point DNS at this
+VPS and make ports 80/443 available before running it. For another domain, adapt
+both `deploy/Caddyfile` and the helper’s `P60_HOST` and HTTPS health-check URL
+first. Resolve existing services using ports 80/443.
+
+The helper replaces `/etc/caddy/Caddyfile`, saving its first existing version as
+`/etc/caddy/Caddyfile.before-predict60`, and writes
+`/etc/systemd/system/predict60.service`. The service runs as the checkout owner,
+binds to `127.0.0.1:8000`, uses normal logging, and restarts on failure. It stops
+this checkout’s development watchdog before starting systemd.
+
+If `/etc/predict60/predict60.env` does not exist, the helper creates it with mode
+0600, setting the HTTPS origin, Secure cookies, and loopback trusted proxies. It
+attempts to preserve database-path and provider-key variables from a process
+whose command line contains this checkout’s absolute `server.py` path. A process
+started as `python3 server.py` may not match. Verify the database path and keys
+manually; an existing environment file is left unchanged. **`P60_SIGNUP_CODE` is
+not copied**: set it explicitly in that private file to enable new signups.
+Restart the service after editing the file.
+
+```bash
+sudo systemctl restart predict60
+sudo systemctl status predict60 caddy
+sudo journalctl -u predict60 -n 100 --no-pager
+```
+
+The helper opens ports 80/443 only when UFW is already active; configure provider
+firewalls separately. It checks loopback and public HTTPS `/healthz` endpoints.
+It does not install the backup timer or move the database out of the checkout.
+Use systemctl for this deployment’s lifecycle and the journal for logs. The
+release-directory setup below is a separate, manually configured option.
 
 ## Preflight
 

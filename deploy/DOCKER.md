@@ -11,11 +11,18 @@ cp deploy/docker.env.example .env
 chmod 600 .env
 # Edit .env and set P60_DOMAIN to your real domain.
 sudo systemctl enable --now docker
-docker compose config --quiet
-docker compose up -d --build
-docker compose ps
+bash deploy/start-docker.sh
 docker compose logs --tail=100 app caddy
 ```
+
+`start-docker.sh` can be called from any directory. It requires the repository’s
+`.env`, validates Compose without printing secrets, checks daemon access, builds
+the images, and waits up to 120 seconds for service readiness. Use a recent
+Compose plugin supporting `up --wait`. If startup fails, containers remain
+available for log inspection; correct the problem and rerun the command. Caddy
+startup does not verify public DNS or certificate issuance, so check the public
+HTTPS endpoint separately. The helper does not stop host services or import an
+existing database; complete the data import below before first startup if needed.
 
 Caddy provides HTTPS and forwards to the private app port 8000. No app port is
 published on the host. The image runs Python directly as user 10001; Docker
@@ -60,7 +67,7 @@ docker compose cp app:/app/data/backups/REPLACE_WITH_FILENAME.sqlite3 ./
 
 Schedule backups on the host and test restoration. Before every upgrade, back up
 the database, retain the previous image tag, set a new P60_IMAGE_TAG in .env, and
-run `docker compose up -d --build`. Startup applies database migrations. Rolling
+run `bash deploy/start-docker.sh`. Startup applies database migrations. Rolling
 back an image may also require restoring its pre-upgrade database backup.
 
 ## Verification and recovery

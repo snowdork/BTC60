@@ -163,3 +163,23 @@ and mocked providers; see [local performance measurements](VPS_PERFORMANCE.md).
 
 Signup tests configure `P60_SIGNUP_CODE` explicitly, verify code changes, and
 verify that missing/empty configuration disables signup without blocking login.
+
+## Password changes and logout
+
+Run the focused browser regressions with:
+
+```bash
+node --test account.test.js password.test.js
+python3 -m unittest server_test.AccountsTest.test_change_password_validation_and_session_revocation
+```
+
+Browser tests cover CSRF submission, confirmation mismatch, retry after an
+incorrect password, a settlement response arriving after logout, and logout
+after another tab ends the session. API coverage checks authentication, CSRF,
+password lengths, confirmation, current-password verification, other-session
+revocation, old/new login credentials, and throttling.
+
+On a disposable installation, sign in with two separate browser profiles. Open
+**Change password** in one and submit a valid change. Confirm that this profile
+stays signed in, the other must log in again, the old password fails, and the new
+password succeeds. Check the link from Markets, the terminal, and the portfolio.

@@ -12,7 +12,7 @@ Predict60 is a buildless web app for exploring hourly direction predictions with
 - **Live market context:** Coinbase Exchange ticker updates and minute-candle history, with separate spot freshness, history, and order-readiness indicators.
 - **Demo predictions:** choose Up or Down, set a budget, and review whole-contract cost, possible return, and potential profit. Model percentages determine simulated contract prices.
 - **Live confirmation:** review follows the market; the server executes at its current model price within your budget. Final quantity and return can differ from review.
-- **Persistent accounts:** signup/login, 10,000 starting credits, saved predictions, and automatic settlement backed by SQLite.
+- **Persistent accounts:** signup/login, password changes, 10,000 starting credits, saved predictions, and automatic settlement backed by SQLite.
 - **Portfolio tracking:** pending orders, wins, losses, returns, and realized profit/loss, with committed funds shown separately.
 - **Display controls:** light/dark themes, responsive layouts, chart pause, reconnect, and an explicit synthetic preview mode.
 
@@ -43,6 +43,10 @@ Live advertising networks and automatic prize delivery are not connected.
 Up wins when the closing benchmark is greater than or equal to the opening benchmark; Down wins when it is lower. Each benchmark uses the minute candle close immediately before its interval boundary. A winning contract returns 1 credit; a losing contract returns 0 credits, with zero demo fees. Missing history leaves orders awaiting settlement for retry.
 
 These are uncalibrated model estimates, simulated prices, and Coinbase minute-close proxy results. Predict60 does not trade real money or claim official Kalshi or CF Benchmarks settlement. Synthetic preview and historical views cannot place orders.
+
+Signed-in users can open **Change password** from Markets, the terminal, or the
+portfolio. Changing a password keeps the current session and signs out all other
+sessions. See the [user guide](doc/USER_GUIDE.md#change-your-password).
 
 ## Run locally
 
@@ -78,7 +82,9 @@ P60_TRUSTED_PROXIES=127.0.0.1,::1
 ```
 
 `P60_SECURE_COOKIES=true` can force HTTPS-only cookies independently, but cannot
-disable them for an HTTPS `P60_HOST`. See [the VPS deployment files](deploy/README.md).
+disable them for an HTTPS `P60_HOST`. See [the VPS deployment files](deploy/README.md), including the
+[existing-checkout setup script](deploy/README.md#enable-https-for-an-existing-checkout)
+for systemd startup and Caddy HTTPS.
 
 ### Automatic crash recovery (Linux)
 

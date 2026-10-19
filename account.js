@@ -2,19 +2,28 @@
  * Synchronize account state, session-aware navigation, CSRF requests, and signed-in controls.
  */
 (() => {
+  let generation=0,loggingOut=false;
   const account={user:null,csrf:null,predictions:[],ready:false,error:null};
   /** Send an account JSON request with the current CSRF token; invalidate local state on unauthorized responses. */ async function request(path,body){
     const response=await fetch('/api/'+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','X-CSRF-Token':account.csrf||''},...(body?{body:JSON.stringify(body)}:{})});
     let data;try{data=await response.json();}catch{throw Error('Start the local app with python3 server.py to use accounts.');}
-    if(!response.ok){if(response.status===401){Object.assign(account,{user:null,predictions:[],csrf:null,ready:true});window.dispatchEvent(new Event('account-update'));}throw Error(data.error||'Request failed.');}return data;
+    if(!response.ok){if(response.status===401){Object.assign(account,{user:null,predictions:[],csrf:null,ready:true});window.dispatchEvent(new Event('account-update'));}throw Object.assign(Error(data.error||'Request failed.'),{status:response.status});}return data;
   }
   let snapshot='';
   /** Replace the account snapshot and emit account-update only when state or error status changes. */ function update(data){const next=JSON.stringify(data),changed=next!==snapshot||!account.ready||account.error;snapshot=next;Object.assign(account,data,{ready:true,error:null});if(changed)window.dispatchEvent(new Event('account-update'));}
-  account.place=/** Submit a prediction and replace local state with the authoritative server snapshot. */ async prediction=>{update(await request('predictions',prediction));};
-  account.refresh=/** Fetch the authoritative signed-in account snapshot and emit state changes. */ async()=>{update(await request('account'));};
-  account.logout=/** Invalidate the server session, clear account state, and return to the welcome screen. */ async()=>{await request('logout',{});update({user:null,csrf:null,predictions:[]});location.href='welcome.html';};
+  account.place=/** Submit a prediction and replace local state with the authoritative server snapshot. */ async prediction=>{const current=generation,data=await request('predictions',prediction);if(current===generation)update(data);};
+  account.refresh=/** Fetch the authoritative signed-in account snapshot and emit state changes. */ async()=>{const current=generation,data=await request('account');if(current===generation)update(data);};
+  account.logout=/** Invalidate the server session, clear account state, and return to the welcome screen. */ async()=>{
+    if(loggingOut)return;
+    loggingOut=true;
+    try{
+      try{await request('logout',{});}catch(error){if(error.status!==401)throw error;}
+      // Discard account snapshots fetched before the server ended this session.
+      generation++;update({user:null,csrf:null,predictions:[],contestWallet:null});location.href='welcome.html';
+    }finally{loggingOut=false;}
+  };
   let settling=false;
-  account.settle=/** Retry due settlements for signed-in users under an in-flight request guard. */ async()=>{if(!account.user||settling)return;settling=true;try{update(await request('settle',{}));}finally{settling=false;}};
+  account.settle=/** Retry due settlements for signed-in users under an in-flight request guard. */ async()=>{if(!account.user||settling||loggingOut)return;settling=true;const current=generation;try{const data=await request('settle',{});if(current===generation)update(data);}finally{settling=false;}};
   window.Predict60Account=account;
   /** Render account controls from the latest account, market, and interface state. */ function renderAccountControls(){
     document.querySelectorAll('[data-account-name]').forEach(label=>{

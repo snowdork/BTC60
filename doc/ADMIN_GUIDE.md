@@ -6,6 +6,14 @@ server and watchdog. Run them as the same operating-system user that owns the
 server. They do not install boot-time startup, restart a crashed watchdog, or
 check HTTP health after startup.
 
+For boot-time startup and HTTPS on an existing VPS checkout, see the
+[systemd setup helper](../deploy/README.md#enable-https-for-an-existing-checkout).
+Once installed, manage that service with `sudo systemctl restart predict60` and
+`sudo systemctl stop predict60`; inspect logs with `journalctl -u predict60`.
+Stop it with systemctl before database operations requiring a stopped server.
+The watchdog commands below apply to deployments supervised by the development
+scripts.
+
 ## Start, restart, and stop
 
 ```bash

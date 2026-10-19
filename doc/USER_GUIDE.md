@@ -29,6 +29,22 @@ After the `p60` naming update, sign in again and reselect your theme. Existing
 accounts and predictions remain in the retained database; do not create a new
 account just because the browser asks you to sign in again.
 
+## Change your password
+
+While signed in, choose **Change password** from Markets, the terminal, or your
+portfolio. Enter your current password, then a new password of 8–16 characters
+and a matching confirmation. After success, the form clears and shows a
+confirmation. Your current session stays signed in; all other sessions must log
+in again with the new password.
+
+An incorrect current password or mismatched confirmation leaves the password
+unchanged. Too many password verification attempts temporarily block further
+attempts; wait a minute before retrying. This form requires your current password;
+self-service recovery for a forgotten password is not available.
+
+Use **Log out** to end the current session and return to the welcome page. Logout
+also completes when another tab has already ended that session.
+
 ## Read the terminal
 
 Choose a coin using the header buttons. The default choices are BTC, ETH, SOL, XRP, DOGE, ADA, and LTC; administrators can change availability. Coin selection updates prices, chart, and market context. All coins share your account balance.

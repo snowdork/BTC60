@@ -47,6 +47,7 @@ SETTLE_LOCK = threading.Lock()
 STATIC_CACHE = {}
 LOG = logging.getLogger(__name__)
 PUBLIC_FILES = {
+    'password.html', 'password.js',
     'contests.html', 'contests.js', 'contests.css', 'sponsor.js',
     'account.js',
     'app.js',
@@ -739,7 +740,7 @@ class Handler(SimpleHTTPRequestHandler):
         if relative == 'index.html' and set(urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('category', [])) & COMING_SOON_CATEGORIES:
             return self.redirect('/welcome.html')
         # Protect direct terminal/category URLs independently of client-side navigation.
-        if relative in {'index.html', 'categories.html', 'contests.html'} and not self.session():
+        if relative in {'index.html', 'categories.html', 'contests.html', 'password.html'} and not self.session():
             return self.redirect('/welcome.html')
         self.serve_static()
 
@@ -811,6 +812,8 @@ class Handler(SimpleHTTPRequestHandler):
                 with connect() as conn:
                     conn.execute('DELETE FROM sessions WHERE token_hash=?', (session['token_hash'],))
                 return self.reply(200, {'ok': True}, session_cookie('', 0))
+            if path == '/api/change-password':
+                return self.change_password(session, data)
             if path == '/api/settle':
                 settle_due(session['user_id'])
                 return self.reply(200, self.account(session))
@@ -826,8 +829,8 @@ class Handler(SimpleHTTPRequestHandler):
             LOG.debug('User action failure details', exc_info=True)
             return self.reply(503, {'error': 'Service unavailable. Please try again.'})
 
-    def authenticate(self, path, data):
-        """Validate credentials, throttle attempts, create or verify the account, and issue a session cookie."""
+    def auth_rate_limited(self):
+        """Limit password verification attempts per client address."""
         with AUTH_LOCK:
             now = time.time()
             for address in list(AUTH_ATTEMPTS):
@@ -836,8 +839,39 @@ class Handler(SimpleHTTPRequestHandler):
                     del AUTH_ATTEMPTS[address]
             attempts = AUTH_ATTEMPTS.setdefault(self.client_ip(), [])
             if len(attempts) >= 20:
-                return self.reply(429, {'error': 'Too many attempts. Try again in a minute.'})
+                return True
             attempts.append(now)
+        return False
+
+    def change_password(self, session, data):
+        """Verify the current password and revoke other sessions atomically."""
+        if self.auth_rate_limited():
+            return self.reply(429, {'error': 'Too many attempts. Try again in a minute.'})
+        current = data.get('currentPassword')
+        password = data.get('newPassword')
+        confirmation = data.get('confirmPassword')
+        if not isinstance(current, str) or not 8 <= len(current) <= 128:
+            raise ValueError('Enter your current password.')
+        if not isinstance(password, str) or not 8 <= len(password) <= 16:
+            raise ValueError('Use a password of 8–16 characters.')
+        if not isinstance(confirmation, str) or not secrets.compare_digest(password.encode(), confirmation.encode()):
+            raise ValueError('Passwords do not match.')
+        with connect() as conn:
+            conn.execute('BEGIN IMMEDIATE')
+            user = conn.execute('SELECT password_hash,salt FROM users WHERE id=?', (session['user_id'],)).fetchone()
+            digest = hashlib.scrypt(current.encode(), salt=bytes.fromhex(user['salt']), n=16384, r=8, p=1).hex()
+            if not secrets.compare_digest(digest, user['password_hash']):
+                return self.reply(403, {'error': 'Current password is incorrect.'})
+            salt = secrets.token_hex(16)
+            digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
+            conn.execute('UPDATE users SET password_hash=?,salt=? WHERE id=?', (digest, salt, session['user_id']))
+            conn.execute('DELETE FROM sessions WHERE user_id=? AND token_hash<>?', (session['user_id'], session['token_hash']))
+        return self.reply(200, {'ok': True})
+
+    def authenticate(self, path, data):
+        """Validate credentials, throttle attempts, create or verify the account, and issue a session cookie."""
+        if self.auth_rate_limited():
+            return self.reply(429, {'error': 'Too many attempts. Try again in a minute.'})
         if path == '/api/signup':
             expected_code = os.environ.get('P60_SIGNUP_CODE', '')
             if not expected_code:

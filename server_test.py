@@ -135,6 +135,28 @@ class AccountsTest(unittest.TestCase):
             self.assertIsNone(conn.execute('SELECT id FROM users WHERE email=?', ('blocked@example.com',)).fetchone())
         server.AUTH_ATTEMPTS.clear()
 
+    def test_change_password_validation_and_session_revocation(self):
+        server.AUTH_ATTEMPTS.clear()
+        credentials = {'email': 'change-password@example.com', 'password': 'old-password'}
+        self.assertEqual(self.request('POST', '/api/signup', dict(credentials, name='Password', signupCode='777', confirmPassword='old-password'))[0], 200)
+        _, _, cookie = self.request('POST', '/api/login', credentials)
+        _, _, other = self.request('POST', '/api/login', credentials)
+        csrf = self.request('GET', '/api/account', cookie=cookie)[1]['csrf']
+        payload = {'currentPassword': 'old-password', 'newPassword': 'new-password', 'confirmPassword': 'new-password'}
+        self.assertEqual(self.request('POST', '/api/change-password', payload)[0], 401)
+        self.assertEqual(self.request('POST', '/api/change-password', payload, cookie)[0], 403)
+        for changes, expected in [({'currentPassword': 'wrong-password'}, 403), ({'newPassword': 'short'}, 400), ({'newPassword': 'x' * 17}, 400), ({'confirmPassword': 'different'}, 400), ({'currentPassword': None}, 400)]:
+            self.assertEqual(self.request('POST', '/api/change-password', dict(payload, **changes), cookie, csrf)[0], expected)
+        self.assertEqual(self.request('GET', '/api/account', cookie=other)[0], 200)
+        self.assertEqual(self.request('POST', '/api/change-password', payload, cookie, csrf)[0], 200)
+        self.assertEqual(self.request('GET', '/api/account', cookie=cookie)[0], 200)
+        self.assertEqual(self.request('GET', '/api/account', cookie=other)[0], 401)
+        self.assertEqual(self.request('POST', '/api/login', credentials)[0], 401)
+        self.assertEqual(self.request('POST', '/api/login', dict(credentials, password='new-password'))[0], 200)
+        with patch.dict(server.AUTH_ATTEMPTS, {'127.0.0.1': [server.time.time()] * 20}, clear=True):
+            self.assertEqual(self.request('POST', '/api/change-password', payload, cookie, csrf)[0], 429)
+        server.AUTH_ATTEMPTS.clear()
+
     def test_health_check_verifies_database(self):
         status, payload, _ = self.request('GET', '/healthz')
         self.assertEqual((status, payload), (200, {'ok': True}))

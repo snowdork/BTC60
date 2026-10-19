@@ -4,6 +4,7 @@ services:
     build: .
     image: p60:${P60_IMAGE_TAG:-local}
     restart: unless-stopped
+    stop_grace_period: 30s
     environment:
       PREDICT60_DB: /app/data/p60.sqlite3
       P60_SIGNUP_CODE: ${P60_SIGNUP_CODE:-}
