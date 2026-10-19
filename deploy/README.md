@@ -1,5 +1,8 @@
 # VPS deployment
 
+For the container deployment with Docker crash recovery and Caddy, see
+[Docker deployment](DOCKER.md). The instructions below use systemd without Docker.
+
 Predict60 runs on loopback behind Caddy. Systemd replaces the development
 watchdog, restarts the process, and captures stdout/stderr in the journal.
 
@@ -21,7 +24,7 @@ watchdog, restarts the process, and captures stdout/stderr in the journal.
 Before starting or upgrading, initialize or migrate the database explicitly:
 
 ```bash
-sudo -u predict60 env PREDICT60_DB=/var/lib/predict60/btc60.sqlite3 \
+sudo -u predict60 env PREDICT60_DB=/var/lib/predict60/p60.sqlite3 \
   python3 /opt/predict60/current/scripts/database.py init
 sudo systemctl enable --now predict60.service predict60-backup.timer
 curl --fail http://127.0.0.1:8000/healthz

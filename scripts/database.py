@@ -72,7 +72,7 @@ def reset(path):
     """Back up the database before clearing account state and restoring seeded catalogs."""
     with maintenance_lock(path):
         # Build and validate the replacement before touching the existing database.
-        with tempfile.TemporaryDirectory(prefix='btc60-reset-', dir=path.parent) as folder:
+        with tempfile.TemporaryDirectory(prefix='p60-reset-', dir=path.parent) as folder:
             original = server.DB
             fresh = Path(folder) / 'fresh.sqlite3'
             try:
@@ -93,7 +93,7 @@ def main():
     """Parse maintenance commands and enforce locks and explicit reset confirmation."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['init', 'backup', 'status', 'reset'])
-    parser.add_argument('--db', type=Path, default=server.DB, help='SQLite path (default: PREDICT60_DB or project data/btc60.sqlite3)')
+    parser.add_argument('--db', type=Path, default=server.DB, help='SQLite path (default: PREDICT60_DB or project data/p60.sqlite3)')
     parser.add_argument('--confirm-reset', action='store_true', help='Required for reset; clears all account/order data after backup')
     parser.add_argument('--backup-dir', type=Path, help='Optional destination for the backup command')
     args = parser.parse_args()

@@ -14,7 +14,7 @@ import gzip
 import json
 import math
 import logging
-from btc60_logging import configure
+from p60_logging import configure
 import os
 import re
 import secrets
@@ -29,7 +29,13 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-DB = Path(os.environ.get('PREDICT60_DB') or os.environ.get('BTC60_DB') or ROOT / 'data' / 'btc60.sqlite3')
+# Keep existing installations on their current database unless explicitly configured.
+DEFAULT_DB = ROOT / 'data' / 'p60.sqlite3'
+LEGACY_DB = ROOT / 'data' / 'btc60.sqlite3'
+if not DEFAULT_DB.exists() and LEGACY_DB.exists():
+    DEFAULT_DB = LEGACY_DB
+DB = Path(os.environ.get('PREDICT60_DB') or os.environ.get('P60_DB')
+          or os.environ.get('BTC60_DB') or DEFAULT_DB)
 QUOTES = {'60-0': 68, '30-0': 54, '30-1': 58, '15-0': 49, '15-1': 57, '15-2': 62, '15-3': 50}
 COMING_SOON_CATEGORIES = {'oil', 'weather'}
 AUTH_ATTEMPTS = {}
@@ -111,7 +117,7 @@ def secure_session_cookies():
 
 def session_cookie(value, max_age):
     """Build matching login/logout cookie attributes for the current deployment."""
-    attributes = [f'btc60_session={value}', 'HttpOnly', 'SameSite=Lax', 'Path=/', f'Max-Age={max_age}']
+    attributes = [f'p60_session={value}', 'HttpOnly', 'SameSite=Lax', 'Path=/', f'Max-Age={max_age}']
     if secure_session_cookies():
         attributes.append('Secure')
     return '; '.join(attributes)
@@ -537,7 +543,7 @@ class Handler(SimpleHTTPRequestHandler):
         jar = cookies.SimpleCookie()
         try:
             jar.load(self.headers.get('Cookie', ''))
-            token = jar['btc60_session'].value
+            token = jar['p60_session'].value
         except (KeyError, cookies.CookieError):
             return None
         with connect() as conn:
@@ -843,8 +849,13 @@ class Handler(SimpleHTTPRequestHandler):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, default=8000)
+    parser.add_argument(
+        '--bind',
+        default='127.0.0.1',
+        help='Address to listen on (default: 127.0.0.1)',
+    )
     parser.add_argument('--log-level', choices=('normal', 'debug', 'warning', 'error'),
-                        default=os.environ.get('PREDICT60_LOG_LEVEL') or os.environ.get('BTC60_LOG_LEVEL', 'normal'))
+                        default=os.environ.get('PREDICT60_LOG_LEVEL') or os.environ.get('P60_LOG_LEVEL') or os.environ.get('BTC60_LOG_LEVEL', 'normal'))
     args = parser.parse_args()
     try:
         validate_environment()
@@ -861,5 +872,5 @@ if __name__ == '__main__':
             raise SystemExit('Database is in use by a server or maintenance command. Stop it before starting another server.')
         initialize()
         threading.Thread(target=settlement_worker, daemon=True).start()
-        LOG.info('Predict60 local demo: http://127.0.0.1:%s', args.port)
-        Predict60HTTPServer(('127.0.0.1', args.port), Handler).serve_forever()
+        LOG.info('Predict60 listening on http://%s:%s', args.bind, args.port)
+        Predict60HTTPServer((args.bind, args.port), Handler).serve_forever()

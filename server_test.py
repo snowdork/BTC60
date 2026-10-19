@@ -411,7 +411,7 @@ class AccountsTest(unittest.TestCase):
         self.assertEqual(self.request('GET', '/api/community')[1]['activeUsers'], before['activeUsers'])
 
     def test_private_files_not_served(self):
-        for path in ['/data/btc60.sqlite3', '/server.py', '/.git/config', '/%2e%2e/server.py']:
+        for path in ['/data/p60.sqlite3', '/server.py', '/.git/config', '/%2e%2e/server.py']:
             self.assertEqual(self.request('GET', path)[0], 404)
         for path in ['/', '/login.html', '/signup.html', '/portfolio.html', '/portfolio.js', '/portfolio.css']:
             self.assertEqual(self.request('GET', path)[0], 200)

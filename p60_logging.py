@@ -4,7 +4,7 @@ import logging
 import os
 from pathlib import Path
 
-LOG_DIR = Path(os.environ.get('PREDICT60_LOG_DIR') or os.environ.get('BTC60_LOG_DIR', '/tmp/btc60'))
+LOG_DIR = Path(os.environ.get('PREDICT60_LOG_DIR') or os.environ.get('P60_LOG_DIR') or os.environ.get('BTC60_LOG_DIR', '/tmp/p60'))
 LOG_PATH = LOG_DIR / 'server.log'
 MAX_BYTES = 10 * 1024 * 1024
 BACKUPS = 5

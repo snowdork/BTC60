@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+*.key
+*.pem
+data
+**/__pycache__
+**/*.pyc
+**/node_modules
+doc
+dist
+*_test.py
+*.test.js

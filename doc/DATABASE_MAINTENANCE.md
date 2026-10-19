@@ -20,9 +20,9 @@ python3 scripts/database.py reset --confirm-reset
 
 Stop `server.py` and any other SQLite clients before `init` or `reset`; restart with `python3 server.py` afterward. Server and maintenance commands use an exclusive lock to prevent resetting an active server. Servers started before this maintenance update must also be stopped—the old process does not know about the lock.
 
-By default the database is `data/btc60.sqlite3`, and backups go under `data/backups/`. Both are excluded from Git. Backup files have owner-only read/write permissions and UTC timestamps. The reset command always creates a backup when the target already exists, builds a fresh database first, and uses SQLite's backup API to replace it without manual WAL-file deletion.
+By default the database is `data/p60.sqlite3`, and backups go under `data/backups/`. Both are excluded from Git. Backup files have owner-only read/write permissions and UTC timestamps. The reset command always creates a backup when the target already exists, builds a fresh database first, and uses SQLite's backup API to replace it without manual WAL-file deletion.
 
-Use `--db /path/to/test.sqlite3` for a separate database; `PREDICT60_DB` is also supported. The legacy `BTC60_DB` name remains a fallback. For the backup command only, `--backup-dir /path/to/backups` changes the destination. These commands never push, deploy, or send data externally. TRUMP and AVAX remain disabled in the current default seed.
+Use `--db /path/to/test.sqlite3` for a separate database; `PREDICT60_DB` is also supported. `P60_DB` is also supported, with legacy `BTC60_DB` as the final environment fallback. If no database path is configured and `data/p60.sqlite3` does not exist, an existing `data/btc60.sqlite3` remains in use. For the backup command only, `--backup-dir /path/to/backups` changes the destination. These commands never push, deploy, or send data externally. TRUMP and AVAX remain disabled in the current default seed.
 
 A reset invalidates all sessions and removes all users, prediction records, settlements, and custom coin edits. The backup retains the previous state. It is never run implicitly by `init` or server startup.
 

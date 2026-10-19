@@ -84,7 +84,7 @@ python3 scripts/restart-server.py --port 8080
 
 The watchdog restarts the server three seconds after it exits. Both processes
 inherit your environment (including API keys and `PREDICT60_DB`), and append output to
-`/tmp/btc60/server.log`. Only one watchdog can run for this checkout.
+`/tmp/p60/server.log`. Only one watchdog can run for this checkout.
 
 To stop intentionally:
 
@@ -113,7 +113,7 @@ python3 scripts/restart-server.py --log-level normal
 ```
 
 `warning` and `error` levels are also available. The selected level survives
-watchdog restarts. Logs go to `/tmp/btc60/server.log`, with automatic rotation at
+watchdog restarts. Logs go to `/tmp/p60/server.log`, with automatic rotation at
 10 MiB and five numbered backups (`server.log.1` is newest). The watchdog captures
 server stdout/stderr, so unexpected crashes are retained. Each write opens the
 current log under a shared lock, allowing safe rotation while the server runs.
@@ -176,7 +176,7 @@ Tests cover market calculations, catalog/bootstrap behavior, portfolio summaries
 
 ## Data and catalog
 
-The default database remains `data/btc60.sqlite3`; `PREDICT60_DB` selects another path. The legacy filename and `BTC60_*` environment variables remain supported so existing installations retain their accounts, logs, and configuration. Startup creates missing tables and applies catalog migrations. Accounts start with $14,250 in demo funds. Browser-only positions are not imported. Database files and backups are excluded from Git.
+New installations use `data/p60.sqlite3`; `PREDICT60_DB` or `P60_DB` selects another path. Existing `data/btc60.sqlite3` databases remain in use when the new default does not exist. Legacy `BTC60_*` environment variables remain fallbacks after `PREDICT60_*` and `P60_*`. Session cookies and browser theme storage now use the `p60_` prefix; users must sign in again and reselect their theme after upgrading. Startup creates missing tables and applies catalog migrations. Accounts start with $14,250 in demo funds. Browser-only positions are not imported. Database files and backups are excluded from Git.
 
 The database `coins` table is authoritative. The crypto seed has ten records: BTC, ETH, SOL, XRP, DOGE, ADA, and LTC enabled; LINK, TRUMP, and AVAX disabled. Existing databases can have administrator edits. Triggers allow at most eight enabled instruments per category. Disabling a coin blocks new orders while preserving history and settlement. Keep referenced symbols and product mappings stable.
 

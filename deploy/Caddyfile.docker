@@ -1,0 +1,18 @@
+{$P60_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src 'self' https://api.exchange.coinbase.com wss://ws-feed.exchange.coinbase.com; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+		Permissions-Policy "camera=(), geolocation=(), microphone=()"
+		-Server
+	}
+
+	reverse_proxy app:8000 {
+		# Send one canonical address; the app trusts only this proxy container address.
+		header_up X-Forwarded-For {remote_host}
+		health_uri /healthz
+		health_interval 30s
+		health_timeout 5s
+	}
+}

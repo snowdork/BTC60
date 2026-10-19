@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from btc60_logging import BACKUPS, LOG_PATH, MAX_BYTES, write_or_rotate
+from p60_logging import BACKUPS, LOG_PATH, MAX_BYTES, write_or_rotate
 
 
 def main():

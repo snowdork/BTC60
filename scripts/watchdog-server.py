@@ -11,7 +11,7 @@ import threading
 from server_control import DATA, ROOT, STOP
 
 sys.path.insert(0, str(ROOT))
-from btc60_logging import configure, write_or_rotate
+from p60_logging import configure, write_or_rotate
 
 
 def main():
