@@ -19,3 +19,20 @@ body[data-category="oil"]{--surface:#221c16;--raised:#2d251d;--border:#d4ad7333;
 .category-instruments{display:flex;flex-wrap:wrap;gap:6px;width:100%;margin-top:18px}.category-instrument{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font:10px monospace;color:var(--text)}.category-card[data-category="oil"] .category-instruments{display:grid;grid-template-columns:1fr}.category-quote{font-size:10px;font-weight:400;color:var(--muted)}.category-quote[data-state="live"]{color:var(--category-accent);font-variant-numeric:tabular-nums}
 .feed-message{padding:10px 12px;border:1px solid var(--amber);border-radius:6px;color:var(--amber);font-size:11px;line-height:1.5;margin:6px 0 10px}.feed-message[hidden]{display:none}
 @media(max-width:650px){.category-main{padding-top:28px!important}.category-card{min-height:0}.category-intro h1{letter-spacing:-1.3px}.category-options{gap:16px}.category-card h2{font-size:34px}.category-intro p{font-size:13px}}
+
+/* Prominent account choices on the welcome screen. */
+.welcome-auth{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin-bottom:48px}
+.welcome-auth-choice{display:flex;flex-direction:column;align-items:center;gap:14px;padding:30px 24px;text-align:center;text-decoration:none;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:20px;transition:transform .15s,border-color .15s,background .15s}
+.welcome-auth-icon{display:grid;place-items:center;width:80px;height:80px;border-radius:20px;background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green)}
+.welcome-auth-icon svg{width:46px;height:46px}
+.welcome-auth-choice strong{font-size:26px}
+.welcome-auth-choice>span:last-child{font-size:13px;line-height:1.6;color:var(--muted)}
+.welcome-auth-choice:hover{transform:translateY(-3px);border-color:var(--green);background:var(--raised)}
+.welcome-auth-choice:focus-visible{outline:3px solid var(--green);outline-offset:5px}
+@media(max-width:650px){.welcome-auth{grid-template-columns:1fr;gap:16px;margin-bottom:32px}.welcome-auth-choice{padding:24px}}
+@media(prefers-reduced-motion:reduce){.welcome-auth-choice{transition:none}.welcome-auth-choice:hover{transform:none}}
+
+.category-card[data-availability="coming_soon"]{border-style:dashed}
+.category-card[data-availability="coming_soon"]:hover{transform:none;box-shadow:none}
+.category-card[data-availability="coming_soon"] .category-action{color:var(--category-accent)}
+[data-theme="light"] .category-card[data-category="weather"]{--category-accent:#286da8!important}

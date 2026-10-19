@@ -1,6 +1,6 @@
-# BTC60 user guide
+# Predict60 user guide
 
-BTC60 lets you make crypto direction predictions with demo funds. Prices and results use Coinbase proxies; no real money is traded.
+Predict60 lets you make crypto direction predictions with demo funds. Prices and results use Coinbase proxies; no real money is traded.
 
 ## Start and sign in
 
@@ -59,19 +59,23 @@ The sun/moon button switches themes and saves your preference across tabs. On sm
 
 For setup and checks, see [README.md](../README.md). For backups and database maintenance, see [Database maintenance](DATABASE_MAINTENANCE.md). A database reset removes accounts and predictions; it is not a routine troubleshooting step.
 
-## Choose Oil or Crypto
+## Choose a market
 
-Open the entry screen and select the large **Oil** or **Crypto** button. Both use
-the same 60 minute playfield, with 15-, 30-, and 60-minute prediction intervals.
-Use **Categories** in the terminal header to switch markets.
+Open the entry screen and select **Crypto** to use the 60 minute playfield, with
+15-, 30-, and 60-minute prediction intervals. Oil and Weather are shown as
+**Coming soon** and cannot open a prediction terminal. Use **Categories** in the
+terminal header to return to the market list.
 
-Oil has five crude types: WTI, Brent, Dubai, Oman, and Bonny Light. Its amber
-background distinguishes it from Crypto's green background. New oil predictions use **live Twelve Data spot prices**, quoted in USD per barrel.
+Oil has five planned crude types: WTI, Brent, Dubai, Oman, and Bonny Light. Its amber
+card distinguishes it from Crypto's green background. Oil predictions are paused
+until a verified, settlement-capable data feed is ready.
 WTI and Brent have verified feed mappings. Dubai, Oman, and Bonny Light show
-unavailable until a matching feed is connected. The category screen displays
-connection readiness and real quotes when available. If the key or subscription
-is missing, oil prices remain unavailable. Quotes update minutely; closed sessions
-and stale quotes block predictions. Old simulated bets retain their original source. Crypto continues to use Coinbase prices when connected.
+unavailable until a matching feed is connected. The category screen does not
+request quotes while Oil is dormant. Development diagnostics can still exercise
+the feed adapters. If the key or subscription
+is missing, oil prices remain unavailable. The adapter expects minute updates and
+rejects closed sessions and stale quotes during diagnostics. Old simulated bets
+retain their original source. Crypto continues to use Coinbase prices when connected.
 
 Your account balance is shared. Portfolio history identifies the category of each
 prediction; choose a category to filter history and statistics. Log in or sign up,

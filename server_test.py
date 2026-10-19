@@ -17,7 +17,7 @@ class AccountsTest(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory()
         server.DB = Path(cls.temp.name) / 'test.sqlite3'
         server.initialize()
-        cls.http = server.ThreadingHTTPServer(('127.0.0.1', 0), server.Handler)
+        cls.http = server.Predict60HTTPServer(('127.0.0.1', 0), server.Handler)
         threading.Thread(target=cls.http.serve_forever, daemon=True).start()
 
     @classmethod
@@ -27,16 +27,120 @@ class AccountsTest(unittest.TestCase):
         cls.temp.cleanup()
         cls.oil_config.stop()
 
-    def request(self, method, path, data=None, cookie='', csrf=''):
+    def request(self, method, path, data=None, cookie='', csrf='', extra_headers=None):
         conn = http.client.HTTPConnection('127.0.0.1', self.http.server_port)
         headers = {'Content-Type': 'application/json', 'Cookie': cookie, 'X-CSRF-Token': csrf}
+        headers.update(extra_headers or {})
         conn.request(method, path, json.dumps(data) if data is not None else None, headers)
         response = conn.getresponse()
         raw = response.read()
+        self.last_headers = dict(response.getheaders())
         payload = json.loads(raw) if response.getheader('Content-Type', '').startswith('application/json') else raw
         result = response.status, payload, response.getheader('Set-Cookie', '').split(';')[0]
         conn.close()
         return result
+
+    def test_health_check_verifies_database(self):
+        status, payload, _ = self.request('GET', '/healthz')
+        self.assertEqual((status, payload), (200, {'ok': True}))
+        self.assertEqual(self.last_headers['Cache-Control'], 'no-store')
+
+    def test_https_origin_sets_matching_secure_login_and_logout_cookies(self):
+        with patch.dict(server.os.environ, {'P60_HOST': 'https://predict60.com'}, clear=True):
+            status, _, cookie = self.request('POST', '/api/signup', {
+                'name': 'Secure', 'email': 'secure@example.com', 'password': 'strong-password-secure',
+            })
+            self.assertEqual(status, 200)
+            login_cookie = self.last_headers['Set-Cookie']
+            for attribute in ('HttpOnly', 'SameSite=Lax', 'Path=/', 'Max-Age=604800', 'Secure'):
+                self.assertIn(attribute, login_cookie)
+            self.assertEqual(self.last_headers['Strict-Transport-Security'],
+                             'max-age=31536000')
+            csrf = self.request('GET', '/api/account', cookie=cookie)[1]['csrf']
+            self.assertEqual(self.request('POST', '/api/logout', {}, cookie, csrf)[0], 200)
+            logout_cookie = self.last_headers['Set-Cookie']
+            for attribute in ('HttpOnly', 'SameSite=Lax', 'Path=/', 'Max-Age=0', 'Secure'):
+                self.assertIn(attribute, logout_cookie)
+
+    def test_local_http_cookie_is_not_forced_secure(self):
+        with patch.dict(server.os.environ, {}, clear=True):
+            self.assertNotIn('Secure', server.session_cookie('token', 60))
+        with patch.dict(server.os.environ, {'P60_SECURE_COOKIES': 'true'}, clear=True):
+            self.assertIn('Secure', server.session_cookie('token', 60))
+
+    def test_deployment_environment_validation(self):
+        valid = {
+            'P60_HOST': 'https://predict60.com',
+            'P60_TRUSTED_PROXIES': '127.0.0.1,::1',
+            'P60_SECURE_COOKIES': 'true',
+        }
+        with patch.dict(server.os.environ, valid, clear=True):
+            server.validate_environment()
+        for variable, value in (
+            ('P60_HOST', 'https://predict60.com/path'),
+            ('P60_HOST', 'https://predict60.com/'),
+            ('P60_HOST', 'ftp://predict60.com'),
+            ('P60_TRUSTED_PROXIES', 'not-an-ip'),
+            ('P60_SECURE_COOKIES', 'sometimes'),
+        ):
+            with self.subTest(variable=variable, value=value), patch.dict(
+                    server.os.environ, {variable: value}, clear=True):
+                with self.assertRaises(ValueError):
+                    server.validate_environment()
+
+    def test_forwarded_client_is_used_only_from_a_trusted_proxy(self):
+        server.AUTH_ATTEMPTS.clear()
+        headers = {'X-Forwarded-For': '203.0.113.25'}
+        with patch.dict(server.os.environ, {'P60_TRUSTED_PROXIES': '127.0.0.1'}, clear=True):
+            self.request('POST', '/api/login', {
+                'email': 'missing@example.com', 'password': 'wrong-password',
+            }, extra_headers=headers)
+        self.assertIn('203.0.113.25', server.AUTH_ATTEMPTS)
+        self.assertNotIn('127.0.0.1', server.AUTH_ATTEMPTS)
+        server.AUTH_ATTEMPTS.clear()
+        with patch.dict(server.os.environ, {}, clear=True):
+            self.request('POST', '/api/login', {
+                'email': 'missing@example.com', 'password': 'wrong-password',
+            }, extra_headers=headers)
+        self.assertIn('127.0.0.1', server.AUTH_ATTEMPTS)
+
+    def test_public_origin_override_accepts_https_and_rejects_other_origins(self):
+        with patch.dict('os.environ', {'P60_HOST': 'https://predict60.com'}):
+            for path in ('/api/signup', '/api/login', '/api/logout', '/api/predictions'):
+                for origin, expected in (
+                    ('https://predict60.com', 415),
+                    ('http://predict60.com', 403),
+                    ('https://predict60.com.evil.example', 403),
+                    ('https://evil.example', 403),
+                    ('null', 403),
+                    (f'http://127.0.0.1:{self.http.server_port}', 403),
+                ):
+                    with self.subTest(path=path, origin=origin):
+                        # Unsupported content type proves accepted origins reach the next validation.
+                        status, _, _ = self.request('POST', path, {}, extra_headers={
+                            'Origin': origin, 'Content-Type': 'text/plain',
+                        })
+                        self.assertEqual(status, expected)
+
+    def test_origin_default_and_absent_origin_preserve_existing_behavior(self):
+        for configuration in (None, ''):
+            with patch.dict('os.environ'):
+                if configuration is None:
+                    server.os.environ.pop('P60_HOST', None)
+                else:
+                    server.os.environ['P60_HOST'] = configuration
+                for origin, expected in (
+                    (f'http://127.0.0.1:{self.http.server_port}', 415),
+                    ('https://predict60.com', 403),
+                    (None, 415),
+                ):
+                    with self.subTest(configuration=configuration, origin=origin):
+                        headers = {'Content-Type': 'text/plain'}
+                        if origin is not None:
+                            headers['Origin'] = origin
+                        self.assertEqual(self.request('POST', '/api/login', {}, extra_headers=headers)[0], expected)
+        with patch.dict('os.environ', {'P60_HOST': 'https://predict60.com'}):
+            self.assertEqual(self.request('POST', '/api/login', {}, extra_headers={'Content-Type': 'text/plain'})[0], 415)
 
     def test_account_prediction_settlement_lifecycle(self):
         status, _, cookie = self.request('POST', '/api/signup', {'name': '<Test>', 'email': 'one@example.com', 'password': 'strong-password-123'})
@@ -108,10 +212,13 @@ class AccountsTest(unittest.TestCase):
             self.assertEqual(status, 400)
             self.assertEqual(self.request('GET', '/api/account', cookie=cookie)[1]['user']['balance_cents'], balance)
 
-    def test_oil_categories_prices_orders_and_settlements(self):
+    def test_oil_is_coming_soon_while_feed_diagnostics_remain_available(self):
         categories = self.request('GET', '/api/categories')[1]['categories']
         self.assertEqual({c['id'] for c in categories}, {'crypto', 'oil', 'weather'})
-        self.assertEqual(next(c for c in categories if c['id'] == 'oil')['instrumentCount'], 5)
+        oil_category = next(c for c in categories if c['id'] == 'oil')
+        self.assertEqual(oil_category['instrumentCount'], 5)
+        self.assertEqual(oil_category['availability'], 'coming_soon')
+        self.assertFalse(oil_category['tradable'])
         oil = [c for c in self.request('GET', '/api/coins')[1]['coins'] if c['category'] == 'oil']
         self.assertEqual({c['symbol'] for c in oil}, {'WTI', 'BRENT', 'DUBAI', 'OMAN', 'BONNY'})
         self.assertTrue(all(c['feed'] == 'twelvedata' and c['unit'] == 'USD/barrel' for c in oil))
@@ -132,27 +239,14 @@ class AccountsTest(unittest.TestCase):
             self.assertEqual(self.request('GET', f'/api/candles?coin=WTI&start=0&end={now}')[0], 400)
             _, _, cookie = self.request('POST', '/api/signup', {'name':'Oil player', 'email':'oil@example.com', 'password':'strong-password-oil'})
             account = self.request('GET', '/api/account', cookie=cookie)[1]
-            user_id, csrf = account['user']['id'], account['csrf']
-            close, strike = server.candle_close('WTI', start+3600), server.candle_close('WTI', start)
-            side = 'up' if close >= strike else 'down'
-            order = {'coin':'WTI', 'marketId':'60-0', 'side':side, 'budget':50, 'requestId':'oil-test-request-0001', 'startsAt':start*1000}
-            status, account, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
-            self.assertEqual(status, 201, account)
-            self.assertEqual(account['predictions'][0]['category'], 'oil')
-            self.assertEqual(account['predictions'][0]['strike'], strike)
-            self.assertEqual(account['user']['balance_cents'], 1420000)
-            self.assertEqual(self.request('POST', '/api/predictions', order, cookie, csrf)[1]['user']['balance_cents'], 1420000)
-            with server.connect() as conn:
-                with self.assertRaises(sqlite3.IntegrityError):
-                    conn.execute("UPDATE coins SET demo_base=100 WHERE symbol='WTI'")
-        with patch('server.time.time', return_value=start+3606), patch('server.live_oil.candles',side_effect=history), patch('server.urllib.request.urlopen', side_effect=AssertionError('Oil settlement must use the selected provider')):
-            server.settle_due(user_id)
-            server.settle_due(user_id)
+            csrf = account['csrf']
+            order = {'coin':'WTI', 'marketId':'60-0', 'side':'up', 'budget':50, 'requestId':'oil-test-request-0001', 'startsAt':start*1000}
+            status, error, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
+            self.assertEqual(status, 400)
+            self.assertEqual(error['error'], 'Oil predictions are coming soon.')
             account = self.request('GET', '/api/account', cookie=cookie)[1]
-        settled = account['predictions'][0]
-        self.assertEqual(settled['close_price'], close)
-        self.assertIn('Twelve Data live oil', settled['source'])
-        self.assertEqual(account['user']['balance_cents'], 1420000+settled['payout_cents'])
+            self.assertEqual(account['user']['balance_cents'], 1425000)
+            self.assertEqual(account['predictions'], [])
 
     def test_live_oil_missing_key_and_unavailable_grades_do_not_return_fake_prices(self):
         with patch.dict(server.os.environ,{},clear=True),patch('server.urllib.request.urlopen') as network:
@@ -280,11 +374,41 @@ class AccountsTest(unittest.TestCase):
         _, account, cookie = self.request('POST', '/api/signup', {
             'name': 'Market access', 'email': 'market-access@example.com',
             'password': 'strong-password-123'})
-        self.assertEqual(self.request('GET', '/index.html?category=oil', cookie=cookie)[0], 200)
+        self.assertEqual(self.request('GET', '/index.html?category=oil', cookie=cookie)[0], 302)
         self.assertEqual(self.request('GET', '/categories.html', cookie=cookie)[0], 200)
+        for path in ['/', '/welcome.html']:
+            conn = http.client.HTTPConnection('127.0.0.1', self.http.server_port)
+            conn.request('GET', path, headers={'Cookie': cookie})
+            response = conn.getresponse()
+            response.read()
+            self.assertEqual(response.status, 302)
+            self.assertEqual(response.getheader('Location'), '/categories.html')
+            self.assertEqual(response.getheader('Cache-Control'), 'no-store')
+            conn.close()
         _, account, _ = self.request('GET', '/api/account', cookie=cookie)
         self.assertEqual(self.request('POST', '/api/logout', {}, cookie, account['csrf'])[0], 200)
         self.assertEqual(self.request('GET', '/index.html', cookie=cookie)[0], 302)
+        self.assertEqual(self.request('GET', '/welcome.html', cookie=cookie)[0], 200)
+
+    def test_community_counts_track_unique_recent_sessions(self):
+        before = self.request('GET', '/api/community')[1]
+        _, _, cookie = self.request('POST', '/api/signup', {
+            'name': 'Community member', 'email': 'community@example.com',
+            'password': 'strong-password-123'})
+        counts = self.request('GET', '/api/community', cookie=cookie)[1]
+        self.assertEqual(counts['users'], before['users'] + 1)
+        self.assertEqual(counts['activeUsers'], before['activeUsers'] + 1)
+        with server.connect() as conn:
+            user_id = conn.execute("SELECT id FROM users WHERE email='community@example.com'").fetchone()[0]
+            conn.execute("INSERT INTO sessions(token_hash,user_id,csrf,expires_at,last_seen_at) VALUES('second-community-session',?,'csrf',?,?)", (user_id, int(server.time.time())+600, int(server.time.time())))
+        self.assertEqual(self.request('GET', '/api/community')[1]['activeUsers'], counts['activeUsers'])
+        with server.connect() as conn:
+            conn.execute('UPDATE sessions SET last_seen_at=? WHERE user_id=?', (int(server.time.time())-301, user_id))
+        self.assertEqual(self.request('GET', '/api/community')[1]['activeUsers'], before['activeUsers'])
+        self.assertEqual(self.request('GET', '/api/community', cookie=cookie)[1]['activeUsers'], counts['activeUsers'])
+        _, account, _ = self.request('GET', '/api/account', cookie=cookie)
+        self.request('POST', '/api/logout', {}, cookie, account['csrf'])
+        self.assertEqual(self.request('GET', '/api/community')[1]['activeUsers'], before['activeUsers'])
 
     def test_private_files_not_served(self):
         for path in ['/data/btc60.sqlite3', '/server.py', '/.git/config', '/%2e%2e/server.py']:

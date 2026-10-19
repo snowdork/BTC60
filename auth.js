@@ -1,3 +1,6 @@
+/** @module auth
+ * Submit login and signup forms and route successful authentication to categories.
+ */
 (() => {
   const form=document.getElementById('auth-form'),error=document.getElementById('auth-error');
   form.addEventListener('submit',async event=>{

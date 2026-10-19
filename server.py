@@ -1,7 +1,8 @@
-"""Local BTC60 demo server: SQLite accounts, sessions, orders and settlements."""
+"""Local Predict60 demo server: SQLite accounts, sessions, orders and settlements."""
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal, ROUND_CEILING
 import argparse
+import ipaddress
 import odds
 import simulated_prices
 import live_oil
@@ -28,16 +29,110 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-DB = Path(os.environ.get('BTC60_DB', str(ROOT / 'data' / 'btc60.sqlite3')))
+DB = Path(os.environ.get('PREDICT60_DB') or os.environ.get('BTC60_DB') or ROOT / 'data' / 'btc60.sqlite3')
 QUOTES = {'60-0': 68, '30-0': 54, '30-1': 58, '15-0': 49, '15-1': 57, '15-2': 62, '15-3': 50}
+COMING_SOON_CATEGORIES = {'oil', 'weather'}
 AUTH_ATTEMPTS = {}
 AUTH_LOCK = threading.Lock()
 SETTLE_LOCK = threading.Lock()
 STATIC_CACHE = {}
 LOG = logging.getLogger(__name__)
+PUBLIC_FILES = {
+    'account.js',
+    'app.js',
+    'auth.css',
+    'auth.js',
+    'bootstrap.js',
+    'btc-chart.js',
+    'categories.css',
+    'categories.html',
+    'categories.js',
+    'coins.js',
+    'community.js',
+    'index.html',
+    'login.html',
+    'market-model.js',
+    'portfolio-model.js',
+    'portfolio.css',
+    'portfolio.html',
+    'portfolio.js',
+    'responsive.css',
+    'signup.html',
+    'styles.css',
+    'theme.css',
+    'theme.js',
+    'welcome.css',
+    'welcome.html',
+}
+
+
+def configured_public_origin():
+    """Return and validate the optional exact browser origin used behind a proxy."""
+    origin = os.environ.get('P60_HOST', '').strip()
+    if not origin:
+        return ''
+    try:
+        parsed = urllib.parse.urlsplit(origin)
+        port = parsed.port  # Force validation of malformed ports.
+    except ValueError as error:
+        raise ValueError(f'Invalid P60_HOST: {error}') from error
+    if (parsed.scheme not in ('http', 'https') or not parsed.hostname
+            or parsed.username or parsed.password or parsed.path
+            or parsed.query or parsed.fragment):
+        raise ValueError('P60_HOST must be an exact http(s) origin with no path, credentials, query, or fragment.')
+    default_port = 443 if parsed.scheme == 'https' else 80
+    expected_netloc = parsed.hostname if port in (None, default_port) else f'{parsed.hostname}:{port}'
+    if ':' in parsed.hostname:
+        expected_netloc = f'[{parsed.hostname}]' if port in (None, default_port) else f'[{parsed.hostname}]:{port}'
+    normalized = f'{parsed.scheme}://{expected_netloc}'
+    if origin != normalized:
+        raise ValueError(f'P60_HOST must use its normalized form: {normalized}')
+    return origin
+
+
+def trusted_proxies():
+    """Parse explicitly trusted reverse-proxy addresses from the environment."""
+    configured = os.environ.get('P60_TRUSTED_PROXIES', '').strip()
+    if not configured:
+        return set()
+    try:
+        return {str(ipaddress.ip_address(value.strip())) for value in configured.split(',') if value.strip()}
+    except ValueError as error:
+        raise ValueError(f'Invalid P60_TRUSTED_PROXIES: {error}') from error
+
+
+def secure_session_cookies():
+    """Require HTTPS-only cookies whenever the configured public origin uses HTTPS."""
+    override = os.environ.get('P60_SECURE_COOKIES', '').strip().lower()
+    if override not in ('', '0', '1', 'false', 'true', 'no', 'yes'):
+        raise ValueError('P60_SECURE_COOKIES must be true/false or 1/0.')
+    return configured_public_origin().startswith('https://') or override in ('1', 'true', 'yes')
+
+
+def session_cookie(value, max_age):
+    """Build matching login/logout cookie attributes for the current deployment."""
+    attributes = [f'btc60_session={value}', 'HttpOnly', 'SameSite=Lax', 'Path=/', f'Max-Age={max_age}']
+    if secure_session_cookies():
+        attributes.append('Secure')
+    return '; '.join(attributes)
+
+
+def validate_environment():
+    """Fail startup before binding when deployment security settings are malformed."""
+    configured_public_origin()
+    trusted_proxies()
+    secure_session_cookies()
+
+
+class Predict60HTTPServer(ThreadingHTTPServer):
+    """Bounded, promptly terminating HTTP server intended for loopback proxying."""
+    daemon_threads = True
+    request_queue_size = 128
+    allow_reuse_address = True
 
 
 def connect():
+    """Open the configured SQLite database with foreign keys and a 15-second busy timeout."""
     conn = sqlite3.connect(DB, timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA foreign_keys=ON')
@@ -45,6 +140,7 @@ def connect():
 
 
 def initialize():
+    """Create missing tables and apply idempotent catalog migrations while preserving saved accounts and orders."""
     DB.parent.mkdir(parents=True, exist_ok=True)
     with connect() as conn:
         seed_coins = not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='coins'").fetchone()
@@ -90,9 +186,12 @@ def initialize():
         BEGIN SELECT RAISE(ABORT,'Coin has predictions; preserve its symbol'); END;
         CREATE INDEX IF NOT EXISTS predictions_user ON predictions(user_id,created_at);
         ''')
+        if 'last_seen_at' not in {row['name'] for row in conn.execute('PRAGMA table_info(sessions)')}:
+            conn.execute('ALTER TABLE sessions ADD COLUMN last_seen_at INTEGER NOT NULL DEFAULT 0')
         if seed_coins:
             for coin in json.loads((ROOT / 'coins.seed.json').read_text()):
                 conn.execute('INSERT INTO coins(symbol,name,product,precision,demo_base,icon,enabled,sort_order) VALUES(?,?,?,?,?,?,?,?)', (coin['symbol'],coin['name'],coin['product'],coin['precision'],coin['demoBase'],coin['icon'],int(coin['enabled']),coin['sortOrder']))
+        # Apply this migration once; saved prediction sources and account state must survive restarts.
         if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=1').fetchone():
             # Add new catalog entries once, preserving administrator changes on restart.
             for coin in json.loads((ROOT / 'coins.seed.json').read_text())[5:]:
@@ -101,6 +200,7 @@ def initialize():
                 room = conn.execute('SELECT count(*) FROM coins WHERE enabled=1').fetchone()[0] < 8
                 conn.execute('INSERT INTO coins(symbol,name,product,precision,demo_base,icon,enabled,sort_order) VALUES(?,?,?,?,?,?,?,?)', (coin['symbol'],coin['name'],coin['product'],coin['precision'],coin['demoBase'],coin['icon'],int(coin['enabled'] and room),coin['sortOrder']))
             conn.execute('INSERT INTO catalog_migrations VALUES(1)')
+        # Apply this migration once; saved prediction sources and account state must survive restarts.
         if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=2').fetchone():
             conn.execute("UPDATE coins SET enabled=0 WHERE symbol='LINK'")
             coin = next(c for c in json.loads((ROOT / 'coins.seed.json').read_text()) if c['symbol']=='LTC')
@@ -111,6 +211,7 @@ def initialize():
 
         # Add categories without rebuilding existing accounts or prediction tables.
         conn.execute('CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL, icon TEXT NOT NULL, accent TEXT NOT NULL, background TEXT NOT NULL, unit TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0)')
+        # Insert missing category metadata without overwriting administrator customizations.
         for category in json.loads((ROOT / 'categories.seed.json').read_text()):
             conn.execute('INSERT OR IGNORE INTO categories VALUES(?,?,?,?,?,?,?,?)', (category['id'],category['name'],category['description'],category['icon'],category['accent'],category['background'],category['unit'],category['sortOrder']))
         columns = {row['name'] for row in conn.execute('PRAGMA table_info(coins)')}
@@ -145,6 +246,7 @@ def initialize():
         BEGIN SELECT RAISE(ABORT,'Category has instruments; preserve its id'); END;
         CREATE INDEX IF NOT EXISTS coins_category ON coins(category,enabled,sort_order);
         """)
+        # Apply this migration once; saved prediction sources and account state must survive restarts.
         if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=3').fetchone():
             for instrument in json.loads((ROOT / 'oil.seed.json').read_text()):
                 conn.execute('INSERT INTO coins(symbol,name,product,precision,demo_base,icon,enabled,sort_order,category,feed,unit) VALUES(?,?,?,?,?,?,?,?,?,?,?)', (instrument['symbol'],instrument['name'],instrument['product'],instrument['precision'],instrument['demoBase'],instrument['icon'],int(instrument['enabled']),instrument['sortOrder'],instrument['category'],instrument['feed'],instrument['unit']))
@@ -158,11 +260,13 @@ def initialize():
           prediction_id TEXT PRIMARY KEY REFERENCES predictions(id), provider TEXT NOT NULL,
           product TEXT NOT NULL);
         """)
+        # Apply this migration once; saved prediction sources and account state must survive restarts.
         if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=4').fetchone():
             for row in conn.execute("SELECT symbol FROM coins WHERE category='oil'").fetchall():
                 conn.execute('INSERT OR IGNORE INTO instrument_sources VALUES(?,?,?)',(row['symbol'],'twelvedata',live_oil.SYMBOLS.get(row['symbol'],'')))
             conn.execute('INSERT INTO catalog_migrations VALUES(4)')
 
+        # Apply this migration once; saved prediction sources and account state must survive restarts.
         if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=5').fetchone():
             conn.executescript("""
             ALTER TABLE instrument_sources RENAME TO instrument_sources_v4;
@@ -182,6 +286,7 @@ def initialize():
 
 
 def instrument_source(coin, legacy=False):
+    """Resolve the authoritative feed and product, optionally retaining the legacy settlement source."""
     with connect() as conn:
         row=conn.execute('SELECT symbol,product,feed,demo_base,category FROM coins WHERE symbol=?',(coin,)).fetchone()
         override=None if legacy else conn.execute('SELECT provider,product FROM instrument_sources WHERE coin=?',(coin,)).fetchone()
@@ -194,6 +299,7 @@ def instrument_source(coin, legacy=False):
 
 
 def candle_close(coin, boundary, source=None):
+    """Fetch the exact closing benchmark immediately before a UTC interval boundary; fail if it is unavailable."""
     record=source or instrument_source(coin)
     if record['feed']=='oilpriceapi':
         raise ValueError('OilPriceAPI spot feed has no minute benchmark for this interval.')
@@ -208,7 +314,7 @@ def candle_close(coin, boundary, source=None):
     start = datetime.fromtimestamp(boundary - 60, timezone.utc).isoformat()
     end = datetime.fromtimestamp(boundary, timezone.utc).isoformat()
     query = urllib.parse.urlencode({'granularity': 60, 'start': start, 'end': end})
-    request = urllib.request.Request(f'https://api.exchange.coinbase.com/products/{product}/candles?{query}', headers={'User-Agent': 'BTC60-local-demo/1.0'})
+    request = urllib.request.Request(f'https://api.exchange.coinbase.com/products/{product}/candles?{query}', headers={'User-Agent': 'Predict60-local-demo/1.0'})
     with urllib.request.urlopen(request, timeout=8) as response:
         candles = json.load(response)
     for candle in candles:
@@ -218,6 +324,7 @@ def candle_close(coin, boundary, source=None):
 
 
 def fresh_spot(coin, source=None):
+    """Return a validated current quote; reject stale data and providers without tradable benchmarks."""
     record=source or instrument_source(coin)
     if record['feed']=='oilpriceapi':
         return oilprice_api.fresh_spot(record['product'])
@@ -226,7 +333,7 @@ def fresh_spot(coin, source=None):
     if record['feed']=='simulated':
         return simulated_prices.price(coin, record['demo_base'], int(time.time()))
     product = record['product']
-    request = urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/ticker', headers={'User-Agent':'BTC60-local-demo/1.0'})
+    request = urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/ticker', headers={'User-Agent':'Predict60-local-demo/1.0'})
     try:
         with urllib.request.urlopen(request, timeout=8) as response:
             ticker = json.load(response)
@@ -242,6 +349,7 @@ def fresh_spot(coin, source=None):
 
 
 def estimated_up(strike, spot, now, start, end, volatility, calibration=None):
+    """Calculate the integer Up purchase probability from validated provider history and current price."""
     return max(1, min(99, math.floor(100*odds.probability(strike, spot, now, end, volatility, calibration)+.5)))
 
 
@@ -250,6 +358,7 @@ HISTORY_LOCK = threading.Lock()
 
 
 def pricing_history(product, now, instrument=None):
+    """Load and combine provider minute history for the trailing volatility window."""
     if instrument and instrument['feed']=='oilpriceapi':
         return oilprice_api.candles(product,0,0)
     if instrument and instrument['feed']=='twelvedata':
@@ -272,9 +381,10 @@ def pricing_history(product, now, instrument=None):
     ranges = [(previous[1]-60,boundary)] if previous else [(boundary-(i+1)*14400,boundary-i*14400) for i in range(6)]
 
     def fetch_batch(interval):
+        """Fetch one historical candle batch for the pricing-history aggregation."""
         start,end=interval
         query=urllib.parse.urlencode({'granularity':60,'start':datetime.fromtimestamp(start,timezone.utc).isoformat(),'end':datetime.fromtimestamp(end,timezone.utc).isoformat()})
-        request=urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/candles?'+query,headers={'User-Agent':'BTC60-local-demo/1.0'})
+        request=urllib.request.Request('https://api.exchange.coinbase.com/products/'+urllib.parse.quote(product,safe='')+'/candles?'+query,headers={'User-Agent':'Predict60-local-demo/1.0'})
         with urllib.request.urlopen(request,timeout=8) as response:
             batch=json.load(response)
         if not isinstance(batch,list):raise ValueError('Invalid pricing history.')
@@ -293,6 +403,7 @@ def pricing_history(product, now, instrument=None):
 
 
 def market_up(coin, strike, spot, now, start, end, source=None):
+    """Compute the executable Up quote for an instrument and prediction interval."""
     instrument=source or instrument_source(coin)
     try:
         volatility = odds.minute_volatility(pricing_history(instrument['product'], now, instrument), now)
@@ -302,6 +413,7 @@ def market_up(coin, strike, spot, now, start, end, source=None):
 
 
 def _settle_due(user_id=None):
+    """Settle due orders from their frozen provider snapshots, crediting each winning payout only once."""
     with connect() as conn:
         pending = conn.execute('SELECT p.* FROM predictions p LEFT JOIN settlements s ON s.prediction_id=p.id WHERE s.prediction_id IS NULL AND p.ends_at<=? AND (? IS NULL OR p.user_id=?)', (int(time.time()) - 5, user_id, user_id)).fetchall()
     prices = {}
@@ -332,6 +444,7 @@ def _settle_due(user_id=None):
 
 
 def settle_due(user_id=None):
+    """Run settlement under a nonblocking process lock so concurrent requests cannot overlap."""
     if SETTLE_LOCK.acquire(blocking=False):
         try:
             _settle_due(user_id)
@@ -340,6 +453,7 @@ def settle_due(user_id=None):
 
 
 def settlement_worker():
+    """Retry pending settlements continuously, logging failures without terminating the worker."""
     while True:
         try:
             settle_due()
@@ -350,14 +464,37 @@ def settlement_worker():
 
 
 class Handler(SimpleHTTPRequestHandler):
+    """Serve allowlisted frontend assets and account, quote, prediction, and community HTTP endpoints."""
     def __init__(self, *args, **kwargs):
+        """Initialize the HTTP handler with this checkout as its static source directory."""
         super().__init__(*args, directory=str(ROOT), **kwargs)
+
+    def setup(self):
+        """Bound the lifetime of stalled backend connections from the local proxy."""
+        super().setup()
+        self.connection.settimeout(30)
+
+    def client_ip(self):
+        """Return a proxy-provided client IP only when the direct peer is trusted."""
+        peer = str(ipaddress.ip_address(self.client_address[0]))
+        if peer not in trusted_proxies():
+            return peer
+        forwarded = self.headers.get('X-Forwarded-For', '').strip()
+        # The deployment proxy overwrites this header with exactly one address.
+        if not forwarded or ',' in forwarded:
+            return peer
+        try:
+            return str(ipaddress.ip_address(forwarded))
+        except ValueError:
+            return peer
 
     def log_message(self, format, *args):
         # Preserve existing HTTP diagnostics in debug mode.
-        LOG.debug('%s %s', self.client_address[0], format % args)
+        """Route HTTP diagnostics to debug logging without writing request bodies or credentials."""
+        LOG.debug('%s %s', self.client_ip(), format % args)
 
     def log_request(self, code='-', size='-'):
+        """Record user actions and server failures while keeping routine polling out of normal logs."""
         path = urllib.parse.urlsplit(self.path).path
         if self.command == 'POST':
             LOG.info('User action method=POST path=%s status=%s', path, code)
@@ -366,12 +503,16 @@ class Handler(SimpleHTTPRequestHandler):
         super().log_request(code, size)
 
     def end_headers(self):
+        """Add browser security headers before completing an HTTP response."""
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'same-origin')
         self.send_header('X-Frame-Options', 'DENY')
+        if secure_session_cookies():
+            self.send_header('Strict-Transport-Security', 'max-age=31536000')
         super().end_headers()
 
     def reply(self, status, payload, cookie=None):
+        """Send a JSON response with no-store caching and an optional session cookie; suppress bodies for HEAD."""
         body = json.dumps(payload).encode()
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
@@ -383,7 +524,16 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command!='HEAD':
             self.wfile.write(body)
 
+    def redirect(self, target):
+        """Send an uncached redirect with an empty response body."""
+        self.send_response(302)
+        self.send_header('Location', target)
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Content-Length', '0')
+        self.end_headers()
+
     def session(self):
+        """Validate the session cookie and expiry, then periodically refresh its activity timestamp."""
         jar = cookies.SimpleCookie()
         try:
             jar.load(self.headers.get('Cookie', ''))
@@ -391,16 +541,36 @@ class Handler(SimpleHTTPRequestHandler):
         except (KeyError, cookies.CookieError):
             return None
         with connect() as conn:
-            return conn.execute('SELECT s.*,u.name,u.email,u.balance_cents FROM sessions s JOIN users u ON u.id=s.user_id WHERE token_hash=? AND expires_at>?', (hashlib.sha256(token.encode()).hexdigest(), int(time.time()))).fetchone()
+            session = conn.execute('SELECT s.*,u.name,u.email,u.balance_cents FROM sessions s JOIN users u ON u.id=s.user_id WHERE token_hash=? AND expires_at>?', (hashlib.sha256(token.encode()).hexdigest(), int(time.time()))).fetchone()
+            if session and session['last_seen_at'] < int(time.time()) - 15:
+                conn.execute('UPDATE sessions SET last_seen_at=? WHERE token_hash=?', (int(time.time()), session['token_hash']))
+            return session
 
     def account(self, session):
+        """Build the signed-in account snapshot with saved predictions, settlement results, and CSRF token."""
         with connect() as conn:
             user = conn.execute('SELECT id,name,email,balance_cents FROM users WHERE id=?', (session['user_id'],)).fetchone()
             positions = [dict(row) for row in conn.execute('SELECT p.*,i.category,i.name AS instrument_name,i.unit,ps.provider AS pricing_source,s.close_price,s.outcome,s.payout_cents,s.settled_at,s.source FROM predictions p JOIN coins i ON i.symbol=p.coin LEFT JOIN prediction_sources ps ON ps.prediction_id=p.id LEFT JOIN settlements s ON s.prediction_id=p.id WHERE p.user_id=? ORDER BY p.created_at DESC', (session['user_id'],))]
         return {'user': dict(user), 'csrf': session['csrf'], 'predictions': positions}
 
     def do_GET(self):
+        """Dispatch read endpoints and enforce authentication and the static-file allowlist."""
         path = urllib.parse.urlsplit(self.path).path
+        if path == '/healthz':
+            try:
+                with connect() as conn:
+                    conn.execute('SELECT 1').fetchone()
+                return self.reply(200, {'ok': True})
+            except (OSError, sqlite3.Error):
+                return self.reply(503, {'ok': False})
+        # Heartbeat valid sessions before counting distinct accounts across tabs/devices.
+        if path == '/api/community':
+            self.session()  # Record this signed-in visitor's heartbeat.
+            now = int(time.time())
+            with connect() as conn:
+                total = conn.execute('SELECT count(*) FROM users').fetchone()[0]
+                active = conn.execute('SELECT count(DISTINCT user_id) FROM sessions WHERE expires_at>? AND last_seen_at>=?', (now, now - 300)).fetchone()[0]
+            return self.reply(200, {'users': total, 'activeUsers': active, 'activeWindowSeconds': 300})
         if path == '/api/categories':
             with connect() as conn:
                 categories = [dict(row) for row in conn.execute('SELECT c.*,count(i.symbol) AS instrumentCount FROM categories c LEFT JOIN coins i ON i.category=c.id AND i.enabled=1 GROUP BY c.id ORDER BY c.sort_order,c.id')]
@@ -414,6 +584,8 @@ class Handler(SimpleHTTPRequestHandler):
                     if any(i['symbol'] in overrides for i in instruments):
                         category.update(provider=oilprice_api.PROVIDER if oilprice_api.configured() else 'Twelve Data',feedState='configured' if oilprice_api.configured() or live_oil.configured() else 'setup_required',supportedCount=sum(bool(overrides.get(i['symbol'])) for i in instruments),quoteCadence='Spot assessments · hourly predictions unavailable' if oilprice_api.configured() else 'Minute updates')
                     else:category.update(provider='Coinbase',feedState='available',supportedCount=len(instruments),quoteCadence='Streaming prices')
+                    if category['id'] in COMING_SOON_CATEGORIES:
+                        category.update(availability='coming_soon', tradable=False)
             return self.reply(200, {'categories':categories})
         if path == '/api/coins':
             with connect() as conn:
@@ -471,29 +643,23 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith('/api/'):
             return self.reply(404, {'error': 'Unknown endpoint.'})
         # Serve only public application assets, never SQLite, source or dotfiles.
-        public = {'index.html', 'categories.html', 'welcome.html', 'login.html', 'signup.html', 'styles.css', 'auth.css', 'auth.js', 'account.js', 'app.js', 'btc-chart.js', 'market-model.js', 'coins.js', 'bootstrap.js', 'splash.js', 'portfolio.html', 'portfolio.js', 'portfolio-model.js', 'portfolio.css', 'theme.js', 'theme.css', 'responsive.css', 'categories.js', 'categories.css', 'welcome.css'}
         relative = urllib.parse.unquote(path).lstrip('/')
         if not relative:
             self.path = '/welcome.html'
-        elif relative not in public and relative not in {'assets/previews/prediction-playfield.png', 'assets/backgrounds/hourly-markets.webp'} and not (re.fullmatch(r'assets/coins/[a-zA-Z0-9_-]+\.svg', relative)):
+        elif relative not in PUBLIC_FILES and relative not in {'assets/previews/prediction-playfield.png', 'assets/backgrounds/hourly-markets.webp'} and not (re.fullmatch(r'assets/coins/[a-zA-Z0-9_-]+\.svg', relative)):
             return self.reply(404, {'error': 'Not found.'})
-        if relative == 'index.html' and urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('category') == ['weather']:
-            self.send_response(302)
-            self.send_header('Location', '/welcome.html')
-            self.send_header('Cache-Control', 'no-store')
-            self.send_header('Content-Length', '0')
-            self.end_headers()
-            return
+        # Returning signed-in visitors enter categories without seeing the guest splash.
+        if relative in {'', 'welcome.html'} and self.session():
+            return self.redirect('/categories.html')
+        if relative == 'index.html' and set(urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('category', [])) & COMING_SOON_CATEGORIES:
+            return self.redirect('/welcome.html')
+        # Protect direct terminal/category URLs independently of client-side navigation.
         if relative in {'index.html', 'categories.html'} and not self.session():
-            self.send_response(302)
-            self.send_header('Location', '/welcome.html')
-            self.send_header('Cache-Control', 'no-store')
-            self.send_header('Content-Length', '0')
-            self.end_headers()
-            return
+            return self.redirect('/welcome.html')
         self.serve_static()
 
     def serve_static(self):
+        """Serve an allowlisted file with gzip, ETag revalidation, and private caching for account entry pages."""
         relative = urllib.parse.unquote(urllib.parse.urlsplit(self.path).path).lstrip('/')
         path = ROOT / relative
         if not path.is_file():
@@ -515,7 +681,7 @@ class Handler(SimpleHTTPRequestHandler):
         body,etag = cached
         unchanged = self.headers.get('If-None-Match')==etag
         self.send_response(304 if unchanged else 200)
-        self.send_header('Cache-Control','private, no-store' if relative in {'index.html', 'categories.html'} else 'public, max-age=0, must-revalidate')
+        self.send_header('Cache-Control','private, no-store' if relative in {'index.html', 'categories.html', 'welcome.html'} else 'public, max-age=0, must-revalidate')
         self.send_header('ETag',etag)
         self.send_header('Vary','Accept-Encoding')
         if not unchanged:
@@ -528,11 +694,15 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
 
     def do_HEAD(self):
+        """Reuse GET routing and headers while suppressing response bodies."""
         self.do_GET()
 
     def do_POST(self):
+        """Validate request origin, JSON size, session, and CSRF token before routing account mutations."""
         origin = self.headers.get('Origin')
-        if origin and origin != f'http://{self.headers.get("Host")}':
+        # Pin the public origin behind HTTPS proxies; retain local behavior without an override.
+        allowed_origin = configured_public_origin() or f'http://{self.headers.get("Host")}'
+        if origin and origin != allowed_origin:
             return self.reply(403, {'error': 'Invalid request origin.'})
         if self.headers.get('Content-Type', '').split(';')[0] != 'application/json':
             return self.reply(415, {'error': 'JSON required.'})
@@ -544,6 +714,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not isinstance(data, dict):
                 raise ValueError('Invalid request.')
             path = urllib.parse.urlsplit(self.path).path
+            # Authentication creates a session; all later mutations require that session and its CSRF token.
             if path in ('/api/signup', '/api/login'):
                 return self.authenticate(path, data)
             session = self.session()
@@ -554,7 +725,7 @@ class Handler(SimpleHTTPRequestHandler):
             if path == '/api/logout':
                 with connect() as conn:
                     conn.execute('DELETE FROM sessions WHERE token_hash=?', (session['token_hash'],))
-                return self.reply(200, {'ok': True}, 'btc60_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0')
+                return self.reply(200, {'ok': True}, session_cookie('', 0))
             if path == '/api/settle':
                 settle_due(session['user_id'])
                 return self.reply(200, self.account(session))
@@ -571,13 +742,14 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(503, {'error': 'Service unavailable. Please try again.'})
 
     def authenticate(self, path, data):
+        """Validate credentials, throttle attempts, create or verify the account, and issue a session cookie."""
         with AUTH_LOCK:
             now = time.time()
             for address in list(AUTH_ATTEMPTS):
                 AUTH_ATTEMPTS[address] = [t for t in AUTH_ATTEMPTS[address] if t > now - 60]
                 if not AUTH_ATTEMPTS[address]:
                     del AUTH_ATTEMPTS[address]
-            attempts = AUTH_ATTEMPTS.setdefault(self.client_address[0], [])
+            attempts = AUTH_ATTEMPTS.setdefault(self.client_ip(), [])
             if len(attempts) >= 20:
                 return self.reply(429, {'error': 'Too many attempts. Try again in a minute.'})
             attempts.append(now)
@@ -604,19 +776,22 @@ class Handler(SimpleHTTPRequestHandler):
                 user_id = user['id']
             token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
             conn.execute('DELETE FROM sessions WHERE expires_at<=?', (int(time.time()),))
-            conn.execute('INSERT INTO sessions VALUES(?,?,?,?)', (hashlib.sha256(token.encode()).hexdigest(), user_id, csrf, int(time.time()) + 604800))
+            conn.execute('INSERT INTO sessions(token_hash,user_id,csrf,expires_at,last_seen_at) VALUES(?,?,?,?,?)', (hashlib.sha256(token.encode()).hexdigest(), user_id, csrf, int(time.time()) + 604800, int(time.time())))
         LOG.info('Authentication action=%s user=%s', path.rsplit('/', 1)[-1], user_id)
-        return self.reply(200, {'ok': True}, f'btc60_session={token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800')
+        return self.reply(200, {'ok': True}, session_cookie(token, 604800))
 
     def predict(self, session, data):
+        """Validate order timing and budget, freeze the provider quote, and atomically debit and save an idempotent order."""
         coin, market_id, side = data.get('coin'), data.get('marketId'), data.get('side')
         budget, request_id = data.get('budget'), data.get('requestId')
         if not isinstance(coin, str) or not isinstance(market_id,str) or not isinstance(side,str):
             raise ValueError('Invalid market or prediction.')
         with connect() as conn:
-            available_coin = conn.execute('SELECT 1 FROM coins WHERE symbol=? AND enabled=1', (coin,)).fetchone()
+            available_coin = conn.execute('SELECT category FROM coins WHERE symbol=? AND enabled=1', (coin,)).fetchone()
         if not available_coin or market_id not in QUOTES or side not in ('up', 'down'):
             raise ValueError('Invalid market or prediction.')
+        if available_coin['category'] in COMING_SOON_CATEGORIES:
+            raise ValueError(f"{available_coin['category'].title()} predictions are coming soon.")
         if isinstance(budget, bool) or not isinstance(budget, (int, float)) or not math.isfinite(budget) or not 1 <= budget <= 1000000:
             raise ValueError('Enter a valid budget.')
         if not isinstance(request_id, str) or not re.fullmatch(r'[a-zA-Z0-9-]{16,80}', request_id):
@@ -669,8 +844,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, default=8000)
     parser.add_argument('--log-level', choices=('normal', 'debug', 'warning', 'error'),
-                        default=os.environ.get('BTC60_LOG_LEVEL', 'normal'))
+                        default=os.environ.get('PREDICT60_LOG_LEVEL') or os.environ.get('BTC60_LOG_LEVEL', 'normal'))
     args = parser.parse_args()
+    try:
+        validate_environment()
+    except ValueError as error:
+        parser.error(str(error))
     configure(args.log_level)
     DB = DB.expanduser().resolve()
     DB.parent.mkdir(parents=True, exist_ok=True)
@@ -682,5 +861,5 @@ if __name__ == '__main__':
             raise SystemExit('Database is in use by a server or maintenance command. Stop it before starting another server.')
         initialize()
         threading.Thread(target=settlement_worker, daemon=True).start()
-        LOG.info('BTC60 local demo: http://127.0.0.1:%s', args.port)
-        ThreadingHTTPServer(('127.0.0.1', args.port), Handler).serve_forever()
+        LOG.info('Predict60 local demo: http://127.0.0.1:%s', args.port)
+        Predict60HTTPServer(('127.0.0.1', args.port), Handler).serve_forever()

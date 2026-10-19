@@ -6,20 +6,28 @@ Reviewed October 14, 2026. This is a source review and local test result, not a 
 
 The frontend is plain HTML/CSS/JavaScript. The API is Python 3.10+ and uses SQLite, not PHP or MySQL/MariaDB. A LAMP VPS can host it if Python services and Apache reverse proxy configuration are permitted. Uploading files into a PHP document root alone does not provide the API.
 
-Suggested architecture: browser → Apache HTTPS → loopback Python API, with SQLite on local persistent storage. Apache can serve only dist/ as its document root and proxy /api/ to the backend. Set DirectoryIndex welcome.html. Never use the repository root as a public document root: it contains backend code, credentials, and database files. Keep the backend running as a dedicated service; it also runs automatic settlement. The current startup permits only one server process per database.
+Suggested architecture: browser → HTTPS reverse proxy → loopback Python API,
+with SQLite on local persistent storage. The supplied deployment uses Caddy to
+proxy the complete application so backend authentication still protects terminal
+pages. An Apache installation can instead serve only `dist/` and proxy `/api/`,
+but must preserve equivalent access controls. Never use the repository root as a
+public document root: it contains backend code and operational files. Keep the
+backend running as a dedicated service; it also runs automatic settlement. The
+current startup permits only one server process per database.
 
 Apache reverse proxy reference: https://httpd.apache.org/docs/2.4/howto/reverse_proxy.html
 
-## Blockers before publication
+## Application deployment protections
 
-- server.py do_POST compares Origin against http://Host only. HTTPS browser requests will fail with 403; deployment needs an explicit configured public HTTPS origin and matching proxy configuration.
-- Session cookies currently omit Secure, both at login and logout. Add HTTPS deployment cookie configuration.
-- The backend uses Python http.server.ThreadingHTTPServer, described as a local demo server. A production backend/server strategy and process supervision remain necessary; adding Apache alone does not verify production readiness.
-- Authentication throttling uses the direct socket client address. Behind Apache this will be loopback for all users; implement trusted proxy client address handling or suitable edge throttling.
+- Configure `P60_HOST=https://predict60.com` in the backend service environment. POST Origin headers must match this exact origin, HTTPS enables Secure cookies and HSTS, and malformed values fail startup.
+- Configure `P60_TRUSTED_PROXIES` with only the direct proxy address. The app accepts one validated `X-Forwarded-For` address from those peers and otherwise uses the socket address for authentication throttling.
+- Keep the backend loopback-only. The supplied Caddy and hardened systemd units provide TLS termination, security headers, health checks, process supervision, and persistent service logs for a controlled beta.
+- The backend still derives from Python `ThreadingHTTPServer`. Complete a production server refactor before treating the service as a high-assurance or large public deployment.
+- Public self-service accounts still need an email provider and flows for email verification and password recovery. Until then, use controlled beta access.
 
 ## Deployment requirements
 
-Keep database, keys, and backups outside Apache's document root. Set BTC60_DB to a writable persistent local path for the backend service user. Supply provider keys through server-only configuration. Allow outbound provider connections. Test provider subscriptions on the VPS: OilPriceAPI assessments do not support hourly prediction settlement; unsupported Twelve Data grades remain unavailable.
+Keep database, keys, and backups outside Apache's document root. Set PREDICT60_DB to a writable persistent local path for the backend service user. Supply provider keys through server-only configuration. Allow outbound provider connections. Test provider subscriptions on the VPS: OilPriceAPI assessments do not support hourly prediction settlement; unsupported Twelve Data grades remain unavailable.
 
 After HTTPS configuration, verify signup, login, logout, session invalidation, predictions, filters/sorting, settlement after restart, and backup/restore through the public domain. No VPS or Apache instance was available in the local environment for an end-to-end deployment check.
 

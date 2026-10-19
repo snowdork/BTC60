@@ -14,6 +14,7 @@ SETTLEMENT_VERSION = 'weather-hourly-observation-v1'
 
 
 def catalog():
+    """Build the dormant weather category, city metadata, and twenty disabled temperature/wind instruments."""
     cities = [dict(city) for city in SEED['cities']]
     metrics = [dict(metric) for metric in SEED['metrics']]
     instruments = [dict(symbol=f"WX-{city['id']}-{metric['id'].upper()}",
@@ -30,6 +31,7 @@ def catalog():
 
 
 def validate_value(metric, value):
+    """Validate a weather value, allowing negative temperature and zero wind but rejecting negative wind or nonfinite data."""
     if metric not in {item['id'] for item in SEED['metrics']}:
         raise ValueError('Unknown weather metric.')
     if isinstance(value, bool) or not isinstance(value, (float, int)) or not math.isfinite(value):
@@ -61,6 +63,7 @@ def benchmark(observations, *, city_id, metric, station_id, boundary):
         raise ValueError('Weather benchmarks require an hourly UTC boundary.')
     unit = next(item['unit'] for item in SEED['metrics'] if item['id'] == metric)
     candidates = {}
+    # Only actual observations from the pinned station and canonical unit can settle a market.
     for row in observations:
         if (row.get('cityId'), row.get('metric'), row.get('stationId'), row.get('unit'), row.get('kind')) != (city_id, metric, station_id, unit, 'observation'):
             continue
@@ -74,6 +77,7 @@ def benchmark(observations, *, city_id, metric, station_id, boundary):
         except ValueError:
             continue
         candidates.setdefault(observed_at, set()).add(value)
+    # Defer settlement instead of estimating a missing boundary observation.
     if not candidates:
         return None
     values = candidates[max(candidates)]

@@ -1,18 +1,20 @@
+/** @module portfolio
+ * Render authenticated portfolio statistics, category filters, and prediction history.
+ */
 (() => {
-  const account=window.BTC60Account,model=window.BTC60Portfolio,$=id=>document.getElementById(id);
+  const account=window.Predict60Account,model=window.Predict60Portfolio,/** Find an interface element by its stable DOM identifier. */ $=id=>document.getElementById(id);
   let filter='all',category='all',coins=[],lastRender='',sortColumn='window',sortDirection='desc';
   const currency=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
   const shareFormatter=new Intl.NumberFormat('en-US',{maximumFractionDigits:2});
-  const money=cents=>currency.format(cents/100);
-  const signed=cents=>(cents>=0?'+':'−')+money(Math.abs(cents));
-  const date=seconds=>new Date(seconds*1000).toISOString().slice(0,10);
-  const time=seconds=>new Date(seconds*1000).toISOString().slice(11,16);
-  function price(value,symbol){const precision=coins.find(c=>c.symbol===symbol)?.precision??2;return value==null?'—':value.toLocaleString('en-US',{style:'currency',currency:'USD',minimumFractionDigits:precision,maximumFractionDigits:precision});}
-  function render(){
+  const /** Format a monetary display value using the module currency formatter. */ money=cents=>currency.format(cents/100);
+  const /** Format a cent-denominated monetary change with its sign. */ signed=cents=>(cents>=0?'+':'−')+money(Math.abs(cents));
+  const /** Format epoch seconds as a UTC calendar date. */ date=seconds=>new Date(seconds*1000).toISOString().slice(0,10);
+  const /** Format the current time value as UTC hour and minute. */ time=seconds=>new Date(seconds*1000).toISOString().slice(11,16);
+  /** Format an instrument price with the active or supplied instrument precision. */ function price(value,symbol){const precision=coins.find(c=>c.symbol===symbol)?.precision??2;return value==null?'—':value.toLocaleString('en-US',{style:'currency',currency:'USD',minimumFractionDigits:precision,maximumFractionDigits:precision});}
+  /** Render  from the latest account, market, and interface state. */ function render(){
     if(!account.ready)return;
     $('portfolio-message').textContent=account.user?account.error||'Account history synced. Demo settlements update automatically.':account.error||'';
-    $('portfolio-content').hidden=!account.user;$('portfolio-login').hidden=!!account.user;$('portfolio-logout').hidden=!account.user;$('portfolio-refresh').disabled=!account.user;
-    $('portfolio-user').textContent=account.user?.name||'';
+    $('portfolio-content').hidden=!account.user;$('portfolio-login').hidden=!!account.user;$('portfolio-refresh').disabled=!account.user;
     if(!account.user){$('portfolio-message').textContent=account.error||'';return;}
     const signature=JSON.stringify([account.user,account.predictions,filter,category,sortColumn,sortDirection,coins,account.predictions.filter(p=>p.settled_at==null).map(p=>model.result(p))]);
     if(signature===lastRender)return;lastRender=signature;
@@ -27,9 +29,9 @@
     $('history-empty').firstChild.textContent=account.predictions.length?'No predictions match this filter. ':'No predictions yet. ';
     $('history-rows').replaceChildren(...predictions.map(p=>{
       const row=document.createElement('tr'),state=model.result(p),settled=p.settled_at!=null;
-      const add=(text,small)=>{const cell=document.createElement('td');cell.textContent=text;if(small){const label=document.createElement('small');label.textContent=small;cell.append(label);}row.append(cell);return cell;};
+      const /** Append a text-only history cell with an optional secondary label. */ add=(text,small)=>{const cell=document.createElement('td');cell.textContent=text;if(small){const label=document.createElement('small');label.textContent=small;cell.append(label);}row.append(cell);return cell;};
       const coin=coins.find(c=>c.symbol===p.coin),cell=add(`${p.coin} · ${p.market_id.split('-')[0]} MIN · ${p.category||'crypto'}`, `${shareFormatter.format(p.contracts)} shares at ${p.cents}¢`);
-      if(coin?.icon){const image=document.createElement('img');image.src=coin.icon;image.alt='';image.width=24;image.height=24;image.style.marginRight='7px';image.style.verticalAlign='middle';image.onerror=()=>image.remove();cell.prepend(image);}
+      if(coin?.icon){const image=document.createElement('img');image.src=coin.icon;image.alt='';image.width=24;image.height=24;image.style.marginRight='7px';image.style.verticalAlign='middle';image.onerror=/** Handle the error event for the current transport or resource. */ ()=>image.remove();cell.prepend(image);}
       add(p.side==='up'?'↗ Up':'↘ Down').style.color=p.side==='up'?'var(--green)':'#ff6a84';
       add(`${time(p.starts_at)}–${time(p.ends_at)}`,date(p.starts_at));
       const status=add(''),badge=document.createElement('span');badge.className='badge '+(state==='won'?'green':state==='lost'?'red':'amber');badge.textContent=state==='settling'?'AWAITING SETTLEMENT':state.toUpperCase();status.append(badge);

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Restart this checkout's BTC60 server with a background watchdog on Linux."""
+"""Restart this checkout's Predict60 server with a background watchdog on Linux."""
 import argparse
 import os
 from pathlib import Path
@@ -16,6 +16,7 @@ from btc60_logging import LOG_PATH, write_or_rotate
 
 
 def main():
+    """Validate restart options and serialize checkout lifecycle changes under the control lock."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', type=int, default=8000)
     parser.add_argument('--log-level', choices=('normal', 'debug', 'warning', 'error'), default=None,
@@ -41,6 +42,7 @@ def main():
 
 
 def start_server(args):
+    """Stop checkout processes, import legacy logs, and launch the watchdog with the requested configuration."""
     stop_server()
     # Import the old log only after its writers have stopped.
     legacy_log = DATA / 'server.log'

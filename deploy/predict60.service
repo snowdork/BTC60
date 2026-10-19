@@ -1,0 +1,39 @@
+[Unit]
+Description=Predict60 application server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=predict60
+Group=predict60
+WorkingDirectory=/opt/predict60/current
+EnvironmentFile=/etc/predict60/predict60.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 /opt/predict60/current/server.py --port 8000 --log-level normal
+Restart=on-failure
+RestartSec=3s
+TimeoutStopSec=20s
+UMask=0077
+
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/predict60
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

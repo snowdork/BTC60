@@ -30,7 +30,7 @@ function chartHarness({oil=false,live=false,spotError=false}={}){
  class FakeDate extends Date{static now(){return now;}}
  class Socket{constructor(){this.readyState=1;socket=this;}close(){}send(){}}
  const window={PredictModel:model,PredictCoins:{available:[coin],getCoin:()=>coin,formatPrice:v=>'$'+v.toFixed(2)},dispatchEvent(){},addEventListener(){}};
- const context={window,document:{getElementById:element,querySelector:s=>s.startsWith('[data-remaining')?null:element(s),querySelectorAll:()=>[],addEventListener(){},createElement:()=>{const node={dataset:{}};return node;}},Date:FakeDate,Intl,URLSearchParams,fetch,AbortController,WebSocket:Socket,Event:class{},localStorage:{getItem(){return null;},setItem(){}},setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout(){},performance:{now:()=>frameStamp},console};
+ const context={window,document:{getElementById:element,querySelector:s=>s.startsWith('[data-remaining')?null:element(s),querySelectorAll:()=>[],addEventListener(){},createElement:()=>({dataset:{},style:{setProperty(){}},setAttribute(k,v){this[k]=v;}})},Date:FakeDate,Intl,URLSearchParams,fetch,AbortController,WebSocket:Socket,Event:class{},localStorage:{getItem(){return null;},setItem(){}},setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout(){},performance:{now:()=>frameStamp},console};
  vm.runInNewContext(fs.readFileSync('btc-chart.js','utf8'),context);
  return {element,pending,model,hour,requests,step(){frameStamp+=1000;timers.at(-1)();},tick(price){frameStamp+=1000;socket.onmessage({data:JSON.stringify({type:'ticker',product_id:'BTC-USD',price:String(price),time:new Date(now).toISOString()})});timers.at(-1)();}};
 }
@@ -45,6 +45,16 @@ test('initial current hour backfills to its start before pricing history complet
  assert.match(h.element('btc-line').d,/^M0\.000,/);
  assert.equal(h.model.historyStatus,'ready');
  assert.equal(h.model.pricingHistoryStatus,'error');
+});
+
+test('minute heat map renders sixty time-aligned candle directions',async()=>{
+ const h=chartHarness();await flush();
+ const map=h.element('minute-heatmap'),dots=map.children;
+ assert.equal(dots.length,60);
+ assert.equal(dots.filter(dot=>dot.className.includes(' up')).length,25);
+ assert.equal(dots[25].className,'minute-dot current');
+ assert.match(dots[0].title,/17:00–17:01 UTC · Up/);
+ assert.match(map['aria-label'],/25 up, 0 down, 35 pending or unavailable/);
 });
 
 test('returning to current hour restores history and ignores old pricing responses',async()=>{

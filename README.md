@@ -1,8 +1,8 @@
-# BTC60 — Crypto prediction terminal
+# Predict60 — Hourly prediction terminal
 
-BTC60 is a buildless web app for exploring crypto direction predictions with demo funds. See a complete UTC hour at once: one 60-minute market, two 30-minute markets, and four 15-minute markets, with a live chart and a persistent order ticket.
+Predict60 is a buildless web app for exploring hourly direction predictions with demo funds. See a complete UTC hour at once: one 60-minute market, two 30-minute markets, and four 15-minute markets, with a live chart and a persistent order ticket.
 
-![BTC60 terminal with an hourly chart, aligned prediction intervals, and an order ticket](assets/previews/prediction-playfield.png)
+![Predict60 terminal with an hourly chart, aligned prediction intervals, and an order ticket](assets/previews/prediction-playfield.png)
 
 *Illustrative demo preview. Prices, percentages, and account figures shown are sample values.*
 
@@ -34,7 +34,7 @@ BTC · ETH · SOL · XRP · DOGE · ADA · LTC. The database catalog controls av
 
 Up wins when the closing benchmark is greater than or equal to the opening benchmark; Down wins when it is lower. Each benchmark uses the minute candle close immediately before its interval boundary. A winning contract returns $1; a losing contract returns $0, with zero demo fees. Missing history leaves orders awaiting settlement for retry.
 
-These are uncalibrated model estimates, simulated prices, and Coinbase minute-close proxy results. BTC60 does not trade real money or claim official Kalshi or CF Benchmarks settlement. Synthetic preview and historical views cannot place orders.
+These are uncalibrated model estimates, simulated prices, and Coinbase minute-close proxy results. Predict60 does not trade real money or claim official Kalshi or CF Benchmarks settlement. Synthetic preview and historical views cannot place orders.
 
 ## Run locally
 
@@ -45,6 +45,32 @@ python3 server.py
 ```
 
 Open http://127.0.0.1:8000 for the welcome page or http://127.0.0.1:8000/index.html for the terminal. Use `--port` to change the port. Internet access is required for live prices, benchmarks, and settlement. The terminal requires `/api/coins`; file previews and static hosting alone cannot initialize a working terminal or provide accounts.
+
+Behind an HTTPS reverse proxy, set `P60_HOST` to the exact public origin
+(scheme and hostname, optional port, no path or trailing slash):
+
+```bash
+P60_HOST=https://predict60.com python3 scripts/restart-server.py
+```
+
+POST requests with an `Origin` header must match this value exactly. If
+`P60_HOST` is unset or empty, the existing `http://<Host header>` check applies.
+Requests without an `Origin` header retain their existing behavior; authenticated
+mutations still require a valid session and CSRF token. Restart the server after
+changing the environment. An HTTPS origin automatically adds `Secure` to login
+and logout cookies and enables HSTS responses. Invalid origins fail startup.
+
+When a reverse proxy overwrites `X-Forwarded-For` with one client address, list
+only its direct IP in `P60_TRUSTED_PROXIES` so authentication throttling remains
+per-client. Never trust a public interface or arbitrary network range. The Caddy
+deployment uses:
+
+```bash
+P60_TRUSTED_PROXIES=127.0.0.1,::1
+```
+
+`P60_SECURE_COOKIES=true` can force HTTPS-only cookies independently, but cannot
+disable them for an HTTPS `P60_HOST`. See [the VPS deployment files](deploy/README.md).
 
 ### Automatic crash recovery (Linux)
 
@@ -57,7 +83,7 @@ python3 scripts/restart-server.py --port 8080
 ```
 
 The watchdog restarts the server three seconds after it exits. Both processes
-inherit your environment (including API keys and `BTC60_DB`), and append output to
+inherit your environment (including API keys and `PREDICT60_DB`), and append output to
 `/tmp/btc60/server.log`. Only one watchdog can run for this checkout.
 
 To stop intentionally:
@@ -101,34 +127,56 @@ python3 scripts/rotate-logs.py --force
 
 No scheduled job is needed: rotation runs as logs are written. On the next
 restart, the old `data/server.log` is imported under the same retention policy
-and removed. `/tmp` logs may be cleared on reboot; `BTC60_LOG_DIR` can override
+and removed. `/tmp` logs may be cleared on reboot; `PREDICT60_LOG_DIR` can override
 the directory when persistent storage is desired. Direct `server.py` runs log to
 the console and support the same `--log-level` option.
 
 ## Documentation
 
+- [Project TODO](TODO.md): deferred launch work and prerequisites for re-enabling features.
 - [Admin guide](doc/ADMIN_GUIDE.md): server scripts, log levels, rotation, maintenance, and troubleshooting.
 - [User guide](doc/USER_GUIDE.md): accounts, predictions, history, portfolio, and troubleshooting.
 - [Design](doc/DESIGN.md): interaction, pricing, settlement, architecture, and persistence.
 - [Database maintenance](doc/DATABASE_MAINTENANCE.md): initialization, inspection, backups, and explicit reset.
+- [VPS deployment](deploy/README.md): Caddy, systemd, secrets, backups, and cutover checks.
+
+## Code documentation (Sphinx)
+
+Python modules and procedures have docstrings; named browser procedures have JSDoc.
+The Sphinx reference includes source listings, signatures, and branch/iteration
+inventories, plus an architecture guide. Build it without executing app modules:
+
+```bash
+python3 -m pip install -r doc/requirements.txt
+npm install --prefix doc
+python3 -m sphinx -W --keep-going -b html doc doc/_build/html
+```
+
+Open `doc/_build/html/index.html`. See [documentation maintenance](doc/contributing.rst).
+Sphinx requires Python 3.11+; runtime requirements for the app are unchanged.
+Node.js and the docs-only Acorn dependency parse browser source. Generated pages
+and rendered docs are ignored by Git and excluded from the static app build.
 
 ## Development and validation
 
 The root files are the application source. `bootstrap.js` loads the database coin catalog before loading the model, trading controller, and chart. `server.py` serves the interface and account API with SQLite persistence. Keep development on the `Phase1` branch.
 
 ```bash
-node --test *.test.js
-python3 -m unittest server_test.py
-python3 -m unittest discover -s scripts -p '*_test.py'
+python3 scripts/run_tests.py
 node --check app.js
 node --check btc-chart.js
 ```
 
-Tests cover market calculations, catalog/bootstrap behavior, portfolio summaries, account/order/settlement handling, and database maintenance. They do not establish live Coinbase availability.
+The runner executes the JavaScript, application Python, and scripts Python
+suites. Every run prints a colored summary and saves the complete colored log
+as `/tmp/test_results/test_result_<date_time>.log`. Use `less -R` to retain the
+PASS/FAIL colors while reading a saved log.
+
+Tests cover market calculations, catalog/bootstrap behavior, portfolio summaries, restored and expired sessions, login/signup errors, logout and settlement retries, community polling, weather benchmark boundaries, static build isolation, account/order/settlement handling, and database maintenance. They do not establish live Coinbase availability.
 
 ## Data and catalog
 
-The default database is `data/btc60.sqlite3`; `BTC60_DB` selects another path. Startup creates missing tables and applies catalog migrations. Accounts start with $14,250 in demo funds. Browser-only positions are not imported. Database files and backups are excluded from Git.
+The default database remains `data/btc60.sqlite3`; `PREDICT60_DB` selects another path. The legacy filename and `BTC60_*` environment variables remain supported so existing installations retain their accounts, logs, and configuration. Startup creates missing tables and applies catalog migrations. Accounts start with $14,250 in demo funds. Browser-only positions are not imported. Database files and backups are excluded from Git.
 
 The database `coins` table is authoritative. The crypto seed has ten records: BTC, ETH, SOL, XRP, DOGE, ADA, and LTC enabled; LINK, TRUMP, and AVAX disabled. Existing databases can have administrator edits. Triggers allow at most eight enabled instruments per category. Disabling a coin blocks new orders while preserving history and settlement. Keep referenced symbols and product mappings stable.
 
@@ -145,7 +193,7 @@ Custom coins need a supported Coinbase USD product, display precision, positive 
 
 ## Static distribution and hosting
 
-`dist/` contains static copies, not a standalone account backend. After frontend changes, synchronize all root HTML, CSS, and browser JavaScript files plus `assets/` into `dist/`; exclude tests and backend scripts. Include portfolio, theme, and responsive assets. The welcome preview is `assets/previews/prediction-playfield.png`. `.openai/hosting.json` identifies the existing private Site.
+`dist/` contains static copies, not a standalone account backend. After frontend changes, run `python3 scripts/build-static.py` to refresh the public HTML, CSS, browser JavaScript, and artwork in `dist/`. The build uses the server’s public file list and excludes backend scripts, tests, credentials, and account data. The welcome preview is `assets/previews/prediction-playfield.png`. `.openai/hosting.json` identifies the existing private Site.
 
 The Python server binds to loopback for local development. Public account hosting requires a production server, HTTPS, Secure session cookies, and account recovery/email verification. Static hosting cannot replace the Python/SQLite API.
 
@@ -160,18 +208,19 @@ python3 scripts/calibrate-odds.py BTC data/btc-candles.json
 
 Both commands report progress. Rerun the download command after interruption to resume saved batches. Coinbase must be reachable from the machine running it. Calibration activates only if held-out Brier score and log loss both improve; otherwise the existing model is preserved. Repeat using each coin's product and symbol. Reload the terminal after a successful calibration export.
 
-## Market categories: Oil and Crypto
+## Market categories
 
-The entry screen at `/` (or `welcome.html`) loads category buttons from `/api/categories`.
-Choose **Oil** or **Crypto** to open the same one-hour playfield at
-`index.html?category=oil` or `index.html?category=crypto`. The existing 15-, 30-,
+The entry screen at `/` (or `welcome.html`) offers login and signup. Signed-in visitors go directly to `categories.html`, which loads category buttons from `/api/categories`. Oil and Weather are visible as Coming soon; neither category can open a terminal or accept predictions while their data feeds are being completed. See [weather preparation](doc/WEATHER.md).
+Choose **Crypto** to open the one-hour playfield at
+`index.html?category=crypto`. The existing 15-, 30-,
 and 60-minute intervals remain aligned inside that hour. Each category has its own
 background, accent, instrument selection, and remembered instrument. The portfolio
 shows both categories and can filter history and statistics by category; the demo
 balance is shared.
 
-Crypto retains Coinbase USD prices and minute-close proxy settlement. Oil now uses
-**Twelve Data live spot quotes** and exact one-minute history for new predictions.
+Crypto retains Coinbase USD prices and minute-close proxy settlement. The dormant
+Oil integration can query **Twelve Data live spot quotes** and exact one-minute
+history for feed validation.
 The public provider catalogue verifies WTI (`WTI/USD`) and Brent (`XBR/USD`).
 Dubai, Oman, and Bonny Light remain visible but have no verified provider mapping;
 they show an unavailable feed instead of synthetic values. Urals is available from
@@ -190,10 +239,10 @@ python3 server.py
 The key stays server-side and is sent in an Authorization header. The provider
 subscription must include commodities. This adapter uses minute-updated REST spot
 quotes, not WebSocket streaming. Quotes are cached for 20 seconds across clients,
-and the original provider quote timestamp is preserved. Oil prices older than
-90 seconds, closed sessions, missing keys, unsupported grades, and missing exact
-benchmark minutes block new orders. Crypto retains its 15-second freshness limit.
-Category cards show source readiness and real oil quotes when available.
+and the original provider quote timestamp is preserved. Its readiness checks reject
+prices older than 90 seconds, closed sessions, missing keys, unsupported grades,
+and missing exact benchmark minutes. Crypto retains its 15-second freshness limit.
+The Oil card does not request or display quotes while the category is Coming soon. The diagnostic feed endpoints and adapters remain available for development and validation, but server-side order validation rejects Oil predictions independently of the browser.
 
 `live_oil.py` supplies quotes and minute history. No live request falls back to
 simulation. Old oil predictions keep their original deterministic simulated source

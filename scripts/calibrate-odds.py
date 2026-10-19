@@ -14,12 +14,14 @@ import odds
 
 
 def scores(rows, slope=1, intercept=0):
+    """Compute held-out Brier score and log loss for candidate probability estimates."""
     probabilities = [1/(1+math.exp(-max(-35, min(35, slope*x+intercept)))) for x, y in rows]
     return {'brier':sum((p-y)**2 for p, (_, y) in zip(probabilities, rows))/len(rows),
             'logLoss':-sum(y*math.log(p)+(1-y)*math.log(1-p) for p, (_, y) in zip(probabilities, rows))/len(rows)}
 
 
 def fit(rows):
+    """Fit logistic calibration parameters from historical predictions and observed outcomes."""
     slope, intercept = 1., 0.
     # Damped Newton updates converge quickly for a two-parameter sigmoid.
     for iteration in range(80):
@@ -50,6 +52,7 @@ def fit(rows):
 
 
 def main():
+    """Fit and validate calibration, saving coefficients only when held-out scores improve."""
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('coin')
     parser.add_argument('candles', type=Path)

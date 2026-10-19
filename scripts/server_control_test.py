@@ -14,7 +14,8 @@ import unittest
 class WatchdogTest(unittest.TestCase):
     def test_crash_restart_and_intentional_stop(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory) / 'checkout'
+            root.mkdir()
             scripts = root / 'scripts'
             scripts.mkdir()
             for name in ('server_control.py', 'restart-server.py', 'stop-server.py',
@@ -32,7 +33,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
     def log_message(self, *args): pass
 server = HTTPServer(('127.0.0.1', a.port), Handler)
-Path('level').write_text(os.environ['BTC60_LOG_LEVEL'])
+Path('level').write_text(os.environ['PREDICT60_LOG_LEVEL'])
 with Path('starts').open('a') as f: f.write(str(os.getpid()) + '\\n')
 server.serve_forever()
 ''')
@@ -44,7 +45,7 @@ server.serve_forever()
             def run(name, *args):
                 return subprocess.run([sys.executable, str(scripts / name), *args],
                                       capture_output=True, text=True, timeout=25,
-                                      env={**os.environ, 'BTC60_LOG_DIR': str(root / 'logs')})
+                                      env={**os.environ, 'PREDICT60_LOG_DIR': str(root / 'logs')})
 
             def starts():
                 return (root / 'starts').read_text().splitlines()
@@ -55,38 +56,46 @@ server.serve_forever()
                 self.assertEqual((root / 'level').read_text(), 'normal')
                 self.assertTrue((root / 'logs/server.log').exists())
                 self.assertFalse((root / 'data/server.log').exists())
+                # Restart must still find processes whose argv retained the pre-rename path.
+                renamed_root = root.with_name('renamed-checkout')
+                root.rename(renamed_root)
+                root = renamed_root
+                scripts = root / 'scripts'
+                result = run('restart-server.py', '--port', str(port))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(len(starts()), 2)
                 os.kill(int(starts()[-1]), signal.SIGKILL)
                 deadline = time.monotonic() + 8
-                while len(starts()) < 2 and time.monotonic() < deadline:
+                while len(starts()) < 3 and time.monotonic() < deadline:
                     time.sleep(0.1)
-                self.assertEqual(len(starts()), 2)
+                self.assertEqual(len(starts()), 3)
                 self.assertEqual((root / 'level').read_text(), 'normal')
                 result = run('stop-server.py')
                 self.assertEqual(result.returncode, 0, result.stderr)
                 time.sleep(3.5)
-                self.assertEqual(len(starts()), 2)
+                self.assertEqual(len(starts()), 3)
                 self.assertTrue((root / 'data/server.stopped').exists())
                 self.assertEqual(run('stop-server.py').returncode, 0)
                 self.assertEqual(run('restart-server.py', '--port', str(port),
                                      '--log-level', 'debug').returncode, 0)
                 self.assertEqual((root / 'level').read_text(), 'debug')
-                self.assertEqual(len(starts()), 3)
+                self.assertEqual(len(starts()), 4)
                 # A crash must retain an explicitly selected debug level.
                 os.kill(int(starts()[-1]), signal.SIGKILL)
                 deadline = time.monotonic() + 8
-                while len(starts()) < 4 and time.monotonic() < deadline:
+                while len(starts()) < 5 and time.monotonic() < deadline:
                     time.sleep(0.1)
-                self.assertEqual(len(starts()), 4)
+                self.assertEqual(len(starts()), 5)
                 self.assertEqual((root / 'level').read_text(), 'debug')
                 # A manual restart without a level retains the previous selection.
                 self.assertEqual(run('restart-server.py', '--port', str(port)).returncode, 0)
                 self.assertEqual((root / 'level').read_text(), 'debug')
-                self.assertEqual(len(starts()), 5)
+                self.assertEqual(len(starts()), 6)
                 # Stop while the watchdog is waiting to restart a crashed child.
                 os.kill(int(starts()[-1]), signal.SIGKILL)
                 self.assertEqual(run('stop-server.py').returncode, 0)
                 time.sleep(3.5)
-                self.assertEqual(len(starts()), 5)
+                self.assertEqual(len(starts()), 6)
             finally:
                 run('stop-server.py')
 

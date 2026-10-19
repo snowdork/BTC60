@@ -35,6 +35,31 @@ class WeatherTest(unittest.TestCase):
         self.assertIsNone(benchmark([row, dict(row, value=-4)]))
         self.assertEqual(benchmark([row, dict(row)]), -3)
 
+    def test_hourly_boundaries_and_invalid_times(self):
+        for timestamp, expected in [(0, (0, 3600)), (3600, (3600, 7200)),
+                                    (3599.99, (0, 3600)), (-1, (-3600, 0))]:
+            self.assertEqual(weather.hourly_window(timestamp), expected)
+        for value in [True, None, '3600', float('inf'), float('nan')]:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                weather.hourly_window(value)
+
+    def test_benchmark_uses_latest_valid_observation_independent_of_order(self):
+        row = dict(cityId='DEN', metric='wind', stationId='station',
+                   observedAt=3000, value=0, unit='m/s', kind='observation')
+        def benchmark(rows):
+            return weather.benchmark(rows, city_id='DEN', metric='wind',
+                                     station_id='station', boundary=3600)
+        self.assertEqual(benchmark([row]), 0)  # Exact freshness cutoff and calm wind.
+        newer = dict(row, observedAt=3600, value=4)
+        invalid = dict(row, observedAt=3600, value=-1)
+        self.assertEqual(benchmark([newer, row, invalid]), 4)
+        self.assertEqual(benchmark([invalid, row, newer]), 4)
+        for changes in [dict(city_id='missing'), dict(station_id=''), dict(metric='humidity'), dict(boundary=3601)]:
+            args = dict(city_id='DEN', metric='wind', station_id='station', boundary=3600)
+            args.update(changes)
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                weather.benchmark([row], **args)
+
 
 if __name__ == '__main__':
     unittest.main()
