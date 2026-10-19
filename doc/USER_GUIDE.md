@@ -4,9 +4,27 @@ Predict60 lets you make crypto direction predictions with demo funds. Prices and
 
 ## Start and sign in
 
-Run `python3 server.py` from the project folder, then open http://127.0.0.1:8000. Select the welcome page's terminal preview or open `/index.html`. Use the signup or login pages to access an account. New accounts receive $14,250 in demo funds. Your balance and predictions are stored by the local server and survive browser refreshes and server restarts.
+For a hosted installation, open the HTTPS address supplied by your administrator.
+You do not need to install Python or Docker on your own computer. Sign up or log
+in, then choose **Crypto** from the category screen. New accounts receive $14,250
+in demo funds. Accounts and saved predictions belong to that installation;
+a separate local installation does not automatically share them.
 
-Keep the server running and allow internet access for live prices and settlement. Opening HTML files directly or using static hosting alone does not provide a working terminal.
+For local use, run `python3 server.py` from the project folder and open
+http://127.0.0.1:8000. The default bind address remains local-only. Administrators
+setting up a VPS should follow the [Docker deployment guide](../deploy/DOCKER.md).
+
+Your balance and predictions survive browser refreshes and server restarts when
+the installation retains its database. During a restart, wait for the site to
+return and refresh your portfolio before retrying an uncertain submission.
+Overdue settlements are retried when the server and price history are available.
+
+The server needs internet access for live prices and settlement. Opening HTML
+files directly or using static hosting alone does not provide a working terminal.
+
+After the `p60` naming update, sign in again and reselect your theme. Existing
+accounts and predictions remain in the retained database; do not create a new
+account just because the browser asks you to sign in again.
 
 ## Read the terminal
 
@@ -49,12 +67,13 @@ The sun/moon button switches themes and saves your preference across tabs. On sm
 
 | Message or symptom | Action |
 | --- | --- |
-| Coins unavailable / terminal offline | Start or restart `python3 server.py`, open the localhost terminal URL, and retry or refresh. |
+| Coins unavailable / terminal offline | On a hosted site, refresh and contact the administrator if it persists. For local use, start `python3 server.py` and open the localhost URL. |
 | Price feed disconnected or stale | Check internet access and use Reconnect; wait for a fresh live update. |
 | History or opening benchmark unavailable | Wait for Coinbase candle history, then reconnect if needed. Orders stay blocked until required data is available. |
 | Chart paused / synthetic preview / historical market | Resume, reconnect to live data, or select Current hour. |
 | Too late to place | Select an open interval and review a new prediction. |
 | Insufficient demo balance | Reduce the budget and check pending commitments in your portfolio. |
+| Site temporarily unavailable | Wait for the service to recover, then refresh. Contact the administrator if it remains unavailable. |
 | Awaiting settlement | Keep the server running with internet access; missing candles are retried automatically. |
 
 For setup and checks, see [README.md](../README.md). For backups and database maintenance, see [Database maintenance](DATABASE_MAINTENANCE.md). A database reset removes accounts and predictions; it is not a routine troubleshooting step.

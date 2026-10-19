@@ -135,6 +135,7 @@ the console and support the same `--log-level` option.
 
 - [Project TODO](TODO.md): deferred launch work and prerequisites for re-enabling features.
 - [Admin guide](doc/ADMIN_GUIDE.md): server scripts, log levels, rotation, maintenance, and troubleshooting.
+- [Test guide](doc/TEST_GUIDE.md): regression tests, Docker health, crash recovery, and restore checks.
 - [User guide](doc/USER_GUIDE.md): accounts, predictions, history, portfolio, and troubleshooting.
 - [Design](doc/DESIGN.md): interaction, pricing, settlement, architecture, and persistence.
 - [Database maintenance](doc/DATABASE_MAINTENANCE.md): initialization, inspection, backups, and explicit reset.

@@ -1,7 +1,48 @@
 # VPS deployment
 
-For the container deployment with Docker crash recovery and Caddy, see
-[Docker deployment](DOCKER.md). The instructions below use systemd without Docker.
+## Docker Compose deployment
+
+Use [Docker deployment](DOCKER.md) for the supplied container setup. It includes
+an app image, Caddy HTTPS, persistent SQLite and certificate volumes, bounded
+logs, and `unless-stopped` crash recovery. Run one app instance. The app binds to
+`0.0.0.0:8000` inside Docker, but Compose does not publish that port on the VPS.
+
+From the repository root, after installing Docker Engine and Compose:
+
+```bash
+cp deploy/docker.env.example .env
+chmod 600 .env
+# Edit .env: set P60_DOMAIN to your domain, without https:// or a path.
+sudo systemctl enable --now docker
+docker compose config --quiet
+docker compose up -d --build
+docker compose ps
+```
+
+Point DNS at the VPS and make ports 80/443 available to Caddy. If Apache or a host
+Caddy already uses those ports, resolve that conflict before starting this stack.
+The Docker network must not overlap existing networks. Follow the Docker guide
+for importing existing accounts **before first startup**; the image does not
+include the checkout's local database. The Docker app explicitly uses
+`/app/data/p60.sqlite3`, so an old filename must be imported under this name.
+
+The `.env` configuration becomes the app environment; Caddy's fixed private IP
+is the only trusted proxy. Do not copy the systemd loopback proxy setting into
+Docker. Docker recovers exited processes; health checks report availability but
+do not restart an unhealthy process that is still running. Enable Docker at boot
+and verify recovery using the [test guide](../doc/TEST_GUIDE.md).
+
+Back up before upgrades and copy backups off-host. Do not run
+`docker compose down -v` during routine maintenance: it deletes persistent data.
+Use the Docker guide's commands for backup, restore, logs, and image rollback.
+The systemd backup timer below targets the host deployment and is not installed
+or adapted automatically by Compose.
+
+## Alternative: systemd deployment
+
+The remaining instructions use systemd without Docker. Choose one process
+supervisor for the app; do not run the host service or development watchdog
+alongside the container against the same database.
 
 Predict60 runs on loopback behind Caddy. Systemd replaces the development
 watchdog, restarts the process, and captures stdout/stderr in the journal.
