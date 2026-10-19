@@ -9,7 +9,7 @@ test('binary outcome includes equal prices on Up',()=>{assert.equal(outcome(100,
 test('fractional shares use the full budget with upward penny payout rounding',()=>{const m=markets.find(m=>m.id==='15-2');assert.deepEqual(quote(m,'up',50,14250),{cents:62,contracts:5000/62,cost:50,payout:80.65,profit:30.65});assert.deepEqual(quote(m,'down',50,14250),{cents:38,contracts:5000/38,cost:50,payout:131.58,profit:81.58});});
 test('closed and upcoming markets cannot be traded',()=>{for(const m of markets.filter(m=>m.status!=='open'))assert.equal(quote(m,'up',50,14250),null);});
 test('invalid budgets and insufficient balances cannot be quoted',()=>{const m=markets[0];for(const budget of [0,-1,NaN,Infinity,.99,14251])assert.equal(quote(m,'up',budget,14250),null);assert.equal(quote(m,'other',50,14250),null);assert.equal(quote(m,'up',50,49),null);});
-test('all quotes preserve funds and settle to one dollar per contract',()=>{for(const m of markets.filter(m=>m.status==='open'))for(const side of ['up','down'])for(const budget of [1,10,25,50,100,250,14250]){const q=quote(m,side,budget,14250);assert(q.cost<=budget);assert.equal(q.cost,budget);assert(q.payout>=q.contracts);assert(q.payout-q.contracts<.010001);assert.equal(Math.round((q.payout-q.cost)*100),Math.round(q.profit*100));}});
+test('all quotes preserve funds and settle to one credit per contract',()=>{for(const m of markets.filter(m=>m.status==='open'))for(const side of ['up','down'])for(const budget of [1,10,25,50,100,250,1000]){const q=quote(m,side,budget,14250);assert(q.cost<=budget);assert.equal(q.cost,budget);assert(q.payout>=q.contracts);assert(q.payout-q.contracts<.010001);assert.equal(Math.round((q.payout-q.cost)*100),Math.round(q.profit*100));}});
 test('market without a loaded benchmark cannot accept a prediction',()=>{assert.equal(quote({...markets[0],strike:null},'up',50,14250),null);});
 const {estimateChances,minuteVolatility}=require('./market-model.js');
 test('chance model is centered on the benchmark and complements to 100',()=>{const m={status:'open',strike:100,endsAt:900000};assert.deepEqual(estimateChances(m,100,0,.001),{up:50,down:50,label:'ESTIMATE'});for(const spot of [90,99.9,100,100.1,110]){const p=estimateChances(m,spot,0,.001);assert.equal(p.up+p.down,100);assert(p.up>=1&&p.up<=99);if(spot>100)assert(p.up>50);if(spot<100)assert(p.up<50);}});
@@ -52,4 +52,11 @@ test('pricing backfill failures are distinct from benchmark failures',()=>{
  const now=100000,market={status:'open',strike:100,up:62,endsAt:200000},model={feedMode:'live',feedConnection:'connected',spot:101,priceUpdatedAt:now,historyStatus:'ready',quoteReady:true};
  assert.equal(dataStatus({...model,pricingHistoryStatus:'error'},market,now).reason,'Odds history unavailable · reconnect');
  assert.equal(dataStatus({...model,pricingHistoryStatus:'loading'},market,now).ready,false);
+});
+
+test('prediction cap accepts 1000 credits and rejects larger budgets even with sufficient balance',()=>{
+ const m=markets[0];
+ assert.equal(quote(m,'up',1000,14250).cost,1000);
+ for(const budget of [1000.001,1000.01,1001,14250])assert.equal(quote(m,'up',budget,14250),null);
+ assert.equal(quote(m,'up',1000,999),null);
 });

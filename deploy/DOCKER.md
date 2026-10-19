@@ -82,3 +82,17 @@ docker compose logs --tail=30 app
 Docker should restart the app. To stop intentionally use `docker compose stop`;
 resume with `docker compose up -d`. Existing email verification and account
 recovery limitations still apply; see the main VPS guide.
+
+## Contests and sponsors
+
+Startup adds contest tables automatically; back up before upgrading. Sponsor
+configuration and the local prize CLI are documented in
+[contest operations](../doc/CONTEST_OPERATIONS.md). Prize pools are unconfigured
+by default. Docker rebuilds must include the new contest module and admin script.
+
+## Request capacity
+
+`P60_MAX_REQUESTS` defaults to 32 simultaneous app HTTP handlers (allowed 1–256).
+Overload returns HTTP 503 with Retry-After. Raise the limit only after measuring
+VPS memory, latency, and provider limits. The app tmpfs is capped at 64 MiB.
+See the [performance review](../doc/VPS_PERFORMANCE.md) for measurements and limits.

@@ -134,10 +134,10 @@
           $('chart-source').textContent='Chart history loaded · pricing history unavailable';
         }
       }
-      if(historical){lastPrice=candles.find(c=>c[0]*1000===hour+3600000-60000)?.[4]??null;model.spot=lastPrice??NaN;status('HISTORICAL','neutral');$('chart-source').textContent=`${sourceLabel()} history · demo settlements`;}
+      if(historical){lastPrice=candles.find(c=>c[0]*1000===hour+3600000-60000)?.[4]??null;model.spot=lastPrice??NaN;status('HISTORICAL','neutral');$('chart-source').textContent=`${sourceLabel()} history · settlements`;}
       syncMarkets(Date.now(),true);draw(Date.now(),true);
     } catch(error) {
-      if(mode==='live'&&version===historyVersion){historyFailed=true;model.historyStatus='error';broadcast('btc-chances-update');$('chart-source').textContent='History unavailable · reconnect or preview demo';}
+      if(mode==='live'&&version===historyVersion){historyFailed=true;model.historyStatus='error';broadcast('btc-chances-update');$('chart-source').textContent='History unavailable · reconnect or use synthetic preview';}
     } finally {clearTimeout(timeout);if(fetchController===controller)fetchController=null;}
   }
   /** Poll the server quote endpoint with timeout and freshness checks for non-WebSocket feeds. */ async function pollServerSpot(){
@@ -207,13 +207,13 @@
   }
   /** Switch between live and synthetic preview modes and reload the selected hour. */ function setMode(next,targetHour) {
     disconnect();mode=next;paused=false;lastHistoryAt=0;backoff=1000;demoEpoch=Date.now();demoSecond=-1;
-    $('demo-preview').textContent=mode==='demo'?`${simulated()?'Oil game':'Live '+coin.symbol}`:'Demo preview';
+    $('demo-preview').textContent=mode==='demo'?`${simulated()?'Oil game':'Live '+coin.symbol}`:'Synthetic preview';
     $('chart-pause').textContent='Pause';$('chart-pause').setAttribute('aria-pressed','false');
     $('clock-label').textContent=mode==='demo'?'Simulated UTC':'UTC';
     resetHour(currentTime(),targetHour);
-    if(mode==='demo'){status('SIMULATED','amber');$('chart-source').textContent='Animated demo · no live feed';}
-    else{$('chart-source').textContent=`${sourceLabel()} prices · demo contracts`;connect();}
-    if(historical){status('HISTORICAL','neutral');$('chart-source').textContent=mode==='demo'?'Simulated history · demo settlements':`${sourceLabel()} history · demo settlements`;}
+    if(mode==='demo'){status('SIMULATED','amber');$('chart-source').textContent='Synthetic preview · no live feed';}
+    else{$('chart-source').textContent=`${sourceLabel()} prices · points predictions`;connect();}
+    if(historical){status('HISTORICAL','neutral');$('chart-source').textContent=mode==='demo'?'Simulated history · settlements':`${sourceLabel()} history · settlements`;}
     draw(currentTime());
   }
   /** Render sixty minute direction cells from exact candle opens and closes. */
@@ -248,7 +248,7 @@
     $('next-hour').disabled=!historical;$('current-hour').hidden=!historical;$('chart-pause').disabled=historical;
     $('hour-date').textContent=`${new Date(hour).toISOString().slice(0,10)} · UTC`;
     $('price-context').textContent=coin.feed==='oilpriceapi'?'SPOT ASSESSMENT · USD / BARREL':historical?'HOUR CLOSE':mode==='demo'?'SYNTHETIC PREVIEW':simulated()?'SIMULATED · USD / BARREL':coin.feed==='twelvedata'?'LIVE SPOT · USD / BARREL':'LIVE SPOT';
-    $('market-heading').textContent=historical?'Settlement history · demo results':'Choose your market';
+    $('market-heading').textContent=historical?'Settlement history · results':'Choose your market';
     const fraction=Math.max(0,Math.min(1,(now-hour)/3600000));
     const stack=$('timeline-stack'),chart=$('btc-chart'),bounds=chart.getBoundingClientRect(),stackBounds=stack.getBoundingClientRect();
     // Pixel geometry keeps one vertical line aligned on every duration row.
@@ -268,7 +268,7 @@
     const hasPoints=valid.length>0;
     renderMinuteHeatmap(displayTime);
     $('chart-empty').hidden=hasPoints;
-    $('chart-empty').textContent=coin.feed==='oilpriceapi'&&mode==='live'?'Checking latest spot assessment every 5 seconds…':historical?(historyFailed?'History unavailable. Select Reconnect to retry.':'Loading the selected hour…'):mode==='demo'?'Starting demo…':lastPriceAt?'Waiting for history…':`Waiting for live ${coin.symbol}/USD · use Demo preview if unavailable`;
+    $('chart-empty').textContent=coin.feed==='oilpriceapi'&&mode==='live'?'Checking latest spot assessment every 5 seconds…':historical?(historyFailed?'History unavailable. Select Reconnect to retry.':'Loading the selected hour…'):mode==='demo'?'Starting synthetic preview…':lastPriceAt?'Waiting for history…':`Waiting for live ${coin.symbol}/USD · use Synthetic preview if unavailable`;
     const opening=candles.find(c=>c[0]*1000===hour-60000)?.[4];
     const change=Number.isFinite(lastPrice)&&Number.isFinite(opening)?lastPrice-opening:null;
     $('btc-change').textContent=change===null?'Waiting for price data':`${change>=0?'+':'−'}${money(Math.abs(change))} ${historical?'that hour':'this hour'}`;
@@ -283,7 +283,7 @@
     $('btc-tip').setAttribute('cx',x(last.t));$('btc-tip').setAttribute('cy',y(last.price));$('btc-tip').setAttribute('visibility','visible');
     $('chart-price-high').textContent=money(high);$('chart-price-low').textContent=money(low);
     const tag=$('chart-price-tag');tag.hidden=false;tag.textContent=money(last.price);tag.style.left=`${Math.min(90,Math.max(10,x(last.t)/10))}%`;tag.style.top=`${Math.max(10,y(last.price)/130*100)}%`;
-    $('chart-description').textContent=historical?`${coin.name} historical price from ${time(hour)} to ${time(hour+3600000)} UTC on ${new Date(hour).toISOString().slice(0,10)}. Last available price ${money(last.price)}. Outcomes are demo settlement proxies.`:`${mode==='demo'?'Simulated':coin.feed==='oilpriceapi'?'Polled spot assessment (observation times, not market ticks)':sourceLabel()} ${coin.symbol}/USD hourly price. Latest ${money(last.price)}. Red dashed cursor at ${clock(now)} UTC.`;
+    $('chart-description').textContent=historical?`${coin.name} historical price from ${time(hour)} to ${time(hour+3600000)} UTC on ${new Date(hour).toISOString().slice(0,10)}. Last available price ${money(last.price)}. Outcomes are settlement proxies.`:`${mode==='demo'?'Simulated':coin.feed==='oilpriceapi'?'Polled spot assessment (observation times, not market ticks)':sourceLabel()} ${coin.symbol}/USD hourly price. Latest ${money(last.price)}. Red dashed cursor at ${clock(now)} UTC.`;
   }
   /** Advance chart time and repaint when needed without issuing a draw for every unchanged frame. */ function frame(stamp) {
     if(stopped)return;
@@ -324,8 +324,8 @@
     $('chart-title').textContent=`${coin.name} hourly price`;
     document.querySelector('.hour-chart').setAttribute('aria-label',`${coin.name} price for the current hour`);
     document.title=`${coin.name} · ${window.Predict60Category?.name||'Crypto'} · Predict60`;
-    const description=coin.feed==='oilpriceapi'?'OilPriceAPI physical spot assessments with original source dates. These feeds do not supply the exact minute benchmarks required by this hourly game. Predictions remain unavailable.':coin.feed==='twelvedata'?'Twelve Data live spot prices in USD per barrel, updated minutely. Benchmarks use the exact completed one-minute candle before each interval boundary. Closed markets, stale quotes, and missing benchmark candles block new orders. No simulated substitute is used.':simulated()?'Simulated oil prices in USD per barrel. Opening and closing benchmarks use the simulated minute close immediately before each interval boundary. These are illustrative prices, not exchange quotes.':'Coinbase Exchange USD prices. Opening and closing benchmarks use the minute candle close immediately before each interval boundary. These are proxy demo settlements, not official exchange contracts or averaged prices.';
-    $('settlement-source').textContent=coin.feed==='oilpriceapi'?'HOURLY PREDICTIONS UNAVAILABLE':coin.feed==='twelvedata'?'DEMO SETTLEMENT · LIVE OIL MINUTE CLOSE':simulated()?'DEMO SETTLEMENT · SIMULATED OIL':'DEMO SETTLEMENT · COINBASE MINUTE CLOSE';
+    const description=coin.feed==='oilpriceapi'?'OilPriceAPI physical spot assessments with original source dates. These feeds do not supply the exact minute benchmarks required by this hourly game. Predictions remain unavailable.':coin.feed==='twelvedata'?'Twelve Data live spot prices in USD per barrel, updated minutely. Benchmarks use the exact completed one-minute candle before each interval boundary. Closed markets, stale quotes, and missing benchmark candles block new orders. No simulated substitute is used.':simulated()?'Simulated oil prices in USD per barrel. Opening and closing benchmarks use the simulated minute close immediately before each interval boundary. These are illustrative prices, not exchange quotes.':'Coinbase Exchange USD prices. Opening and closing benchmarks use the minute candle close immediately before each interval boundary. These are proxy settlements, not official exchange contracts or averaged prices.';
+    $('settlement-source').textContent=coin.feed==='oilpriceapi'?'HOURLY PREDICTIONS UNAVAILABLE':coin.feed==='twelvedata'?'SETTLEMENT · LIVE OIL MINUTE CLOSE':simulated()?'SETTLEMENT · SIMULATED OIL':'SETTLEMENT · COINBASE MINUTE CLOSE';
     $('settlement-source-detail').textContent=description;
     $('rules-source').textContent=description;
     try{localStorage.setItem(`predict_selected_coin_${coin.category||'crypto'}`,coin.symbol);}catch{}

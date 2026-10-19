@@ -40,15 +40,89 @@ class AccountsTest(unittest.TestCase):
         conn.close()
         return result
 
+    def test_prediction_credit_cap_is_enforced_without_debiting_rejections(self):
+        _, _, cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-cap', 'signupCode': '777',
+            'name': 'Cap', 'email': 'cap@example.com', 'password': 'pass-cap',
+        })
+        before = self.request('GET', '/api/account', cookie=cookie)[1]
+        csrf = before['csrf']
+        now = int(server.time.time()) // 3600 * 3600 + 300
+        start = now // 3600 * 3600
+        order = {'coin': 'BTC', 'marketId': '60-0', 'side': 'up',
+                 'startsAt': start * 1000, 'requestId': 'credit-cap-request-0001'}
+        with patch('server.time.time', return_value=now), patch('server.candle_close', return_value=100), patch('server.fresh_spot', return_value=101), patch('server.market_up', return_value=68):
+            for budget in (1000.001, 1000.01, 1001, 14250):
+                status, error, _ = self.request('POST', '/api/predictions', dict(order, budget=budget), cookie, csrf)
+                self.assertEqual(status, 400)
+                self.assertIn('1,000 credits', error['error'])
+            unchanged = self.request('GET', '/api/account', cookie=cookie)[1]
+            self.assertEqual(unchanged['user']['balance_cents'], before['user']['balance_cents'])
+            self.assertEqual(unchanged['predictions'], [])
+            status, accepted, _ = self.request('POST', '/api/predictions', dict(order, budget=1000), cookie, csrf)
+            self.assertEqual(status, 201, accepted)
+            self.assertEqual(accepted['user']['balance_cents'], before['user']['balance_cents'] - 100000)
+
+    def test_signup_requires_exact_secret_code_and_creates_nothing_on_failure(self):
+        server.AUTH_ATTEMPTS.clear()
+        payload = {'confirmPassword': 'pass-invite', 'name': 'Invited', 'email': 'invite-code@example.com', 'password': 'pass-invite'}
+        with server.connect() as conn:
+            users_before = conn.execute('SELECT count(*) FROM users').fetchone()[0]
+            sessions_before = conn.execute('SELECT count(*) FROM sessions').fetchone()[0]
+        for value in (None, '', 'wrong', '777 ', '７７７', 777, True, ['777']):
+            data = dict(payload)
+            if value is not None:
+                data['signupCode'] = value
+            status, response, cookie = self.request('POST', '/api/signup', data)
+            self.assertEqual(status, 403, response)
+            self.assertEqual(response, {'error': 'Invalid signup code.'})
+            self.assertEqual(cookie, '')
+        with server.connect() as conn:
+            self.assertEqual(conn.execute('SELECT count(*) FROM users').fetchone()[0], users_before)
+            self.assertEqual(conn.execute('SELECT count(*) FROM sessions').fetchone()[0], sessions_before)
+        status, _, cookie = self.request('POST', '/api/signup', dict(payload, signupCode='777'))
+        self.assertEqual(status, 200)
+        self.assertTrue(cookie)
+        self.assertEqual(self.request('POST', '/api/login', {'email': payload['email'], 'password': payload['password']})[0], 200)
+        server.AUTH_ATTEMPTS.clear()
+
+    def test_signup_password_length_and_confirmation(self):
+        server.AUTH_ATTEMPTS.clear()
+        base = {'name': 'Password rules', 'email': 'password-rules@example.com', 'signupCode': '777'}
+        for password, confirmation in [('short77', 'short77'), ('x' * 17, 'x' * 17), ('valid888', None), ('valid888', 'mismatch'), ('valid888', 123)]:
+            payload = dict(base, password=password)
+            if confirmation is not None:
+                payload['confirmPassword'] = confirmation
+            status, _, cookie = self.request('POST', '/api/signup', payload)
+            self.assertEqual(status, 400)
+            self.assertEqual(cookie, '')
+        with server.connect() as conn:
+            self.assertIsNone(conn.execute('SELECT id FROM users WHERE email=?', (base['email'],)).fetchone())
+        for length in (8, 16):
+            password = 'p' * length
+            payload = dict(base, email=f'password-{length}@example.com', password=password, confirmPassword=password)
+            status, _, _ = self.request('POST', '/api/signup', payload)
+            self.assertEqual(status, 200)
+            self.assertEqual(self.request('POST', '/api/login', {'email': payload['email'], 'password': password})[0], 200)
+        # Existing accounts with longer passwords must remain able to sign in.
+        legacy = 'existing-long-password'
+        with server.connect() as conn:
+            salt = conn.execute('SELECT salt FROM users WHERE email=?', ('password-16@example.com',)).fetchone()[0]
+            digest = server.hashlib.scrypt(legacy.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
+            conn.execute('UPDATE users SET password_hash=? WHERE email=?', (digest, 'password-16@example.com'))
+        self.assertEqual(self.request('POST', '/api/login', {'email': 'password-16@example.com', 'password': legacy})[0], 200)
+        server.AUTH_ATTEMPTS.clear()
+
     def test_health_check_verifies_database(self):
         status, payload, _ = self.request('GET', '/healthz')
         self.assertEqual((status, payload), (200, {'ok': True}))
         self.assertEqual(self.last_headers['Cache-Control'], 'no-store')
+        with tempfile.TemporaryDirectory() as directory, patch('server.DB', Path(directory) / 'empty.sqlite3'):
+            self.assertEqual(self.request('GET', '/healthz')[0], 503)
 
     def test_https_origin_sets_matching_secure_login_and_logout_cookies(self):
         with patch.dict(server.os.environ, {'P60_HOST': 'https://predict60.com'}, clear=True):
-            status, _, cookie = self.request('POST', '/api/signup', {
-                'name': 'Secure', 'email': 'secure@example.com', 'password': 'strong-password-secure',
+            status, _, cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-secure', 'signupCode': '777',
+                'name': 'Secure', 'email': 'secure@example.com', 'password': 'pass-secure',
             })
             self.assertEqual(status, 200)
             login_cookie = self.last_headers['Set-Cookie']
@@ -143,7 +217,7 @@ class AccountsTest(unittest.TestCase):
             self.assertEqual(self.request('POST', '/api/login', {}, extra_headers={'Content-Type': 'text/plain'})[0], 415)
 
     def test_account_prediction_settlement_lifecycle(self):
-        status, _, cookie = self.request('POST', '/api/signup', {'name': '<Test>', 'email': 'one@example.com', 'password': 'strong-password-123'})
+        status, _, cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-123', 'signupCode': '777', 'name': '<Test>', 'email': 'one@example.com', 'password': 'pass-123'})
         self.assertEqual(status, 200)
         self.assertEqual(self.request('GET', '/api/account')[0], 401)
         status, account, _ = self.request('GET', '/api/account', cookie=cookie)
@@ -151,8 +225,8 @@ class AccountsTest(unittest.TestCase):
         csrf = account['csrf']
         self.assertEqual(self.request('POST', '/api/predictions', {}, cookie)[0], 403)
         self.assertEqual(self.request('POST', '/api/login', {'email': 'one@example.com', 'password': 'wrong-password'})[0], 401)
-        self.assertEqual(self.request('POST', '/api/signup', {'name': 'Again', 'email': 'ONE@example.com', 'password': 'strong-password-123'})[0], 409)
-        self.assertEqual(self.request('POST', '/api/login', {'email': 'one@example.com', 'password': 'strong-password-123'})[0], 200)
+        self.assertEqual(self.request('POST', '/api/signup', {'confirmPassword': 'pass-123', 'signupCode': '777', 'name': 'Again', 'email': 'ONE@example.com', 'password': 'pass-123'})[0], 409)
+        self.assertEqual(self.request('POST', '/api/login', {'email': 'one@example.com', 'password': 'pass-123'})[0], 200)
         now = int(server.time.time())
         start = now // 3600 * 3600
         order = {'coin': 'BTC', 'marketId': '60-0', 'side': 'up', 'budget': 50, 'requestId': 'test-request-00000001', 'startsAt': start * 1000, 'strike': 100, 'cents': 68}
@@ -182,17 +256,17 @@ class AccountsTest(unittest.TestCase):
         _, settled, _ = self.request('GET', '/api/account', cookie=cookie)
         self.assertEqual(settled['user']['balance_cents'], 1425000 - 5000 + 7353)
         self.assertEqual(settled['predictions'][0]['outcome'], 'up')
-        status, _, other_cookie = self.request('POST', '/api/signup', {'name': 'Other', 'email': 'other@example.com', 'password': 'strong-password-456'})
+        status, _, other_cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-456', 'signupCode': '777', 'name': 'Other', 'email': 'other@example.com', 'password': 'pass-456'})
         self.assertEqual(status, 200)
         self.assertEqual(self.request('GET', '/api/account', cookie=other_cookie)[1]['predictions'], [])
         with server.connect() as conn:
             saved = conn.execute('SELECT password_hash FROM users LIMIT 1').fetchone()[0]
-            self.assertNotEqual(saved, 'strong-password-123')
+            self.assertNotEqual(saved, 'pass-123')
         self.assertEqual(self.request('POST', '/api/logout', {}, cookie, csrf)[0], 200)
         self.assertEqual(self.request('GET', '/api/account', cookie=cookie)[0], 401)
 
     def test_live_execution_accepts_updated_benchmark_and_quote_until_cutoff(self):
-        _, _, cookie = self.request('POST', '/api/signup', {'name': 'Live', 'email': 'live@example.com', 'password': 'strong-password-123'})
+        _, _, cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-123', 'signupCode': '777', 'name': 'Live', 'email': 'live@example.com', 'password': 'pass-123'})
         csrf = self.request('GET', '/api/account', cookie=cookie)[1]['csrf']
         start = int(server.time.time()) // 3600 * 3600
         order = {'coin': 'BTC', 'marketId': '60-0', 'side': 'up', 'budget': 50, 'requestId': 'live-request-00000001', 'startsAt': start * 1000, 'strike': 99, 'cents': 10}
@@ -237,7 +311,7 @@ class AccountsTest(unittest.TestCase):
             self.assertTrue(all(c[1] <= min(c[3], c[4]) <= max(c[3], c[4]) <= c[2] for c in candles))
             self.assertEqual(self.request('GET', '/api/spot?coin=BTC')[0], 400)
             self.assertEqual(self.request('GET', f'/api/candles?coin=WTI&start=0&end={now}')[0], 400)
-            _, _, cookie = self.request('POST', '/api/signup', {'name':'Oil player', 'email':'oil@example.com', 'password':'strong-password-oil'})
+            _, _, cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-oil', 'signupCode': '777', 'name':'Oil player', 'email':'oil@example.com', 'password':'pass-oil'})
             account = self.request('GET', '/api/account', cookie=cookie)[1]
             csrf = account['csrf']
             order = {'coin':'WTI', 'marketId':'60-0', 'side':'up', 'budget':50, 'requestId':'oil-test-request-0001', 'startsAt':start*1000}
@@ -280,7 +354,7 @@ class AccountsTest(unittest.TestCase):
         added = next(c for c in catalog['coins'] if c['symbol'] == 'TEST')
         self.assertEqual(added['enabled'], 0)
         self.assertEqual(added['name'], 'Renamed coin')
-        status, _, cookie = self.request('POST', '/api/signup', {'name':'Catalog user','email':'catalog@example.com','password':'strong-password-789'})
+        status, _, cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-789', 'signupCode': '777', 'name':'Catalog user','email':'catalog@example.com','password':'pass-789'})
         self.assertEqual(status, 200)
         csrf = self.request('GET', '/api/account', cookie=cookie)[1]['csrf']
         self.assertEqual(self.request('POST', '/api/predictions', {'coin':'TEST','marketId':'60-0','side':'up'}, cookie, csrf)[0], 400)
@@ -293,7 +367,7 @@ class AccountsTest(unittest.TestCase):
             self.assertIn('/products/CUSTOM-USD/candles?', request.call_args.args[0].full_url)
 
     def test_win_loss_settlement_credits_once_and_is_user_scoped(self):
-        status, _, cookie = self.request('POST','/api/signup',{'name':'Settlement user','email':'settle@example.com','password':'strong-password-999'})
+        status, _, cookie = self.request('POST','/api/signup',{'confirmPassword': 'pass-999', 'signupCode': '777', 'name':'Settlement user','email':'settle@example.com','password':'pass-999'})
         self.assertEqual(status,200)
         _, account, _ = self.request('GET','/api/account',cookie=cookie)
         user_id=account['user']['id'];csrf=account['csrf']
@@ -371,9 +445,9 @@ class AccountsTest(unittest.TestCase):
     def test_markets_require_login(self):
         self.assertEqual(self.request('GET', '/index.html?category=oil')[0], 302)
         self.assertEqual(self.request('GET', '/categories.html')[0], 302)
-        _, account, cookie = self.request('POST', '/api/signup', {
+        _, account, cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-123', 'signupCode': '777',
             'name': 'Market access', 'email': 'market-access@example.com',
-            'password': 'strong-password-123'})
+            'password': 'pass-123'})
         self.assertEqual(self.request('GET', '/index.html?category=oil', cookie=cookie)[0], 302)
         self.assertEqual(self.request('GET', '/categories.html', cookie=cookie)[0], 200)
         for path in ['/', '/welcome.html']:
@@ -392,9 +466,9 @@ class AccountsTest(unittest.TestCase):
 
     def test_community_counts_track_unique_recent_sessions(self):
         before = self.request('GET', '/api/community')[1]
-        _, _, cookie = self.request('POST', '/api/signup', {
+        _, _, cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-123', 'signupCode': '777',
             'name': 'Community member', 'email': 'community@example.com',
-            'password': 'strong-password-123'})
+            'password': 'pass-123'})
         counts = self.request('GET', '/api/community', cookie=cookie)[1]
         self.assertEqual(counts['users'], before['users'] + 1)
         self.assertEqual(counts['activeUsers'], before['activeUsers'] + 1)

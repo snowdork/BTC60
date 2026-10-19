@@ -8,7 +8,11 @@ services:
       PREDICT60_DB: /app/data/p60.sqlite3
       P60_HOST: https://${P60_DOMAIN:?Set P60_DOMAIN in .env}
       P60_TRUSTED_PROXIES: 172.30.60.2
+      P60_MAX_REQUESTS: ${P60_MAX_REQUESTS:-32}
       PREDICT60_LOG_LEVEL: ${PREDICT60_LOG_LEVEL:-normal}
+      P60_SPONSOR_NAME: ${P60_SPONSOR_NAME:-}
+      P60_SPONSOR_URL: ${P60_SPONSOR_URL:-}
+      P60_SPONSOR_MESSAGE: ${P60_SPONSOR_MESSAGE:-}
       OILPRICE_API_KEY: ${OILPRICE_API_KEY:-}
       TWELVE_DATA_API_KEY: ${TWELVE_DATA_API_KEY:-}
     volumes:
@@ -17,7 +21,7 @@ services:
       - p60
     read_only: true
     tmpfs:
-      - /tmp
+      - /tmp:size=64m
     cap_drop:
       - ALL
     security_opt:

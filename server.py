@@ -1,9 +1,11 @@
 """Local Predict60 demo server: SQLite accounts, sessions, orders and settlements."""
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from decimal import Decimal, ROUND_CEILING
 import argparse
 import ipaddress
 import odds
+import contests
 import simulated_prices
 import live_oil
 import oilprice_api
@@ -37,6 +39,7 @@ if not DEFAULT_DB.exists() and LEGACY_DB.exists():
 DB = Path(os.environ.get('PREDICT60_DB') or os.environ.get('P60_DB')
           or os.environ.get('BTC60_DB') or DEFAULT_DB)
 QUOTES = {'60-0': 68, '30-0': 54, '30-1': 58, '15-0': 49, '15-1': 57, '15-2': 62, '15-3': 50}
+MAX_PREDICTION_CREDITS = 1000
 COMING_SOON_CATEGORIES = {'oil', 'weather'}
 AUTH_ATTEMPTS = {}
 AUTH_LOCK = threading.Lock()
@@ -44,6 +47,7 @@ SETTLE_LOCK = threading.Lock()
 STATIC_CACHE = {}
 LOG = logging.getLogger(__name__)
 PUBLIC_FILES = {
+    'contests.html', 'contests.js', 'contests.css', 'sponsor.js',
     'account.js',
     'app.js',
     'auth.css',
@@ -136,13 +140,50 @@ class Predict60HTTPServer(ThreadingHTTPServer):
     request_queue_size = 128
     allow_reuse_address = True
 
+    def __init__(self, *args, **kwargs):
+        """Limit in-flight HTTP threads so bursts cannot exhaust VPS memory."""
+        limit = int(os.environ.get('P60_MAX_REQUESTS', '32'))
+        if not 1 <= limit <= 256:
+            raise ValueError('P60_MAX_REQUESTS must be between 1 and 256.')
+        self.request_slots = threading.BoundedSemaphore(limit)
+        super().__init__(*args, **kwargs)
 
+    def process_request(self, request, client_address):
+        """Reject overload promptly instead of creating an unbounded request thread."""
+        if not self.request_slots.acquire(blocking=False):
+            try:
+                request.settimeout(1)
+                request.sendall(b'HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nRetry-After: 1\r\nConnection: close\r\n\r\n')
+            except OSError:
+                pass
+            finally:
+                self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self.request_slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        """Return the concurrency slot even if a request handler raises."""
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self.request_slots.release()
+
+
+@contextmanager
 def connect():
-    """Open the configured SQLite database with foreign keys and a 15-second busy timeout."""
+    """Commit or roll back one database scope and always close its connection."""
     conn = sqlite3.connect(DB, timeout=15)
-    conn.row_factory = sqlite3.Row
-    conn.execute('PRAGMA foreign_keys=ON')
-    return conn
+    try:
+        conn.row_factory = sqlite3.Row
+        conn.execute('PRAGMA foreign_keys=ON')
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def initialize():
@@ -191,7 +232,11 @@ def initialize():
         WHEN EXISTS(SELECT 1 FROM predictions WHERE coin=OLD.symbol)
         BEGIN SELECT RAISE(ABORT,'Coin has predictions; preserve its symbol'); END;
         CREATE INDEX IF NOT EXISTS predictions_user ON predictions(user_id,created_at);
+        CREATE INDEX IF NOT EXISTS predictions_due ON predictions(ends_at);
+        CREATE INDEX IF NOT EXISTS predictions_user_window ON predictions(user_id,coin,starts_at,ends_at);
+        CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at);
         ''')
+        contests.initialize(conn)
         if 'last_seen_at' not in {row['name'] for row in conn.execute('PRAGMA table_info(sessions)')}:
             conn.execute('ALTER TABLE sessions ADD COLUMN last_seen_at INTEGER NOT NULL DEFAULT 0')
         if seed_coins:
@@ -361,9 +406,17 @@ def estimated_up(strike, spot, now, start, end, volatility, calibration=None):
 
 HISTORY_CACHE = {}
 HISTORY_LOCK = threading.Lock()
+# Fixed stripes bound lock memory while coalescing simultaneous cold loads.
+HISTORY_LOAD_LOCKS = tuple(threading.Lock() for _ in range(32))
 
 
 def pricing_history(product, now, instrument=None):
+    """Coalesce concurrent history loads for a product before checking the minute cache."""
+    with HISTORY_LOAD_LOCKS[hash(product) % len(HISTORY_LOAD_LOCKS)]:
+        return _pricing_history(product, now, instrument)
+
+
+def _pricing_history(product, now, instrument=None):
     """Load and combine provider minute history for the trailing volatility window."""
     if instrument and instrument['feed']=='oilpriceapi':
         return oilprice_api.candles(product,0,0)
@@ -421,19 +474,31 @@ def market_up(coin, strike, spot, now, start, end, source=None):
 def _settle_due(user_id=None):
     """Settle due orders from their frozen provider snapshots, crediting each winning payout only once."""
     with connect() as conn:
-        pending = conn.execute('SELECT p.* FROM predictions p LEFT JOIN settlements s ON s.prediction_id=p.id WHERE s.prediction_id IS NULL AND p.ends_at<=? AND (? IS NULL OR p.user_id=?)', (int(time.time()) - 5, user_id, user_id)).fetchall()
-    prices = {}
+        query = ('SELECT p.*,ps.provider AS frozen_provider,ps.product AS frozen_product '
+                 'FROM predictions p LEFT JOIN settlements s ON s.prediction_id=p.id '
+                 'LEFT JOIN prediction_sources ps ON ps.prediction_id=p.id '
+                 'WHERE s.prediction_id IS NULL AND p.ends_at<=?')
+        parameters = [int(time.time()) - 5]
+        if user_id is not None:
+            query += ' AND p.user_id=?'
+            parameters.append(user_id)
+        pending = conn.execute(query, parameters).fetchall()
+    prices, sources, failed = {}, {}, set()
     for p in pending:
-        with connect() as conn:
-            snapshot=conn.execute('SELECT provider,product FROM prediction_sources WHERE prediction_id=?',(p['id'],)).fetchone()
-        source=instrument_source(p['coin'],legacy=True)
-        if snapshot:source.update(feed=snapshot['provider'],product=snapshot['product'])
+        if p['coin'] not in sources:
+            sources[p['coin']] = instrument_source(p['coin'], legacy=True)
+        source = dict(sources[p['coin']])
+        if p['frozen_provider'] is not None:
+            source.update(feed=p['frozen_provider'], product=p['frozen_product'])
         key = (p['coin'], p['ends_at'], source['feed'], source['product'])
+        if key in failed:
+            continue
         try:
             if key not in prices:
                 prices[key] = candle_close(p['coin'],p['ends_at'],source=source)
             close = prices[key]
         except Exception:
+            failed.add(key)
             LOG.debug('Settlement deferred prediction=%s', p['id'], exc_info=True)
             continue  # Keep pending and retry; never invent a settlement.
         outcome = 'up' if close >= p['strike'] else 'down'
@@ -443,7 +508,8 @@ def _settle_due(user_id=None):
             settlement_source='Twelve Data live oil minute close' if source['feed']=='twelvedata' else 'Simulated oil minute close · '+simulated_prices.VERSION if source['feed']=='simulated' else 'Coinbase minute-close proxy'
             inserted = conn.execute('INSERT OR IGNORE INTO settlements(prediction_id,close_price,outcome,payout_cents,settled_at,source) VALUES(?,?,?,?,?,?)', (p['id'], close, outcome, payout, int(time.time()), settlement_source)).rowcount
             if inserted:
-                conn.execute('UPDATE users SET balance_cents=balance_cents+? WHERE id=?', (payout, p['user_id']))
+                if not conn.execute('SELECT 1 FROM contest_entries WHERE prediction_id=?', (p['id'],)).fetchone():
+                    conn.execute('UPDATE users SET balance_cents=balance_cents+? WHERE id=?', (payout, p['user_id']))
         if inserted:
             LOG.info('Settlement prediction=%s user=%s coin=%s outcome=%s payout_cents=%s',
                      p['id'], p['user_id'], p['coin'], outcome, payout)
@@ -454,6 +520,9 @@ def settle_due(user_id=None):
     if SETTLE_LOCK.acquire(blocking=False):
         try:
             _settle_due(user_id)
+            with connect() as conn:
+                conn.execute('BEGIN IMMEDIATE')
+                contests.finalize(conn)
         finally:
             SETTLE_LOCK.release()
 
@@ -556,16 +625,26 @@ class Handler(SimpleHTTPRequestHandler):
         """Build the signed-in account snapshot with saved predictions, settlement results, and CSRF token."""
         with connect() as conn:
             user = conn.execute('SELECT id,name,email,balance_cents FROM users WHERE id=?', (session['user_id'],)).fetchone()
-            positions = [dict(row) for row in conn.execute('SELECT p.*,i.category,i.name AS instrument_name,i.unit,ps.provider AS pricing_source,s.close_price,s.outcome,s.payout_cents,s.settled_at,s.source FROM predictions p JOIN coins i ON i.symbol=p.coin LEFT JOIN prediction_sources ps ON ps.prediction_id=p.id LEFT JOIN settlements s ON s.prediction_id=p.id WHERE p.user_id=? ORDER BY p.created_at DESC', (session['user_id'],))]
-        return {'user': dict(user), 'csrf': session['csrf'], 'predictions': positions}
+            positions = [dict(row) for row in conn.execute("SELECT p.*,CASE WHEN ce.prediction_id IS NULL THEN 'practice' ELSE 'contest' END AS mode,i.category,i.name AS instrument_name,i.unit,ps.provider AS pricing_source,s.close_price,s.outcome,s.payout_cents,s.settled_at,s.source FROM predictions p LEFT JOIN contest_entries ce ON ce.prediction_id=p.id JOIN coins i ON i.symbol=p.coin LEFT JOIN prediction_sources ps ON ps.prediction_id=p.id LEFT JOIN settlements s ON s.prediction_id=p.id WHERE p.user_id=? ORDER BY p.created_at DESC", (session['user_id'],))]
+            contest_wallet = contests.wallet(conn, session['user_id'])
+        return {'user': dict(user), 'csrf': session['csrf'], 'predictions': positions, 'contestWallet': contest_wallet}
 
     def do_GET(self):
         """Dispatch read endpoints and enforce authentication and the static-file allowlist."""
         path = urllib.parse.urlsplit(self.path).path
+        if path == '/api/sponsor':
+            return self.reply(200, contests.sponsor())
+        if path == '/api/contests':
+            session = self.session()
+            if not session:
+                return self.reply(401, {'error': 'Log in to view contests.'})
+            with connect() as conn:
+                dashboard = contests.dashboard(conn, session['user_id'])
+            return self.reply(200, dashboard)
         if path == '/healthz':
             try:
                 with connect() as conn:
-                    conn.execute('SELECT 1').fetchone()
+                    conn.execute('SELECT id FROM users LIMIT 1').fetchone()
                 return self.reply(200, {'ok': True})
             except (OSError, sqlite3.Error):
                 return self.reply(503, {'ok': False})
@@ -660,7 +739,7 @@ class Handler(SimpleHTTPRequestHandler):
         if relative == 'index.html' and set(urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('category', [])) & COMING_SOON_CATEGORIES:
             return self.redirect('/welcome.html')
         # Protect direct terminal/category URLs independently of client-side navigation.
-        if relative in {'index.html', 'categories.html'} and not self.session():
+        if relative in {'index.html', 'categories.html', 'contests.html'} and not self.session():
             return self.redirect('/welcome.html')
         self.serve_static()
 
@@ -759,12 +838,24 @@ class Handler(SimpleHTTPRequestHandler):
             if len(attempts) >= 20:
                 return self.reply(429, {'error': 'Too many attempts. Try again in a minute.'})
             attempts.append(now)
+        if path == '/api/signup':
+            signup_code = data.get('signupCode')
+            if not isinstance(signup_code, str) or not secrets.compare_digest(signup_code.encode('utf-8'), b'777'):
+                return self.reply(403, {'error': 'Invalid signup code.'})
         email, password = data.get('email', ''), data.get('password', '')
         if not isinstance(email, str) or not isinstance(password, str):
             raise ValueError('Enter a valid email and password.')
         email = email.strip().lower()
-        if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', email) or len(email) > 254 or not 10 <= len(password) <= 128:
-            raise ValueError('Use a valid email and a password of 10–128 characters.')
+        if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', email) or len(email) > 254:
+            raise ValueError('Enter a valid email address.')
+        if path == '/api/signup':
+            if not 8 <= len(password) <= 16:
+                raise ValueError('Use a password of 8–16 characters.')
+            confirmation = data.get('confirmPassword')
+            if not isinstance(confirmation, str) or not secrets.compare_digest(password.encode('utf-8'), confirmation.encode('utf-8')):
+                raise ValueError('Passwords do not match.')
+        elif not 8 <= len(password) <= 128:
+            raise ValueError('Enter your password.')
         with connect() as conn:
             if path == '/api/signup':
                 name = data.get('name', '')
@@ -788,6 +879,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def predict(self, session, data):
         """Validate order timing and budget, freeze the provider quote, and atomically debit and save an idempotent order."""
+        mode = data.get('mode', 'practice')
+        if mode not in ('practice', 'contest'):
+            raise ValueError('Choose practice or contest mode.')
         coin, market_id, side = data.get('coin'), data.get('marketId'), data.get('side')
         budget, request_id = data.get('budget'), data.get('requestId')
         if not isinstance(coin, str) or not isinstance(market_id,str) or not isinstance(side,str):
@@ -798,8 +892,8 @@ class Handler(SimpleHTTPRequestHandler):
             raise ValueError('Invalid market or prediction.')
         if available_coin['category'] in COMING_SOON_CATEGORIES:
             raise ValueError(f"{available_coin['category'].title()} predictions are coming soon.")
-        if isinstance(budget, bool) or not isinstance(budget, (int, float)) or not math.isfinite(budget) or not 1 <= budget <= 1000000:
-            raise ValueError('Enter a valid budget.')
+        if isinstance(budget, bool) or not isinstance(budget, (int, float)) or not math.isfinite(budget) or not 1 <= budget <= MAX_PREDICTION_CREDITS:
+            raise ValueError('Enter a prediction budget from 1 to 1,000 credits.')
         if not isinstance(request_id, str) or not re.fullmatch(r'[a-zA-Z0-9-]{16,80}', request_id):
             raise ValueError('Invalid request ID.')
         with connect() as conn:
@@ -834,11 +928,15 @@ class Handler(SimpleHTTPRequestHandler):
             else:
                 if time.time() >= end - 30:
                     raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
-                changed = conn.execute('UPDATE users SET balance_cents=balance_cents-? WHERE id=? AND balance_cents>=?', (cost, session['user_id'], cost)).rowcount
-                if not changed or contracts <= 0:
-                    raise ValueError('Insufficient demo balance.')
+                if mode == 'practice':
+                    changed = conn.execute('UPDATE users SET balance_cents=balance_cents-? WHERE id=? AND balance_cents>=?', (cost, session['user_id'], cost)).rowcount
+                    if not changed or contracts <= 0:
+                        raise ValueError('Insufficient credits.')
                 conn.execute('INSERT INTO predictions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', (secrets.token_hex(16), session['user_id'], request_id, coin, market_id, side, start, end, strike, cents, contracts, cost, now))
                 conn.execute('INSERT INTO prediction_sources VALUES(?,?,?)',(conn.execute('SELECT id FROM predictions WHERE user_id=? AND request_id=?',(session['user_id'],request_id)).fetchone()['id'],source['feed'],source['product']))
+                if mode == 'contest':
+                    prediction_id = conn.execute('SELECT id FROM predictions WHERE user_id=? AND request_id=?', (session['user_id'], request_id)).fetchone()['id']
+                    contests.enter(conn, prediction_id, session['user_id'], coin, start, end, cost)
                 created = True
         if created:
             LOG.info('Prediction created user=%s coin=%s market=%s side=%s cost_cents=%s',

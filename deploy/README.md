@@ -103,3 +103,10 @@ all work through the public hostname.
 Public self-service accounts still need an email provider and product decisions
 for address verification and password recovery. Until those exist, treat the
 deployment as a controlled beta rather than unrestricted public signup.
+
+## Contests and sponsors
+
+Startup adds contest tables automatically; back up before upgrading. Sponsor
+configuration and the local prize CLI are documented in
+[contest operations](../doc/CONTEST_OPERATIONS.md). Prize pools are unconfigured
+by default. Docker rebuilds must include the new contest module and admin script.

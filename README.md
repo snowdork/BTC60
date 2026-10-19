@@ -1,6 +1,6 @@
 # Predict60 — Hourly prediction terminal
 
-Predict60 is a buildless web app for exploring hourly direction predictions with demo funds. See a complete UTC hour at once: one 60-minute market, two 30-minute markets, and four 15-minute markets, with a live chart and a persistent order ticket.
+Predict60 is a buildless web app for exploring hourly direction predictions with game credits. See a complete UTC hour at once: one 60-minute market, two 30-minute markets, and four 15-minute markets, with a live chart and a persistent order ticket.
 
 ![Predict60 terminal with an hourly chart, aligned prediction intervals, and an order ticket](assets/previews/prediction-playfield.png)
 
@@ -12,7 +12,7 @@ Predict60 is a buildless web app for exploring hourly direction predictions with
 - **Live market context:** Coinbase Exchange ticker updates and minute-candle history, with separate spot freshness, history, and order-readiness indicators.
 - **Demo predictions:** choose Up or Down, set a budget, and review whole-contract cost, possible return, and potential profit. Model percentages determine simulated contract prices.
 - **Live confirmation:** review follows the market; the server executes at its current model price within your budget. Final quantity and return can differ from review.
-- **Persistent accounts:** signup/login, $14,250 starting demo balance, saved predictions, and automatic settlement backed by SQLite.
+- **Persistent accounts:** signup/login, 14,250 starting credits, saved predictions, and automatic settlement backed by SQLite.
 - **Portfolio tracking:** pending orders, wins, losses, returns, and realized profit/loss, with committed funds shown separately.
 - **Display controls:** light/dark themes, responsive layouts, chart pause, reconnect, and an explicit synthetic preview mode.
 
@@ -32,7 +32,15 @@ BTC · ETH · SOL · XRP · DOGE · ADA · LTC. The database catalog controls av
 
 ### Prediction rules
 
-Up wins when the closing benchmark is greater than or equal to the opening benchmark; Down wins when it is lower. Each benchmark uses the minute candle close immediately before its interval boundary. A winning contract returns $1; a losing contract returns $0, with zero demo fees. Missing history leaves orders awaiting settlement for retry.
+Prediction budgets are limited to **1–1,000 credits** per submission, enforced by
+the server and browser. Credits are game points; market prices remain USD.
+Daily/hourly contests now have separate allowances, leaderboards, and final winners.
+Open **Contests & winners** to play or inspect results. Sponsor and prize setup is
+documented in [contest operations](doc/CONTEST_OPERATIONS.md);
+[revenue research](doc/CONTEST_REVENUE_PLAN.md) covers provider options.
+Live advertising networks and automatic prize delivery are not connected.
+
+Up wins when the closing benchmark is greater than or equal to the opening benchmark; Down wins when it is lower. Each benchmark uses the minute candle close immediately before its interval boundary. A winning contract returns 1 credit; a losing contract returns 0 credits, with zero demo fees. Missing history leaves orders awaiting settlement for retry.
 
 These are uncalibrated model estimates, simulated prices, and Coinbase minute-close proxy results. Predict60 does not trade real money or claim official Kalshi or CF Benchmarks settlement. Synthetic preview and historical views cannot place orders.
 
@@ -135,10 +143,12 @@ the console and support the same `--log-level` option.
 
 - [Project TODO](TODO.md): deferred launch work and prerequisites for re-enabling features.
 - [Admin guide](doc/ADMIN_GUIDE.md): server scripts, log levels, rotation, maintenance, and troubleshooting.
+- [Contest operations](doc/CONTEST_OPERATIONS.md): UTC scoring, sponsor strip, and prize review.
 - [Test guide](doc/TEST_GUIDE.md): regression tests, Docker health, crash recovery, and restore checks.
 - [User guide](doc/USER_GUIDE.md): accounts, predictions, history, portfolio, and troubleshooting.
 - [Design](doc/DESIGN.md): interaction, pricing, settlement, architecture, and persistence.
 - [Database maintenance](doc/DATABASE_MAINTENANCE.md): initialization, inspection, backups, and explicit reset.
+- [VPS performance review](doc/VPS_PERFORMANCE.md): resource limits, query improvements, and local measurements.
 - [VPS deployment](deploy/README.md): Caddy, systemd, secrets, backups, and cutover checks.
 
 ## Code documentation (Sphinx)
@@ -177,7 +187,7 @@ Tests cover market calculations, catalog/bootstrap behavior, portfolio summaries
 
 ## Data and catalog
 
-New installations use `data/p60.sqlite3`; `PREDICT60_DB` or `P60_DB` selects another path. Existing `data/btc60.sqlite3` databases remain in use when the new default does not exist. Legacy `BTC60_*` environment variables remain fallbacks after `PREDICT60_*` and `P60_*`. Session cookies and browser theme storage now use the `p60_` prefix; users must sign in again and reselect their theme after upgrading. Startup creates missing tables and applies catalog migrations. Accounts start with $14,250 in demo funds. Browser-only positions are not imported. Database files and backups are excluded from Git.
+New installations use `data/p60.sqlite3`; `PREDICT60_DB` or `P60_DB` selects another path. Existing `data/btc60.sqlite3` databases remain in use when the new default does not exist. Legacy `BTC60_*` environment variables remain fallbacks after `PREDICT60_*` and `P60_*`. Session cookies and browser theme storage now use the `p60_` prefix; users must sign in again and reselect their theme after upgrading. Startup creates missing tables and applies catalog migrations. Accounts start with 14,250 game credits. Browser-only positions are not imported. Database files and backups are excluded from Git.
 
 The database `coins` table is authoritative. The crypto seed has ten records: BTC, ETH, SOL, XRP, DOGE, ADA, and LTC enabled; LINK, TRUMP, and AVAX disabled. Existing databases can have administrator edits. Triggers allow at most eight enabled instruments per category. Disabling a coin blocks new orders while preserving history and settlement. Keep referenced symbols and product mappings stable.
 

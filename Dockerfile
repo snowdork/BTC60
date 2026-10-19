@@ -10,10 +10,10 @@ RUN groupadd --gid 10001 p60 \
     && mkdir /app/data \
     && chown p60:p60 /app/data
 
-COPY server.py p60_logging.py odds.py simulated_prices.py live_oil.py oilprice_api.py weather.py ./
+COPY server.py contests.py p60_logging.py odds.py simulated_prices.py live_oil.py oilprice_api.py weather.py ./
 COPY *.html *.css *.js *.seed.json ./
 COPY assets/ ./assets/
-COPY scripts/database.py ./scripts/database.py
+COPY scripts/database.py scripts/contest-admin.py ./scripts/
 
 USER p60
 EXPOSE 8000

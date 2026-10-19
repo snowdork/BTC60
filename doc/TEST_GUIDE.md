@@ -34,6 +34,18 @@ Use `node --test *.test.js` if your Node version does not expand the quoted glob
 The help output should show `--bind` with default `127.0.0.1`. Docker overrides
 that address with `0.0.0.0`; this does not publish the port on the VPS.
 
+## Credit limits
+
+The API and quote-model tests cover acceptance at 1,000 credits and rejection
+above the cap, including fractional overages and unchanged balances after a
+rejection. In the browser, check that MAX selects the smaller of 1,000 and the
+available balance. Confirm account/portfolio values show credits while live
+crypto prices and settlement benchmarks still show USD. Existing amounts are
+preserved in hundredths of a credit. Contest tests cover allowance limits, concurrent entries, UTC rollover, score
+finalization, ties, prize allocation retries, and private-reference isolation.
+External gift-card delivery is not implemented. Gift cards are the only supported
+prize type; tests reject other types on both new and existing database schemas.
+
 ## Docker configuration and startup
 
 Follow [Docker setup](../deploy/DOCKER.md) to configure a test domain in `.env`.
@@ -105,3 +117,46 @@ the development environment used to prepare these files, so image build,
 container restart behavior, HTTPS issuance, and VPS reboot/restore checks remain
 unverified. Record the release commit, host, commands, and results when running
 these checks; do not treat mocked tests as a live-feed or capacity test.
+
+## Contest and sponsor acceptance checks
+
+Run `python3 -m unittest contests_test` for backend and HTTP checks. In a browser,
+use two disposable accounts and confirm:
+
+1. The terminal defaults to Daily contest. Practice mode displays its separate
+   balance and never changes a contest score.
+2. A 600-credit contest entry leaves 400 for that instrument/interval, including
+   the opposite direction. MAX reflects this; API bypass attempts are rejected.
+3. Contest history and practice history remain separate in the portfolio filter.
+4. Closed hourly and daily periods show final winners only after all entries
+   settle; ties retain equal rank. Old practice predictions never appear.
+5. Sponsor configuration renders a labeled HTTPS link. With no configuration or
+   a failed sponsor request, the game remains usable and no banner is inserted.
+6. Only the signed-in user's prize records appear. Funding references, delivery
+   references, email addresses, and audit notes are absent from dashboard output.
+7. Using a temporary database, reserve a future pool via the CLI and check that
+   it appears as upcoming, is allocated once, and cannot skip prize review.
+
+Do not use real ad tags or send real gift cards during automated tests. No
+browser was connected during implementation; rendered desktop/mobile layout and
+these manual interface checks still require a browser-capable environment.
+
+## Signup access code
+
+New account creation requires the organizer's signup code. API tests cover
+missing, incorrect, non-string, and whitespace-altered codes, ensuring rejected
+requests create neither an account nor a session. Login remains code-free.
+The signup form sends the code to the server; it does not embed the expected
+value in browser assets.
+
+New signup passwords accept 8–16 characters and require a matching verification
+value on both client and server. Check exact length boundaries, mismatches, and
+Show/Hide controls for each password/code field. Existing accounts with longer
+passwords can still log in; login requires neither confirmation nor signup code.
+
+## VPS resource regressions
+
+`python3 -m unittest performance_test` checks database closure/rollback, read-only
+contest polling under a writer lock, concurrent history request sharing, failed
+settlement deduplication, and HTTP overload recovery. These use temporary data
+and mocked providers; see [local performance measurements](VPS_PERFORMANCE.md).

@@ -5,8 +5,8 @@ const fs=require('node:fs');
 function setup(mode,fetch){
  const button={},error={},location={href:''};let submit;
  const form={dataset:{mode},querySelector:()=>button,addEventListener:(name,fn)=>submit=fn};
- const fields={email:'test@example.com',password:'test-password',...(mode==='signup'?{name:'Taylor'}:{})};
- const context={document:{getElementById:id=>id==='auth-form'?form:error},location,fetch,SyntaxError,FormData:class{[Symbol.iterator](){return Object.entries(fields)[Symbol.iterator]();}}};
+ const fields={email:'test@example.com',password:'test-password',...(mode==='signup'?{name:'Taylor',signupCode:'777',confirmPassword:'test-password'}:{})};
+ const context={document:{querySelectorAll:()=>[],getElementById:id=>id==='auth-form'?form:error},location,fetch,SyntaxError,FormData:class{[Symbol.iterator](){return Object.entries(fields)[Symbol.iterator]();}}};
  vm.runInNewContext(fs.readFileSync('auth.js','utf8'),context);
  return {button,error,location,submit:()=>submit({preventDefault(){}}),fields};
 }
@@ -26,4 +26,26 @@ test('submission is disabled while pending and recovers from non-JSON responses'
  const pending=s.submit();assert.equal(s.button.disabled,true);
  finish({ok:true,json:async()=>{throw new SyntaxError('HTML response');}});await pending;
  assert.match(s.error.textContent,/python3 server.py/);assert.equal(s.location.href,'');assert.equal(s.button.disabled,false);
+});
+
+test('invalid signup code stays on signup with a retryable error',async()=>{
+ const s=setup('signup',async()=>({ok:false,json:async()=>({error:'Invalid signup code.'})}));
+ s.fields.signupCode='wrong';await s.submit();
+ assert.equal(s.error.textContent,'Invalid signup code.');
+ assert.equal(s.location.href,'');assert.equal(s.button.disabled,false);
+});
+
+test('signup confirmation mismatch prevents the request',async()=>{
+ let calls=0;const s=setup('signup',async()=>{calls++;});s.fields.confirmPassword='different';
+ await s.submit();assert.equal(calls,0);assert.equal(s.error.textContent,'Passwords do not match.');assert.equal(s.button.disabled,false);
+});
+test('show controls toggle password and signup-code visibility without submitting',()=>{
+ for(const id of ['password','confirm-password','signup-code']){
+  const field={type:'password'},attrs={'aria-label':'Show secret'};let click;
+  const toggle={dataset:{togglePassword:id},getAttribute:name=>attrs[name],setAttribute:(name,value)=>attrs[name]=value,addEventListener:(name,fn)=>click=fn};
+  const form={addEventListener(){}};
+  vm.runInNewContext(fs.readFileSync('auth.js','utf8'),{document:{querySelectorAll:()=>[toggle],getElementById:key=>key===id?field:key==='auth-form'?form:{}}});
+  click();assert.equal(field.type,'text');assert.equal(toggle.textContent,'Hide');assert.equal(attrs['aria-pressed'],'true');
+  click();assert.equal(field.type,'password');assert.equal(toggle.textContent,'Show');assert.equal(attrs['aria-pressed'],'false');
+ }
 });
