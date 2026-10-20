@@ -5,6 +5,10 @@ and mocked providers; this is not a production VPS load test.
 
 ## Implemented improvements
 
+- Catalog reads now batch instrument/provider metadata: `/api/coins` uses one
+  SELECT and `/api/categories` uses two, regardless of the instrument count.
+  No catalog cache is added, so administrator edits remain visible immediately.
+  Regression checks cover the seeded catalog and 30 additional instruments.
 - Database scopes now commit/roll back and close connections deterministically.
   Python's SQLite context manager alone does not close connections; the old code
   relied on garbage collection. Backup/status/reset commands also close handles.
@@ -45,6 +49,11 @@ period INSERT attempts, isolating the query changes rather than comparing releas
 | Write attempts per existing-period dashboard call | 2 | 0 |
 | Median local dashboard computation | 12.54 ms | 9.75 ms |
 | Provider requests for eight simultaneous cold history loads | 48 | 6 |
+
+October 20 catalog cleanup, measured against the previous handlers using the same
+temporary seeded database: coin catalog SELECTs fell from **16 to 1**, and category
+catalog SELECTs from **5 to 2**. Both endpoint responses compared equal. These are
+query counts, not a claim about end-to-end production latency.
 
 History requests were mocked with a short delay to exercise concurrent cold
 misses. These counts do not establish real provider latency or availability.

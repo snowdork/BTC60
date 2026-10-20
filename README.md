@@ -58,6 +58,34 @@ python3 server.py
 
 Open http://127.0.0.1:8000 for the welcome page or http://127.0.0.1:8000/index.html for the terminal. Use `--port` to change the port. Internet access is required for live prices, benchmarks, and settlement. The terminal requires `/api/coins`; file previews and static hosting alone cannot initialize a working terminal or provide accounts.
 
+### Run locally with Docker
+
+Requires Docker Engine and the Docker Compose plugin. From the project root:
+
+```bash
+cp deploy/local.env.example .env.local
+chmod 600 .env.local
+sudo docker compose -f compose.local.yaml --env-file .env.local up -d --build
+```
+
+Open **http://localhost:8080**. The example signup code is `777`; change it in
+`.env.local` if preferred. An empty code disables signup. Repeat the last command
+after code changes to rebuild and recreate the app, then refresh your browser.
+Local Docker uses its own persistent `p60-local-data` volume and leaves the
+checkout's database unchanged.
+
+If switching from the earlier `docker run --name p60-local` instructions, first
+run `sudo docker stop p60-local` and `sudo docker rm p60-local` once. Compose
+reuses the same named data volume, preserving those accounts.
+
+```bash
+sudo docker compose -f compose.local.yaml --env-file .env.local logs -f app
+sudo docker compose -f compose.local.yaml --env-file .env.local down
+```
+
+`down` keeps account data; adding `--volumes` deletes it. The separate
+`compose.yaml` remains the domain-based HTTPS deployment.
+
 Behind an HTTPS reverse proxy, set `P60_HOST` to the exact public origin
 (scheme and hostname, optional port, no path or trailing slash):
 
@@ -210,7 +238,7 @@ Custom coins need a supported Coinbase USD product, display precision, positive 
 
 ## Static distribution and hosting
 
-`dist/` contains static copies, not a standalone account backend. After frontend changes, run `python3 scripts/build-static.py` to refresh the public HTML, CSS, browser JavaScript, and artwork in `dist/`. The build uses the server’s public file list and excludes backend scripts, tests, credentials, and account data. The welcome preview is `assets/previews/prediction-playfield.png`. `.openai/hosting.json` identifies the existing private Site.
+`dist/` contains generated static copies, not a standalone account backend. After frontend changes, run `python3 scripts/build-static.py` to refresh the public HTML, CSS, browser JavaScript, and artwork in `dist/`. The build uses the server’s public file list and excludes backend scripts, tests, credentials, and account data. It stages sources before updating output and removes obsolete files; keep hand-edited files outside `dist/`. The welcome preview is `assets/previews/prediction-playfield.png`. `.openai/hosting.json` identifies the existing private Site.
 
 The Python server binds to loopback for local development. Public account hosting requires a production server, HTTPS, Secure session cookies, and account recovery/email verification. Static hosting cannot replace the Python/SQLite API.
 

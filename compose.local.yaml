@@ -1,0 +1,34 @@
+name: p60-local
+
+services:
+  app:
+    build: .
+    image: p60:local
+    container_name: p60-local
+    restart: unless-stopped
+    stop_grace_period: 30s
+    ports:
+      - "127.0.0.1:8080:8000"
+    environment:
+      P60_HOST: http://localhost:8080
+      P60_SIGNUP_CODE: ${P60_SIGNUP_CODE:-}
+      PREDICT60_DB: /app/data/p60.sqlite3
+      PREDICT60_LOG_LEVEL: normal
+    volumes:
+      - data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "5"
+
+volumes:
+  data:
+    name: p60-local-data

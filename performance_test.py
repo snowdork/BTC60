@@ -1,5 +1,6 @@
 """Regression checks for bounded VPS resources and reduced duplicate database/provider work."""
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 import http.client
 import io
 import json
@@ -23,6 +24,42 @@ class ResourceTest(unittest.TestCase):
     def tearDown(self):
         server.DB = self.original
         self.temp.cleanup()
+
+    def test_catalog_query_counts_are_constant_as_instruments_grow(self):
+        original_connect = server.connect
+        statements = []
+
+        @contextmanager
+        def traced_connect():
+            with original_connect() as conn:
+                conn.set_trace_callback(statements.append)
+                yield conn
+
+        handler = object.__new__(server.Handler)
+        handler.reply = lambda status, body: (status, body)
+        for added in (0, 30):
+            if added:
+                with original_connect() as conn:
+                    for number in range(added):
+                        conn.execute(
+                            'INSERT INTO coins(symbol,name,product,precision,demo_base,icon,enabled,sort_order,category,feed,unit) '
+                            'VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+                            (f'TEST{number}', 'Extra', f'TEST{number}-USD', 2, 100, '', 0, number, 'crypto', 'coinbase', 'USD'),
+                        )
+            for path, expected in (('/api/coins', 1), ('/api/categories', 2)):
+                with self.subTest(added=added, path=path):
+                    statements.clear()
+                    handler.path = path
+                    with patch('server.connect', traced_connect), patch('server.oilprice_api.configured', return_value=False):
+                        status, body = handler.do_GET()
+                    self.assertEqual(status, 200)
+                    self.assertEqual(len([s for s in statements if s.lstrip().upper().startswith('SELECT')]), expected)
+                    if path == '/api/coins':
+                        coins = {coin['symbol']: coin for coin in body['coins']}
+                        self.assertEqual(coins['BTC']['feed'], 'coinbase')
+                        self.assertEqual(coins['WTI']['feed'], 'twelvedata')
+                        self.assertEqual(coins['DUBAI']['feedState'], 'unsupported')
+                        self.assertFalse(any('override_provider' in coin or 'override_product' in coin for coin in coins.values()))
 
     def test_database_scopes_commit_rollback_and_close_without_gc(self):
         with server.connect() as conn:

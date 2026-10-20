@@ -32,6 +32,8 @@
     if(!response.ok)throw Error('Categories unavailable');
     const {categories}=await response.json();
     if(!Array.isArray(categories)||!categories.length)throw Error('No categories available');
+    const marketOrder={crypto:0,oil:1,weather:2};
+    categories.sort((a,b)=>(marketOrder[a.id]??3)-(marketOrder[b.id]??3));
     document.getElementById('category-options').replaceChildren(...categories.map(category=>{
       const comingSoon=category.availability==='coming_soon';
       const link=document.createElement(comingSoon?'article':'a');link.className='category-card';link.dataset.category=category.id;

@@ -45,6 +45,43 @@ alongside the container against the same database.
 Predict60 runs on loopback behind Caddy. Systemd replaces the development
 watchdog, restarts the process, and captures stdout/stderr in the journal.
 
+## Install only the app service
+
+From an existing checkout owned by an unprivileged user on a systemd Linux host:
+
+```bash
+sudo bash deploy/install-service.sh
+sudoedit /etc/predict60/predict60.env
+sudo bash deploy/install-service.sh --start
+```
+
+The first command installs and enables `predict60.service` for boot without
+starting it. Set `P60_SIGNUP_CODE` in the private environment file to enable
+signup, and copy any provider credentials or custom database path used by your
+existing process. Existing environment files are preserved. With no explicit
+database path, the service uses this checkout's existing default database.
+For HTTPS, apply the origin, secure-cookie, and proxy settings from
+`predict60.env.example` once your reverse proxy is configured.
+
+The `--start` command stops this checkout's development watchdog and restarts the
+service, then checks `/healthz`. Stop any Docker deployment before switching to
+this service. The installer does not install packages or change Caddy or firewall
+rules. It binds to `127.0.0.1:8000`; use your reverse proxy for public access.
+Keep the checkout at its installed path. The unit runs `server.py` directly as
+the checkout owner, retries crashes every five seconds, and logs to the journal.
+
+```bash
+sudo systemctl start predict60
+sudo systemctl stop predict60
+sudo systemctl restart predict60
+sudo systemctl status predict60
+sudo journalctl -u predict60 -f
+```
+
+On systemd hosts, `sudo service predict60 start` (and `stop`, `restart`, or
+`status`) also works. To disable boot startup and stop it:
+`sudo systemctl disable --now predict60`.
+
 ## Enable HTTPS for an existing checkout
 
 For an existing checkout on an apt-based Linux VPS with systemd, the helper
@@ -55,7 +92,7 @@ sudo bash deploy/enable-vps.sh
 ```
 
 The checkout must belong to an unprivileged user and its path must contain no
-spaces or `%` characters. The helper targets **predict60.com**: point DNS at this
+characters other than letters, digits, `/`, `_`, `.`, or `-`. The helper targets **predict60.com**: point DNS at this
 VPS and make ports 80/443 available before running it. For another domain, adapt
 both `deploy/Caddyfile` and the helper’s `P60_HOST` and HTTPS health-check URL
 first. Resolve existing services using ports 80/443.

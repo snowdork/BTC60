@@ -1,4 +1,6 @@
-/** Change the signed-in user's password using the current session and CSRF token. */
+/** @module password
+ * Change the signed-in user's password using the current session and CSRF token.
+ */
 (() => {
   const form=document.getElementById('password-form'),error=document.getElementById('password-error'),status=document.getElementById('password-status');
   form.addEventListener('submit',async event=>{

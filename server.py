@@ -46,7 +46,17 @@ AUTH_LOCK = threading.Lock()
 SETTLE_LOCK = threading.Lock()
 STATIC_CACHE = {}
 LOG = logging.getLogger(__name__)
+PUBLIC_ASSETS = {
+    'assets/previews/prediction-playfield.png',
+    'assets/backgrounds/hourly-markets.webp',
+    'assets/brand/p60-mark.svg',
+    'assets/fonts/manrope-latin.woff2',
+    'assets/fonts/space-grotesk-latin.woff2',
+    'assets/fonts/manrope-OFL.txt',
+    'assets/fonts/spacegrotesk-OFL.txt',
+}
 PUBLIC_FILES = {
+    'brand.css',
     'password.html', 'password.js',
     'contests.html', 'contests.js', 'contests.css', 'sponsor.js',
     'account.js',
@@ -660,12 +670,21 @@ class Handler(SimpleHTTPRequestHandler):
         if path == '/api/categories':
             with connect() as conn:
                 categories = [dict(row) for row in conn.execute('SELECT c.*,count(i.symbol) AS instrumentCount FROM categories c LEFT JOIN coins i ON i.category=c.id AND i.enabled=1 GROUP BY c.id ORDER BY c.sort_order,c.id')]
+                instruments_by_category = {}
+                overrides = {}
+                for row in conn.execute(
+                    'SELECT i.symbol,i.name,i.category,s.coin AS override_coin,s.product '
+                    'FROM coins i LEFT JOIN instrument_sources s ON s.coin=i.symbol '
+                    'WHERE i.enabled=1 ORDER BY i.sort_order,i.symbol'
+                ):
+                    instruments_by_category.setdefault(row['category'], []).append(row)
+                    if row['override_coin'] is not None:
+                        overrides[row['symbol']] = row['product']
                 for category in categories:
                     if category['id'] == 'weather':
                         category.update(weather.catalog())
                         continue
-                    instruments=[dict(row) for row in conn.execute('SELECT symbol,name,feed FROM coins WHERE category=? AND enabled=1 ORDER BY sort_order,symbol',(category['id'],))]
-                    overrides={row['coin']:row['product'] for row in conn.execute('SELECT * FROM instrument_sources')}
+                    instruments = instruments_by_category.get(category['id'], [])
                     category['instruments']=[{'symbol':i['symbol'],'name':i['name'],'liveSupported':bool(overrides.get(i['symbol'])) if i['symbol'] in overrides else True} for i in instruments]
                     if any(i['symbol'] in overrides for i in instruments):
                         category.update(provider=oilprice_api.PROVIDER if oilprice_api.configured() else 'Twelve Data',feedState='configured' if oilprice_api.configured() or live_oil.configured() else 'setup_required',supportedCount=sum(bool(overrides.get(i['symbol'])) for i in instruments),quoteCadence='Spot assessments · hourly predictions unavailable' if oilprice_api.configured() else 'Minute updates')
@@ -675,11 +694,22 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(200, {'categories':categories})
         if path == '/api/coins':
             with connect() as conn:
-                records = [dict(row) for row in conn.execute('SELECT symbol,name,product,precision,demo_base AS demoBase,icon,enabled,sort_order AS sortOrder,category,feed,unit FROM coins ORDER BY category,sort_order,symbol')]
+                records = [dict(row) for row in conn.execute(
+                    'SELECT i.symbol,i.name,i.product,i.precision,i.demo_base AS demoBase,'
+                    'i.icon,i.enabled,i.sort_order AS sortOrder,i.category,i.feed,i.unit,'
+                    's.provider AS override_provider,s.product AS override_product '
+                    'FROM coins i LEFT JOIN instrument_sources s ON s.coin=i.symbol '
+                    'ORDER BY i.category,i.sort_order,i.symbol'
+                )]
                 for instrument in records:
-                    override=conn.execute('SELECT * FROM instrument_sources WHERE coin=?',(instrument['symbol'],)).fetchone()
-                    if override:
-                        instrument.update(feed=override['provider'],product=override['product'],maxPriceAgeMs=live_oil.MAX_AGE*1000,feedState='unsupported' if not override['product'] else 'configured' if (oilprice_api.configured() if override['provider']=='oilpriceapi' else live_oil.configured()) else 'setup_required')
+                    provider = instrument.pop('override_provider')
+                    product = instrument.pop('override_product')
+                    if provider is not None:
+                        configured = oilprice_api.configured() if provider == 'oilpriceapi' else live_oil.configured()
+                        instrument.update(
+                            feed=provider, product=product, maxPriceAgeMs=live_oil.MAX_AGE * 1000,
+                            feedState='unsupported' if not product else 'configured' if configured else 'setup_required',
+                        )
             return self.reply(200, {'coins': records, 'marketConfig': {'quotes': QUOTES, 'oddsVersion': odds.VERSION, 'calibrations': odds.calibrations(), 'settlement': {'source':'Coinbase Exchange', 'method':'Minute candle close immediately before interval boundaries', 'version':'coinbase-minute-close-v1', 'tie':'up'}}})
         if path in ('/api/spot','/api/candles'):
             query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
@@ -732,7 +762,7 @@ class Handler(SimpleHTTPRequestHandler):
         relative = urllib.parse.unquote(path).lstrip('/')
         if not relative:
             self.path = '/welcome.html'
-        elif relative not in PUBLIC_FILES and relative not in {'assets/previews/prediction-playfield.png', 'assets/backgrounds/hourly-markets.webp'} and not (re.fullmatch(r'assets/coins/[a-zA-Z0-9_-]+\.svg', relative)):
+        elif relative not in PUBLIC_FILES and relative not in PUBLIC_ASSETS and not (re.fullmatch(r'assets/coins/[a-zA-Z0-9_-]+\.svg', relative)):
             return self.reply(404, {'error': 'Not found.'})
         # Returning signed-in visitors enter categories without seeing the guest splash.
         if relative in {'', 'welcome.html'} and self.session():

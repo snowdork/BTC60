@@ -1,6 +1,7 @@
 data/
 oilpriceapi.key
 .env
+.env.*
 __pycache__/
 *.pyc
 doc/_build/

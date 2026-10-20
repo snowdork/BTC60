@@ -1,0 +1,5 @@
+@font-face{font-family:Manrope;src:url('assets/fonts/manrope-latin.woff2') format('woff2');font-weight:400 700;font-display:swap}
+@font-face{font-family:'Space Grotesk';src:url('assets/fonts/space-grotesk-latin.woff2') format('woff2');font-weight:400 700;font-display:swap}
+.brand .p60-mark{display:block;width:66px;height:36px;flex-shrink:0}
+.brand{font-family:'Space Grotesk',sans-serif!important;letter-spacing:-.8px}
+@media(max-width:480px){.topbar .brand .p60-mark,.auth-nav .brand .p60-mark{width:49px;height:27px}}

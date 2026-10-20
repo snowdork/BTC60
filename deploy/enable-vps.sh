@@ -5,11 +5,10 @@ if [[ $EUID -ne 0 ]]; then
   echo "Run with sudo: sudo bash deploy/enable-vps.sh" >&2
   exit 1
 fi
-root=$(cd "$(dirname "$0")/.." && pwd)
+root=$(cd "$(dirname "$0")/.." && pwd -P)
 owner=$(stat -c %U "$root")
-group=$(stat -c %G "$root")
-if [[ $owner == root || $root == *[[:space:]%]* ]]; then
-  echo "Use a checkout owned by an unprivileged user, with no spaces or % in its path." >&2
+if [[ $owner == root || ! $root =~ ^/[a-zA-Z0-9_./-]+$ ]]; then
+  echo "Use a checkout owned by an unprivileged user, with only letters, digits, /, _, ., or - in its path." >&2
   exit 1
 fi
 
@@ -21,7 +20,7 @@ python3 - "$root" <<'PY'
 import os, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 target = pathlib.Path('/etc/predict60/predict60.env')
-allowed = {'PREDICT60_DB', 'P60_DB', 'BTC60_DB', 'OILPRICE_API_KEY',
+allowed = {'P60_SIGNUP_CODE', 'PREDICT60_DB', 'P60_DB', 'BTC60_DB', 'OILPRICE_API_KEY',
            'TWELVE_DATA_API_KEY', 'TWELVEDATA_API_KEY'}
 if not target.exists():
     settings = {}
@@ -54,33 +53,7 @@ if [[ -f /etc/caddy/Caddyfile && ! -f /etc/caddy/Caddyfile.before-predict60 ]]; 
   cp -p /etc/caddy/Caddyfile /etc/caddy/Caddyfile.before-predict60
 fi
 install -m 644 /etc/caddy/Caddyfile.predict60 /etc/caddy/Caddyfile
-cat > /etc/systemd/system/predict60.service <<EOF
-[Unit]
-Description=Predict60 application server
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=$owner
-Group=$group
-WorkingDirectory=$root
-EnvironmentFile=/etc/predict60/predict60.env
-Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=/usr/bin/python3 $root/server.py --bind 127.0.0.1 --port 8000 --log-level normal
-Restart=on-failure
-RestartSec=3
-UMask=0077
-NoNewPrivileges=true
-PrivateTmp=true
-
-[Install]
-WantedBy=multi-user.target
-EOF
-# Stop the development watchdog before systemd takes ownership of port 8000.
-runuser -u "$owner" -- python3 "$root/scripts/stop-server.py"
-systemctl daemon-reload
-systemctl enable --now predict60
+bash "$root/deploy/install-service.sh" --start
 if command -v ufw >/dev/null && ufw status | head -1 | grep -q 'Status: active'; then
   ufw allow 80/tcp
   ufw allow 443/tcp

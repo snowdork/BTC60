@@ -5,27 +5,36 @@ This copies frontend files and artwork only; it never copies account data or key
 """
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from server import PUBLIC_FILES
+from server import PUBLIC_ASSETS, PUBLIC_FILES
 
 
 def main():
-    """Copy allowlisted frontend files and artwork into the static hosting directory."""
+    """Stage public files before refreshing output and removing obsolete build artifacts."""
     destination = ROOT / 'dist'
-    destination.mkdir(exist_ok=True)
-    # Use the server allowlist rather than copying repository contents or credentials.
-    for name in sorted(PUBLIC_FILES):
-        shutil.copy2(ROOT / name, destination / name)
-    for folder in ('coins', 'previews', 'backgrounds'):
-        source = ROOT / 'assets' / folder
-        target = destination / 'assets' / folder
-        target.mkdir(parents=True, exist_ok=True)
-        for asset in source.iterdir():
-            if asset.is_file() and asset.suffix in {'.svg', '.png', '.webp'}:
-                shutil.copy2(asset, target / asset.name)
+    public = PUBLIC_FILES | PUBLIC_ASSETS | {
+        path.relative_to(ROOT).as_posix()
+        for path in (ROOT / 'assets' / 'coins').glob('*.svg')
+        if path.is_file()
+    }
+    # A missing source must not destroy the last successful build.
+    with tempfile.TemporaryDirectory(prefix='p60-static-') as directory:
+        staging = Path(directory)
+        for name in sorted(public):
+            target = staging / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / name, target)
+        destination.mkdir(exist_ok=True)
+        shutil.copytree(staging, destination, dirs_exist_ok=True)
+        for path in sorted(destination.rglob('*'), reverse=True):
+            if path.is_file() and path.relative_to(destination).as_posix() not in public:
+                path.unlink()
+            elif path.is_dir() and not any(path.iterdir()):
+                path.rmdir()
     print(f'Static frontend refreshed in {destination}')
 
 
