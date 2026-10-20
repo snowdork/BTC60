@@ -3,9 +3,9 @@ import os
 import time
 from urllib.parse import urlsplit
 
-DAILY_CREDITS = 10000
+HOURLY_CREDITS = 1000
 WINDOW_CAP_CREDITS = 1000
-RULE_VERSION = 'utc-net-credits-v1'
+RULE_VERSION = 'hourly-net-credits-v2'
 
 
 def initialize(conn):
@@ -18,7 +18,7 @@ def initialize(conn):
       UNIQUE(kind,starts_at));
     CREATE TABLE IF NOT EXISTS contest_entries (
       prediction_id TEXT PRIMARY KEY REFERENCES predictions(id),
-      daily_id INTEGER NOT NULL REFERENCES contests(id),
+      daily_id INTEGER REFERENCES contests(id),
       hourly_id INTEGER NOT NULL REFERENCES contests(id));
     CREATE INDEX IF NOT EXISTS contest_entries_daily ON contest_entries(daily_id);
     CREATE INDEX IF NOT EXISTS contest_entries_hourly ON contest_entries(hourly_id);
@@ -63,12 +63,29 @@ def initialize(conn):
     BEGIN SELECT RAISE(ABORT,'Only gift-card prizes are supported'); END;
     ''')
 
+    # Older installations require daily_id. Preserve their links while allowing
+    # new hourly-only entries; never delete old predictions or results.
+    if any(row[1] == 'daily_id' and row[3] for row in conn.execute('PRAGMA table_info(contest_entries)')):
+        conn.executescript("""
+        BEGIN IMMEDIATE;
+        CREATE TABLE contest_entries_migration (
+          prediction_id TEXT PRIMARY KEY REFERENCES predictions(id),
+          daily_id INTEGER REFERENCES contests(id),
+          hourly_id INTEGER NOT NULL REFERENCES contests(id));
+        INSERT INTO contest_entries_migration SELECT * FROM contest_entries;
+        DROP TABLE contest_entries;
+        ALTER TABLE contest_entries_migration RENAME TO contest_entries;
+        CREATE INDEX contest_entries_daily ON contest_entries(daily_id);
+        CREATE INDEX contest_entries_hourly ON contest_entries(hourly_id);
+        COMMIT;
+        """)
+
 
 def ensure_period(conn, kind, starts_at):
     """Create or find an aligned UTC period and return its row."""
-    duration = 3600 if kind == 'hourly' else 86400 if kind == 'daily' else 0
+    duration = 3600 if kind == 'hourly' else 0
     if not duration or starts_at % duration:
-        raise ValueError('Choose an aligned UTC hourly or daily start.')
+        raise ValueError('Choose an aligned GMT hourly start; daily contests are disabled.')
     existing = conn.execute('SELECT * FROM contests WHERE kind=? AND starts_at=?', (kind, starts_at)).fetchone()
     if existing is not None:
         return existing
@@ -78,21 +95,25 @@ def ensure_period(conn, kind, starts_at):
 
 
 def enter(conn, prediction_id, user_id, coin, starts_at, ends_at, cost_cents):
-    """Reserve daily and window exposure atomically with an inserted prediction."""
-    # End boundaries belong to the period that just ended: 23:45–00:00 is yesterday.
-    daily = ensure_period(conn, 'daily', (ends_at - 1) // 86400 * 86400)
-    hourly = ensure_period(conn, 'hourly', (ends_at - 1) // 3600 * 3600)
-    if daily['finalized_at'] is not None or hourly['finalized_at'] is not None:
+    """Reserve the hourly spending allowance inside the prediction transaction."""
+    hour = (ends_at - 1) // 3600 * 3600
+    if not hour <= starts_at < ends_at <= hour + 3600:
+        raise ValueError('Contest predictions must fit within one GMT hour.')
+    if reset_blocker(conn, hour) is not None:
+        raise ValueError('Previous hourly contest is awaiting settlement. Credits reset after winners are final.')
+    hourly = ensure_period(conn, 'hourly', hour)
+    if hourly['finalized_at'] is not None:
         raise ValueError('This contest is finalized.')
-    spent = conn.execute('SELECT COALESCE(SUM(p.cost_cents),0) FROM contest_entries e JOIN predictions p ON p.id=e.prediction_id WHERE e.daily_id=? AND p.user_id=?',
-                         (daily['id'], user_id)).fetchone()[0]
-    if spent + cost_cents > DAILY_CREDITS * 100:
-        raise ValueError('Daily contest allowance exhausted. It renews at 00:00 GMT.')
-    committed = conn.execute('SELECT COALESCE(SUM(p.cost_cents),0) FROM contest_entries e JOIN predictions p ON p.id=e.prediction_id WHERE p.user_id=? AND p.coin=? AND p.starts_at=? AND p.ends_at=?',
-                             (user_id, coin, starts_at, ends_at)).fetchone()[0]
-    if committed + cost_cents > WINDOW_CAP_CREDITS * 100:
-        raise ValueError('Maximum 1,000 contest credits per instrument and interval, across both directions.')
-    conn.execute('INSERT INTO contest_entries VALUES(?,?,?)', (prediction_id, daily['id'], hourly['id']))
+    spent = conn.execute('SELECT COALESCE(SUM(p.cost_cents),0) FROM contest_entries e JOIN predictions p ON p.id=e.prediction_id WHERE e.hourly_id=? AND p.user_id=?',
+                         (hourly['id'], user_id)).fetchone()[0]
+    if spent + cost_cents > HOURLY_CREDITS * 100:
+        raise ValueError('Hourly contest allowance exhausted. Maximum 1,000 credits across all instruments and intervals.')
+    conn.execute('INSERT INTO contest_entries VALUES(?,?,?)', (prediction_id, None, hourly['id']))
+
+
+def reset_blocker(conn, hour):
+    """Find a closed hourly contest whose winners must be saved before resetting."""
+    return conn.execute("SELECT id,starts_at FROM contests WHERE kind='hourly' AND ends_at<=? AND finalized_at IS NULL ORDER BY ends_at LIMIT 1", (hour,)).fetchone()
 
 
 def standings(conn, contest):
@@ -118,7 +139,7 @@ def standings(conn, contest):
 def finalize(conn, now=None):
     """Snapshot closed, fully settled contests and allocate reserved pools once."""
     now = int(time.time()) if now is None else now
-    for contest in conn.execute('SELECT * FROM contests WHERE ends_at<=? AND finalized_at IS NULL ORDER BY ends_at,id', (now,)).fetchall():
+    for contest in conn.execute("SELECT * FROM contests WHERE kind='hourly' AND ends_at<=? AND finalized_at IS NULL ORDER BY ends_at,id", (now,)).fetchall():
         rows = standings(conn, contest)
         if any(row['pending'] for row in rows):
             continue  # Missing benchmarks leave rankings provisional, even across restarts.
@@ -142,22 +163,58 @@ def finalize(conn, now=None):
 
 
 def wallet(conn, user_id, now=None):
-    """Report today's non-replenishing contest allowance without changing practice funds."""
+    """Keep each hour's spend and net tally separate; unlock only after finalization."""
     now = int(time.time()) if now is None else now
-    day = now // 86400 * 86400
-    spent = conn.execute('SELECT COALESCE(SUM(p.cost_cents),0) FROM contest_entries e JOIN contests c ON c.id=e.daily_id JOIN predictions p ON p.id=e.prediction_id WHERE c.starts_at=? AND p.user_id=?', (day, user_id)).fetchone()[0]
-    return {'dailyCredits': DAILY_CREDITS, 'remaining_cents': DAILY_CREDITS * 100 - spent,
-            'spent_cents': spent, 'resets_at': day + 86400}
+    hour = now // 3600 * 3600
+    totals = conn.execute("""SELECT COALESCE(SUM(p.cost_cents),0) AS spent,
+      COALESCE(SUM(CASE WHEN s.prediction_id IS NOT NULL THEN s.payout_cents-p.cost_cents ELSE 0 END),0) AS net,
+      COALESCE(SUM(CASE WHEN s.prediction_id IS NULL THEN 1 ELSE 0 END),0) AS pending
+      FROM contest_entries e JOIN contests c ON c.id=e.hourly_id
+      JOIN predictions p ON p.id=e.prediction_id LEFT JOIN settlements s ON s.prediction_id=p.id
+      WHERE c.starts_at=? AND p.user_id=?""", (hour, user_id)).fetchone()
+    blocker = reset_blocker(conn, hour)
+    return {'hourlyCredits': HOURLY_CREDITS,
+            'remaining_cents': 0 if blocker else max(0, HOURLY_CREDITS * 100 - totals['spent']),
+            'spent_cents': totals['spent'], 'net_cents': totals['net'], 'pending': totals['pending'],
+            'starts_at': hour, 'resets_at': hour + 3600,
+            'reset_pending': blocker is not None,
+            'awaiting_hour': blocker['starts_at'] if blocker else None}
 
 
-def dashboard(conn, user_id, now=None):
+def last_hour_score(conn, user_id, now=None):
+    """Return the caller's previous GMT hour tally without loading the leaderboard."""
+    now = int(time.time()) if now is None else now
+    start = now // 3600 * 3600 - 3600
+    period = conn.execute("SELECT id,finalized_at FROM contests WHERE kind='hourly' AND starts_at=?", (start,)).fetchone()
+    result = {'starts_at': start, 'ends_at': start + 3600, 'score_cents': 0,
+              'predictions': 0, 'pending': 0, 'rank': None, 'state': 'no_entries'}
+    if period is None:
+        return result
+    if period['finalized_at'] is not None:
+        row = conn.execute('SELECT score_cents,predictions,rank FROM contest_results WHERE contest_id=? AND user_id=?', (period['id'], user_id)).fetchone()
+        if row:
+            result.update(dict(row), state='final')
+        return result
+    row = conn.execute('''SELECT COUNT(*) AS predictions,
+      COALESCE(SUM(CASE WHEN s.prediction_id IS NULL THEN 1 ELSE 0 END),0) AS pending,
+      COALESCE(SUM(CASE WHEN s.prediction_id IS NULL THEN 0 ELSE s.payout_cents-p.cost_cents END),0) AS score_cents
+      FROM contest_entries e JOIN predictions p ON p.id=e.prediction_id
+      LEFT JOIN settlements s ON s.prediction_id=p.id WHERE e.hourly_id=? AND p.user_id=?''', (period['id'], user_id)).fetchone()
+    if row['predictions']:
+        result.update(dict(row), state='awaiting_settlement')
+    return result
+
+
+def dashboard(conn, user_id, now=None, before=None):
     """Return current/recent contests, the caller's awards, and public prize descriptions."""
     now = int(time.time()) if now is None else now
     ensure_period(conn, 'hourly', now // 3600 * 3600)
-    ensure_period(conn, 'daily', now // 86400 * 86400)
-    periods = conn.execute('SELECT * FROM contests WHERE starts_at<=? ORDER BY starts_at DESC,kind LIMIT 60', (now,)).fetchall()
-    upcoming = conn.execute("SELECT * FROM contests WHERE starts_at>? AND EXISTS(SELECT 1 FROM contest_prize_plans p WHERE p.contest_id=contests.id AND p.kind='gift_card') ORDER BY starts_at LIMIT 10", (now,)).fetchall()
-    selected = [*periods, *upcoming]
+    boundary = now + 1 if before is None else min(before, now + 1)
+    periods = conn.execute("SELECT * FROM contests WHERE kind='hourly' AND starts_at<? ORDER BY starts_at DESC LIMIT 25", (boundary,)).fetchall()
+    next_before = periods[23]['starts_at'] if len(periods) > 24 else None
+    periods = periods[:24]
+    upcoming = conn.execute("SELECT * FROM contests WHERE kind='hourly' AND starts_at>? AND EXISTS(SELECT 1 FROM contest_prize_plans p WHERE p.contest_id=contests.id AND p.kind='gift_card') ORDER BY starts_at LIMIT 10", (now,)).fetchall()
+    selected = [*periods, *(upcoming if before is None else [])]
     pools = {}
     if selected:
         placeholders = ','.join('?' for _ in selected)
@@ -170,6 +227,7 @@ def dashboard(conn, user_id, now=None):
         rows = standings(conn, period)
         entry['state'] = 'final' if period['finalized_at'] is not None else 'upcoming' if period['starts_at'] > now else 'open' if period['ends_at'] > now else 'awaiting_settlement'
         entry['leaders'] = rows[:100]
+        entry['winners'] = [row for row in rows if row['rank'] == 1] if period['finalized_at'] is not None else []
         entry['mine'] = next((row for row in rows if row['user_id'] == user_id), None)
         entry['participants'] = len(rows)
         entry['winnerCount'] = sum(row['rank'] == 1 for row in rows) if period['finalized_at'] is not None else 0
@@ -177,8 +235,9 @@ def dashboard(conn, user_id, now=None):
         result.append(entry)
     prizes = [dict(row) for row in conn.execute("SELECT id,contest_id,kind,amount,description,status,updated_at FROM contest_prizes WHERE user_id=? AND kind='gift_card' ORDER BY id DESC", (user_id,))]
     return {'contests': result, 'wallet': wallet(conn, user_id, now), 'prizes': prizes,
-            'rules': {'version': RULE_VERSION, 'dailyCredits': DAILY_CREDITS, 'windowCap': WINDOW_CAP_CREDITS,
-                      'timezone': 'GMT', 'dailyClose': '00:00', 'hourlyClose': 'HH:00', 'scoring': 'settled net credits', 'ties': 'shared rank'}}
+            'next_before': next_before,
+            'rules': {'version': RULE_VERSION, 'hourlyCredits': HOURLY_CREDITS,
+                      'timezone': 'GMT', 'hourlyClose': 'HH:00', 'scoring': 'settled net credits', 'ties': 'shared rank'}}
 
 
 def reserve_prize(conn, kind, starts_at, prize_kind, amount, description, reference, now=None):

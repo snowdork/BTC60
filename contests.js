@@ -1,60 +1,89 @@
 /** @module contests
- * Display GMT leaderboards and private prize records without exposing delivery references.
+ * Display hourly credit tallies, final winners, and paginated GMT history.
  */
 (() => {
   const /** Find a contest interface node. */ $=id=>document.getElementById(id);
   const /** Format GMT period boundaries. */ utc=seconds=>new Date(seconds*1000).toISOString().slice(0,16).replace('T',' ')+' GMT';
-  const /** Format integer hundredths of a game credit. */ credits=cents=>(cents/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const /** Format integer hundredths of a credit. */ credits=cents=>(cents/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const /** Format an hourly gain or loss. */ signed=cents=>(cents>0?'+':'')+credits(cents);
   const /** Describe a gift-card pool or award in USD. */ prizeLabel=p=>`$${(p.amount/100).toFixed(2)} gift card`;
-  let snapshot=null,busy=false;
-  /** Build period choices while retaining the current selection when possible. */ function periods(){
-    if(!snapshot)return;
+  let snapshot=null,busy=false,before=null,chooseHour=null,followCurrent=true;
+  /** Build period choices while retaining the selection within the loaded history page. */ function periods(){
     const selected=$('contest-period').value;
     $('contest-period').replaceChildren();
-    for(const period of snapshot.contests.filter(p=>p.kind===$('contest-kind').value)){
-      const option=document.createElement('option');option.value=period.id;option.textContent=`${utc(period.starts_at)} · ${period.state.replaceAll('_',' ')}`;$('contest-period').append(option);
+    for(const period of snapshot.contests){
+      const option=document.createElement('option');option.value=String(period.id);option.textContent=`${utc(period.starts_at)} · ${period.state.replaceAll('_',' ')}`;$('contest-period').append(option);
     }
-    if([...$('contest-period').options].some(o=>o.value===selected))$('contest-period').value=selected;
+    if(followCurrent)chooseHour=snapshot.wallet.starts_at;
+    const target=chooseHour===null?snapshot.contests.find(p=>String(p.id)===selected):snapshot.contests.find(p=>p.starts_at===chooseHour);
+    if(target)$('contest-period').value=String(target.id);
+    else if(chooseHour!==null)$('contest-period').value='';
+    chooseHour=null;
     render();
   }
-  /** Render rankings and awards using text nodes for all player and sponsor content. */ function render(){
+  /** Render safe text content for the selected hour, personal history, and winners. */ function render(){
     if(!snapshot)return;
-    $('contest-wallet').textContent=credits(snapshot.wallet.remaining_cents)+' credits';
-    $('contest-reset').textContent=utc(snapshot.wallet.resets_at);
+    const wallet=snapshot.wallet;
+    $('contest-wallet').textContent=credits(wallet.remaining_cents)+' credits';
+    $('contest-reset').textContent=wallet.reset_pending?'Waiting for prior winner':utc(wallet.resets_at);
+    $('contest-tally').textContent=signed(wallet.net_cents)+' credits';
+    $('contest-reset-note').textContent=wallet.reset_pending?`The ${utc(wallet.awaiting_hour)} contest is awaiting settlement. Your next 1,000 credits unlock after final winners are saved.`:'Winnings go into your hourly tally, not your spending allowance. Each new hour starts with 1,000 credits after prior results are finalized.';
     const period=snapshot.contests.find(p=>String(p.id)===$('contest-period').value);
     $('contest-leaders').replaceChildren();
-    if(period){
-      $('contest-title').textContent=`${utc(period.starts_at)} – ${utc(period.ends_at)}`;
-      $('contest-state').textContent=period.state==='final'?'FINAL RESULTS':period.state==='open'?'LIVE · PROVISIONAL':period.state==='upcoming'?'UPCOMING · RESERVED PRIZES':'AWAITING SETTLEMENT';
-      $('contest-participants').textContent=`${period.participants} players`;
-      $('contest-prize-pool').textContent=period.prizes.length?`Reserved pools: ${period.prizes.map(p=>prizeLabel(p)+' · '+p.description).join(' / ')}`:'Recognition only · No prize pool scheduled.';
-      $('contest-mine').textContent=period.mine?`Your rank: ${period.mine.rank} · ${credits(period.mine.score_cents)} net credits${period.state==='final'&&period.mine.rank===1?' · Winner':''}`:'You have no entries in this period.';
-      for(const row of period.leaders){
-        const tr=document.createElement('tr');
-        for(const value of [row.rank,row.name,credits(row.score_cents),row.predictions,row.pending]){const td=document.createElement('td');td.textContent=value;tr.append(td);}
-        $('contest-leaders').append(tr);
-      }
-      $('contest-empty').hidden=period.leaders.length>0;
+    $('contest-title').textContent=period?`${utc(period.starts_at)} – ${utc(period.ends_at)}`:'No recorded contest for this hour';
+    $('contest-state').textContent=period?({final:'FINAL RESULTS',open:'LIVE · PROVISIONAL',upcoming:'UPCOMING',awaiting_settlement:'AWAITING SETTLEMENT'}[period.state]):'NO ENTRIES';
+    $('contest-participants').textContent=period?`${period.participants} players`:'';
+    $('contest-prize-pool').textContent=period?.prizes.length?`Reserved pools: ${period.prizes.map(p=>prizeLabel(p)+' · '+p.description).join(' / ')}`:'Recognition only · No prize pool scheduled.';
+    $('contest-mine').textContent=period?.mine?`Your rank: ${period.mine.rank} · ${signed(period.mine.score_cents)} credits won / lost · ${period.mine.pending} pending`:'You have no entries in this hour.';
+    $('contest-winner').textContent=period?.state==='final'?(period.winners.length?`Winner${period.winners.length>1?'s':''}: ${period.winners.map(row=>row.name).join(', ')} · ${signed(period.winners[0].score_cents)} net credits`:'No winner — no entries.'):'Winner declared after all hourly predictions settle.';
+    for(const row of period?.leaders||[]){
+      const tr=document.createElement('tr');
+      for(const value of [row.rank,row.name,signed(row.score_cents),row.predictions,row.pending]){const td=document.createElement('td');td.textContent=value;tr.append(td);}
+      $('contest-leaders').append(tr);
     }
+    $('contest-empty').hidden=!!period?.leaders.length;
+    $('contest-history').replaceChildren();
+    for(const hour of snapshot.contests.filter(p=>p.state!=='upcoming')){
+      const tr=document.createElement('tr'),cell=document.createElement('td'),button=document.createElement('button');
+      button.type='button';button.textContent=utc(hour.starts_at);button.addEventListener('click',()=>{followCurrent=false;$('contest-period').value=String(hour.id);render();});cell.append(button);tr.append(cell);
+      const winner=hour.state==='final'?(hour.winners.map(row=>row.name).join(', ')||'No entries'):'Pending';
+      for(const value of [hour.mine?signed(hour.mine.score_cents):'—',hour.mine?.pending||0,hour.state.replaceAll('_',' '),winner]){const td=document.createElement('td');td.textContent=value;tr.append(td);}
+      $('contest-history').append(tr);
+    }
+    $('contest-older').disabled=busy||snapshot.next_before===null;
     $('contest-awards').replaceChildren();
     for(const prize of snapshot.prizes){const li=document.createElement('li');li.textContent=`${prizeLabel(prize)} · ${prize.description} · ${prize.status} · Contest #${prize.contest_id}`;$('contest-awards').append(li);}
     if(!snapshot.prizes.length){const li=document.createElement('li');li.textContent='No prize awards yet.';$('contest-awards').append(li);}
   }
-  /** Fetch the authenticated dashboard with an overlap guard and visible error state. */ async function refresh(){
+  /** Fetch a bounded history page while retaining the current view on failure. */ async function refresh(){
     if(busy||document.hidden||!window.Predict60Account.user)return;
-    busy=true;$('contest-refresh').disabled=true;
+    busy=true;
+    for(const id of ['contest-refresh','contest-current','contest-last','contest-older','contest-lookup'])$(id).disabled=true;
     try{
-      const response=await fetch('/api/contests');
+      const response=await fetch('/api/contests'+(before===null?'':`?before=${before}`));
       const data=await response.json();
       if(!response.ok)throw Error(data.error||'Could not load contests.');
-      snapshot=data;periods();$('contest-status').textContent='Updated '+new Date().toLocaleTimeString()+'. Rankings refresh every 30 seconds.';
+      snapshot=data;periods();$('contest-status').textContent='Updated '+new Date().toLocaleTimeString()+'. Results refresh every 15 seconds.';
     }catch(error){$('contest-status').textContent=error.message;}
-    finally{busy=false;$('contest-refresh').disabled=false;}
+    finally{busy=false;for(const id of ['contest-refresh','contest-current','contest-last','contest-lookup'])$(id).disabled=false;$('contest-older').disabled=!snapshot||snapshot.next_before===null;}
   }
-  $('contest-kind').addEventListener('change',periods);
-  $('contest-period').addEventListener('change',render);
+  /** Load a particular GMT hour, including older records outside the current page. */ function jump(hour){
+    if(busy)return;
+    followCurrent=false;chooseHour=hour;before=hour+1;refresh();
+  }
+  $('contest-period').addEventListener('change',()=>{followCurrent=false;render();});
   $('contest-refresh').addEventListener('click',refresh);
+  $('contest-current').addEventListener('click',()=>{if(busy)return;followCurrent=true;before=null;refresh();});
+  $('contest-last').addEventListener('click',()=>jump(Math.floor(Date.now()/3600000)*3600-3600));
+  $('contest-older').addEventListener('click',()=>{if(busy||snapshot?.next_before==null)return;followCurrent=false;before=snapshot.next_before;refresh();});
+  $('contest-lookup').addEventListener('click',()=>{
+    const value=$('contest-date').value;
+    if(!value){$('contest-status').textContent='Choose a GMT date and hour.';return;}
+    const hour=Date.parse(value+'Z')/1000;
+    if(!Number.isFinite(hour)||hour>Date.now()/1000){$('contest-status').textContent='Choose a current or previous GMT hour.';return;}
+    jump(Math.floor(hour/3600)*3600);
+  });
   window.addEventListener('account-update',refresh);
   document.addEventListener('visibilitychange',refresh);
-  setInterval(refresh,30000);refresh();
+  setInterval(refresh,15000);refresh();
 })();

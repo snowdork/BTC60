@@ -121,37 +121,21 @@ then choose the category you want to play. No real money is used.
 
 OilPriceAPI mode shows dated physical spot assessments for all five crudes. These series do not provide minute settlement benchmarks, so hourly oil predictions are unavailable; Crypto continues normally.
 
-## Hourly and daily contests
+## Hourly contests
 
-Hourly contests close on the hour (HH:00 GMT). Daily contests close at 00:00 GMT,
-when the next daily contest begins. GMT matches UTC+00:00 and does not change
-with daylight saving. Winners are finalized after all period results settle.
+The terminal defaults to **Hourly contest**. Each user gets 1,000 spending credits
+per GMT hour across all instruments and intervals. Winnings do not refill the
+allowance; settled returns minus costs form that hour's gain/loss tally. Unspent
+credits do not carry forward. Practice retains a separate 10,000-credit starting balance.
 
-Open **Contests & winners** for current and recent rankings. The terminal starts
-in **Daily contest** mode; choose **Practice** to use the existing practice balance.
-Every contest prediction enters both its hourly and daily contest automatically.
-The history page has a play-mode filter so the two balances and records stay separate.
+At HH:00 GMT the contest closes. Final winners and results are saved after all
+predictions settle, then the next hourly allowance unlocks. If a price benchmark
+is unavailable, results and the credit reset wait; no winner is guessed. GMT is
+UTC+00:00 year-round. The highest net tally wins, including when all tallies are
+negative. Ties share first place; an empty hour has no winner.
 
-Contest mode grants 10,000 credits of spending allowance each GMT day. The
-allowance renews at 00:00 GMT; wins affect your score but do not refill it. Spend
-at most 1,000 credits per instrument and exact interval across both directions
-and repeated entries. MAX respects remaining daily and interval allowance.
-Practice predictions do not count toward rankings or prizes.
-
-Rank is based on settled returns minus settled costs. Pending results are not
-included in the provisional score. The highest final score wins, even if all
-scores are negative; equal scores share first place. Results become final only
-when every prediction in the period settles. Missing price history delays final
-winners. A prediction ending exactly at midnight counts for the previous day.
-
-A contest without an announced prize pool awards recognition only. Reserved
-pools are shown on the contest page, including upcoming periods. Gift-card pools
-are denominated in USD; gift cards are the only prize option.
-Ties split the pool; remainder cents go in ascending account-ID
-order. No participants means no winner. Rejected awards are not redistributed.
-
-Your prize records show review, approved, fulfilled, or rejected status. The
-operator reviews eligibility and arranges delivery separately; game credits
-cannot be redeemed. No ad view, ad click, or purchase is required to enter or win.
-Read the contest's prize description and published terms before entering for a
-valuable prize. The page's rules explain scoring and allocation details.
+Open **Contests & winners** to see your current tally, **Last hour**, and your
+hourly gain/loss history. **Older hours** pages through all stored results;
+use the GMT date/hour lookup to jump directly to an earlier hour. Pending results
+are labeled provisional. Daily contests are disabled; old records are retained.
+Only announced gift-card pools award prizes, subject to operator review.

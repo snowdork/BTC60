@@ -123,18 +123,21 @@ these checks; do not treat mocked tests as a live-feed or capacity test.
 Run `python3 -m unittest contests_test` for backend and HTTP checks. In a browser,
 use two disposable accounts and confirm:
 
-1. The terminal defaults to Daily contest. Practice mode displays its separate
+1. The terminal defaults to Hourly contest. Practice mode displays its separate
    balance and never changes a contest score.
-2. A 600-credit contest entry leaves 400 for that instrument/interval, including
-   the opposite direction. MAX reflects this; API bypass attempts are rejected.
+2. A 600-credit contest entry leaves 400 across all instruments and intervals.
+   Winnings affect the tally only. MAX reflects this; API bypass attempts are rejected.
 3. Contest history and practice history remain separate in the portfolio filter.
-4. Closed hourly and daily periods show final winners only after all entries
+4. Closed hourly periods show final winners only after all entries
    settle; ties retain equal rank. Old practice predictions never appear.
-5. Sponsor configuration renders a labeled HTTPS link. With no configuration or
+5. At the hour boundary, missing settlement blocks new contest entries and the
+   reset. After finalization, the allowance is 1,000 and the new tally is zero.
+   Verify Last hour, older history pages, and a GMT date/hour lookup.
+6. Sponsor configuration renders a labeled HTTPS link. With no configuration or
    a failed sponsor request, the game remains usable and no banner is inserted.
-6. Only the signed-in user's prize records appear. Funding references, delivery
+7. Only the signed-in user's prize records appear. Funding references, delivery
    references, email addresses, and audit notes are absent from dashboard output.
-7. Using a temporary database, reserve a future pool via the CLI and check that
+8. Using a temporary database, reserve a future pool via the CLI and check that
    it appears as upcoming, is allocated once, and cannot skip prize review.
 
 Do not use real ad tags or send real gift cards during automated tests. No

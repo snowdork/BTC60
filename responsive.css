@@ -52,3 +52,59 @@ button,a,input{touch-action:manipulation}
 .community-counts>span{display:inline-flex;align-items:center;gap:5px}.community-counts strong{font-size:14px;font-variant-numeric:tabular-nums;color:var(--text)}
 .community-counts i{width:6px;height:6px;border-radius:50%;background:var(--green)}
 @media(max-width:650px){.community-counts{gap:8px;font-size:10px}.community-counts strong{font-size:12px}}
+
+/* Give the prediction segments priority over chart and header chrome. */
+.terminal-page main{max-width:1920px;padding:12px 18px 0}
+.terminal-page .workspace{gap:12px}
+.terminal-page .topbar{display:flex;min-height:0;height:auto;padding:8px 18px;gap:8px 16px!important}
+.terminal-page .topbar .workspace-label:has(.coin-picker){order:0;flex:1;min-width:0;width:auto;padding:0;overflow-x:auto}
+.terminal-page .topbar .coin-picker{gap:5px;padding:3px;flex-shrink:0}
+.terminal-page .topbar .coin-button{min-height:40px;padding:5px 8px;gap:6px;font-size:11px;border-radius:8px}
+.terminal-page .topbar .coin-button img{width:26px;height:26px}
+.terminal-page .topbar .coin-button span{display:inline}
+.terminal-page .topbar-right{gap:8px;flex-wrap:wrap}
+.terminal-page .terminal-overview.overview{padding:9px 12px!important}
+.terminal-page .terminal-overview .overview-top{gap:8px 12px}
+.terminal-page .terminal-overview .price-row{margin-top:4px}
+.terminal-page .terminal-overview .spot{font-size:23px;gap:3px}
+.terminal-page .terminal-overview .hour-window{gap:4px}
+.terminal-page .terminal-overview .hour-time-navigation{padding:2px;gap:6px}
+.terminal-page .terminal-overview .hour-time-navigation button{height:30px;width:32px}
+.terminal-page .market-status-strip{margin:8px 0 6px;padding:6px 8px}
+.terminal-page .data-health{margin-bottom:5px}
+.terminal-page .timeline-stack{--chart-height:80px}
+.terminal-page .chart-plot{height:var(--chart-height)}
+.terminal-page .chart-toolbar{height:28px}
+.terminal-page .interval-guides,.terminal-page .time-cursor,.terminal-page .chart-coin-icon{top:29px}
+.terminal-page .hour-chart{margin-bottom:6px}
+.terminal-page .chart-times{height:19px}
+.terminal-page .minute-heatmap-wrap{padding:4px 6px 2px}
+.terminal-page .tier{margin-bottom:8px}
+.terminal-page .market-card{min-height:112px!important;padding:10px 12px!important;gap:5px!important}
+@media(min-width:1500px){
+ .terminal-page .topbar{flex-wrap:nowrap}
+ .terminal-page .topbar-right{flex-wrap:nowrap;flex-shrink:0}
+}
+@media(max-width:1499px){
+ .terminal-page .topbar-right{flex-basis:100%;margin-left:0}
+}
+@media(min-width:851px) and (max-height:820px){
+ .terminal-page .timeline-stack{--chart-height:64px}
+ .terminal-page .market-card{min-height:100px!important;padding:8px 10px!important}
+}
+@media(max-width:850px){
+ .terminal-page main{padding:10px 12px 0}
+ .terminal-page .timeline-stack{--chart-height:72px}
+ .terminal-page .topbar{padding:8px 12px}
+ .terminal-page .terminal-overview .price-clock{padding-top:6px}
+}
+
+/* Compact last-hour scoreboard stays separate from spendable contest credits. */
+.score-hud{display:flex;align-items:center;gap:12px;padding:9px 12px;margin-bottom:8px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.score-hud>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.score-hud small,.score-hud-result>span{font-size:10px;color:var(--muted)}
+.score-hud-result{margin-left:auto}
+.score-hud-result strong{font-size:19px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.score-history-button{padding:9px 10px;border:1px solid var(--border);border-radius:7px;background:var(--raised);font-size:11px;white-space:nowrap}
+.score-history-button:hover{border-color:var(--green);color:var(--green)}
+@media(max-width:650px){.score-hud{flex-wrap:wrap;gap:8px}.score-history-button{flex-basis:100%;text-align:center}.score-hud-result strong{font-size:17px}}

@@ -1,1 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 88 48"><rect width="88" height="48" rx="12" fill="#b5f76b"/><g fill="none" stroke="#142018" stroke-width="4.5" stroke-linecap="square" stroke-linejoin="round"><path d="M13 34V14h8a6 6 0 0 1 0 12h-8M48 14h-5a7 7 0 0 0-7 7v7a6 6 0 1 0 6-6h-6"/><rect x="57" y="14" width="16" height="20" rx="8"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 88 48" role="img" aria-labelledby="title desc">
+  <title id="title">P60</title>
+  <desc id="desc">Lime P60 lettering on a midnight badge with a gold star splash and bright highlights.</desc>
+  <defs>
+    <linearGradient id="splash" x1="0" y1="1" x2="1" y2="0">
+      <stop stop-color="#69e895"/>
+      <stop offset=".55" stop-color="#b5f76b"/>
+      <stop offset="1" stop-color="#ffdf70"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#253c34"/>
+      <stop offset="1" stop-color="#091a16"/>
+    </linearGradient>
+    <linearGradient id="letters" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#f2ffd7"/>
+      <stop offset=".45" stop-color="#cafa86"/>
+      <stop offset="1" stop-color="#8fea62"/>
+    </linearGradient>
+  </defs>
+  <!-- The asymmetric splash stays inside the original navigation footprint. -->
+  <path fill="url(#splash)" d="m5 13 10 1-2-9 13 5 6-9 8 8 13-6 3 8 16-7-2 10 15-1-6 11 8 7-12 5 3 10-15-4-7 5-11-5-12 5-7-6-14 2 3-9-13-6 8-6z"/>
+  <path d="M15 9h57a9 9 0 0 1 9 9v17a8 8 0 0 1-8 8H14a9 9 0 0 1-9-9V19A10 10 0 0 1 15 9Z" fill="url(#badge)" stroke="#b5f76b" stroke-width="1.3"/>
+  <path d="M14 12h49M9 19v9" fill="none" stroke="#f2ffd7" stroke-width="1.2" stroke-linecap="round" opacity=".65"/>
+  <path d="m12 37 50-24H16a5 5 0 0 0-5 5v17Z" fill="#fff" opacity=".045"/>
+  <!-- Drawn letterforms keep the logo independent of installed fonts. -->
+  <g fill="none" stroke="url(#letters)" stroke-width="4.2" stroke-linecap="square" stroke-linejoin="round">
+    <path d="M16 33V18h7a4.5 4.5 0 0 1 0 9h-7"/>
+    <path d="M46 17h-4a6 6 0 0 0-6 6v5a5 5 0 1 0 5-5h-5"/>
+    <rect x="54" y="17" width="13" height="17" rx="6.5"/>
+  </g>
+  <path d="m14 39 43 0" stroke="#80eb77" stroke-width="1.3" stroke-linecap="round" opacity=".65"/>
+  <!-- Main four-point star and two smaller glints. -->
+  <path d="m74 2 2.8 7.2L84 12l-7.2 2.8L74 22l-2.8-7.2L64 12l7.2-2.8Z" fill="#ffdf70" stroke="#14251c" stroke-width="1" stroke-linejoin="round"/>
+  <path d="m74 7 1.4 3.6L79 12l-3.6 1.4L74 17l-1.4-3.6L69 12l3.6-1.4Z" fill="#fffce8"/>
+  <path d="m8 3 1.1 3L12 7 9.1 8 8 11 7 8 4 7l3-1Z" fill="#fff6c2"/>
+  <path d="m77 32 1 2.5 2.5 1L78 36.6l-1 2.5-1-2.5-2.5-1.1 2.5-1Z" fill="#dfffbd"/>
+</svg>

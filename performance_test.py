@@ -88,7 +88,7 @@ class ResourceTest(unittest.TestCase):
                 statements = []
                 reader.set_trace_callback(statements.append)
                 result = contests.dashboard(reader, 0, now)
-                self.assertEqual(len(result['contests']), 2)
+                self.assertEqual(len(result['contests']), 1)
                 self.assertFalse(reader.in_transaction)
                 self.assertFalse(any(s.startswith(('INSERT', 'UPDATE', 'DELETE')) for s in statements))
 

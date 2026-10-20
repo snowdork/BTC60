@@ -15,7 +15,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     reserve = commands.add_parser('reserve', help='Record an already-funded future prize pool')
-    reserve.add_argument('--period', choices=('hourly', 'daily'), required=True)
+    reserve.add_argument('--period', choices=('hourly',), required=True)
     reserve.add_argument('--start', required=True, help='Aligned ISO timestamp with timezone, e.g. 2026-11-01T00:00:00Z')
     reserve.add_argument('--kind', choices=('gift_card',), default='gift_card')
     reserve.add_argument('--amount', type=int, required=True, help='Gift-card pool in integer USD cents')

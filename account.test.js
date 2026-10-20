@@ -80,3 +80,53 @@ test('logout succeeds locally when another tab has already ended the session',as
  assert.equal(s.account.user,null);assert.equal(s.account.error,null);
  assert.equal(s.location.href,'welcome.html');
 });
+
+test('stale prediction token refreshes the same account and retries the identical order once',async()=>{
+ let stale=false,attempts=0;
+ const current={...signedIn,user:{id:1,name:'Taylor'}};
+ const fresh={...current,csrf:'fresh-token'};
+ const s=setup((url,options)=>{
+  if(url==='/api/predictions'){
+   attempts++;
+   return attempts===1?response({code:'csrf_mismatch',error:'Refresh the page and try again.'},false,403):response(fresh);
+  }
+  return response(stale?fresh:current);
+ });await s.account.loaded;stale=true;
+ const order={requestId:'same-prediction-id',budget:100};
+ await s.account.place(order);
+ const posts=s.calls.filter(c=>c.url==='/api/predictions');
+ assert.equal(posts.length,2);
+ assert.equal(posts[0].options.body,posts[1].options.body);
+ assert.equal(posts[1].options.headers['X-CSRF-Token'],'fresh-token');
+ assert.equal(s.account.csrf,'fresh-token');
+});
+
+test('background settlement recovers a stale token without reloading the page',async()=>{
+ let stale=false,attempts=0;
+ const current={...signedIn,user:{id:1,name:'Taylor'}};
+ const s=setup((url,options)=>{
+  if(stale&&url==='/api/settle'){
+   attempts++;
+   if(options.headers['X-CSRF-Token']==='token')return response({error:'Refresh the page and try again.'},false,403);
+  }
+  return response({...current,csrf:stale?'renewed':'token'});
+ });await s.account.loaded;stale=true;await s.account.settle();
+ assert.equal(attempts,2);assert.equal(s.account.csrf,'renewed');
+});
+
+test('CSRF recovery never retries an order for a different account',async()=>{
+ let changed=false;
+ const s=setup(url=>url==='/api/predictions'?response({code:'csrf_mismatch'},false,403):response({...signedIn,user:{id:changed?2:1,name:'Player'}}));
+ await s.account.loaded;changed=true;
+ await assert.rejects(s.account.place({requestId:'do-not-replay'}),/account changed/);
+ assert.equal(s.calls.filter(c=>c.url==='/api/predictions').length,1);
+ assert.equal(s.account.user.id,2);
+});
+
+test('CSRF retries are bounded and other errors never replay predictions',async()=>{
+ for(const [status,error,expected] of [[403,{code:'csrf_mismatch'},2],[403,{error:'Invalid request origin.'},1],[503,{error:'Unavailable'},1]]){
+  const s=setup(url=>url==='/api/predictions'?response(error,false,status):response({...signedIn,user:{id:1,name:'Player'}}));
+  await s.account.loaded;await assert.rejects(s.account.place({requestId:'bounded-retry'}));
+  assert.equal(s.calls.filter(c=>c.url==='/api/predictions').length,expected);
+ }
+});

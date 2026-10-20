@@ -34,7 +34,9 @@ BTC · ETH · SOL · XRP · DOGE · ADA · LTC. The database catalog controls av
 
 Prediction budgets are limited to **1–1,000 credits** per submission, enforced by
 the server and browser. Credits are game points; market prices remain USD.
-Daily/hourly contests now have separate allowances, leaderboards, and final winners.
+Hourly contests provide 1,000 spending credits per user, a separate net gain/loss tally,
+and final winners. Daily contests are disabled. New hourly credits unlock after prior
+winners are finalized; missing benchmarks delay the reset.
 Open **Contests & winners** to play or inspect results. Sponsor and prize setup is
 documented in [contest operations](doc/CONTEST_OPERATIONS.md);
 [revenue research](doc/CONTEST_REVENUE_PLAN.md) covers provider options.
@@ -59,6 +61,18 @@ python3 server.py
 Open http://127.0.0.1:8000 for the welcome page or http://127.0.0.1:8000/index.html for the terminal. Use `--port` to change the port. Internet access is required for live prices, benchmarks, and settlement. The terminal requires `/api/coins`; file previews and static hosting alone cannot initialize a working terminal or provide accounts.
 
 ### Run locally with Docker
+
+Without the Compose plugin, use the plain-Docker restart script:
+
+```bash
+cp -n deploy/local.env.example .env.local
+chmod 600 .env.local
+sudo bash scripts/docker-restart.sh --local
+```
+
+Repeat the last command after edits. It builds first, replaces `p60-local`,
+preserves `p60-local-data`, and checks readiness at http://localhost:8080.
+Edit `.env.local` to change the signup code (the example uses `777`).
 
 Requires Docker Engine and the Docker Compose plugin. From the project root:
 
