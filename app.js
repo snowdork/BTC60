@@ -168,23 +168,18 @@
       const saved=segmentPredictions(m);
       const stamp=marketElements.get(m.id)?.card.querySelector('.settled-stamp');
       if(stamp){
-        const results=['up','down'].flatMap(direction=>['won','lost'].flatMap(status=>{
-          const orders=saved.filter(p=>p.side===direction&&p.settled_at!=null&&(p.outcome===p.side?'won':'lost')===status);
-          if(!orders.length)return [];
-          const mark=document.createElement('span');
-          mark.className=`wager-settlement ${status}`;
-          const cost=orders.reduce((total,p)=>total+p.cost_cents,0);
-          const payout=orders.reduce((total,p)=>total+(p.payout_cents||0),0);
-          const amount=(status==='won'?payout-cost:cost)/100;
-          mark.textContent=`${direction==='up'?'↑':'↓'} ${status==='won'?'Win':'Lose'} ${money(amount)}`;
-          mark.title=`Your ${direction==='up'?'Up':'Down'} wager${orders.length===1?'':'s'} · ${status==='won'?'Net profit':'Amount lost'} ${money(amount)}`;
-          return [mark];
-        }));
-        stamp.replaceChildren(...results);
-        if(!results.length)stamp.textContent=saved.length?'SETTLED':'No Wager';
-        stamp.classList.toggle('has-wager',results.length>0);
-        if(results.length)stamp.removeAttribute('aria-hidden');
-        else stamp.setAttribute('aria-hidden','true');
+        const pending=saved.some(p=>p.settled_at==null);
+        const won=saved.some(p=>p.settled_at!=null&&p.outcome===p.side);
+        const lost=saved.some(p=>p.settled_at!=null&&p.outcome!==p.side);
+        const wonCents=saved.filter(p=>p.settled_at!=null&&p.outcome===p.side).reduce((total,p)=>total+(p.payout_cents||0)-p.cost_cents,0);
+        const lostCents=saved.filter(p=>p.settled_at!=null&&p.outcome!==p.side).reduce((total,p)=>total+p.cost_cents,0);
+        const winLabel=`Win +${money(wonCents/100)}`,lossLabel=`Loss −${money(lostCents/100)}`;
+        stamp.textContent=!saved.length?'No wager':pending?'Awaiting settlement':won&&lost?`${winLabel} / ${lossLabel}`:won?winLabel:lossLabel;
+        stamp.title=!saved.length?'No wager in this segment':pending?'Waiting for all your wagers to settle':`Net result: ${money((wonCents-lostCents)/100)}. Winnings exclude the original wager cost.`;
+        stamp.classList.toggle('has-wager',saved.length>0);
+        stamp.classList.toggle('won',!pending&&won&&!lost);
+        stamp.classList.toggle('lost',!pending&&lost&&!won);
+        stamp.removeAttribute('aria-hidden');
       }
       container.replaceChildren(...saved.map(p=>{
         const status=p.settled_at==null?'pending':p.outcome===p.side?'won':'lost';
@@ -195,7 +190,7 @@
         badge.title=label;badge.setAttribute('aria-label',label);
         return badge;
       }));
-      container.hidden=!saved.length;
+      container.hidden=m.status==='settled'||!saved.length;
     });
   }
   /** Render markets from the latest account, market, and interface state. */ function renderMarkets() {
@@ -203,7 +198,7 @@
       const items=markets.filter(m=>m.minutes===minutes);
       return `<div class="tier" data-duration="${minutes}"><div class="tier-label">${minutes}<small>MINUTES</small></div><div class="tier-cards" style="--columns:${items.length}">${items.map(m=>{
         const settled=m.status==='settled',queued=m.status==='queued',result=settled&&Number.isFinite(m.strike)&&Number.isFinite(m.close)?outcome(m.strike,m.close):null;
-        return `<button type="button" class="market-card ${m.status} ${result?'result-'+result:''} ${m.id===market.id?'selected':''}" data-market="${m.id}" aria-pressed="${m.id===market.id}" aria-label="${minutes} minute market ${m.start} to ${m.end} UTC, ${m.status}">${settled?'<span class="settled-stamp" aria-hidden="true">No Wager</span>':''}${settled&&result!==null?`<span class="segment-result ${result}" role="img" aria-label="${result==='up'?'Up':'Down'} won" title="${result==='up'?'Up':'Down'} won">${result==='up'?'↑':'↓'}</span>`:''}<div class="card-top"><span class="card-time">${m.start} – ${m.end}</span><span class="badge ${queued?'neutral':settled?(result===null?'neutral':result==='up'?'green':'red'):'green'}">${queued?'UPCOMING':settled?(result===null?'CLOSED':result==='up'?'↗ UP WON':'↘ DOWN WON'):'● OPEN'}</span></div><div class="card-benchmark"><div class="segment-price"><span ${window.PredictModel.coin.feed==='oilpriceapi'&&window.PredictModel.feedMode==='live'&&!window.PredictModel.isHistorical?'hidden':''}>${Number.isFinite(m.strike)?price(m.strike):'—'}</span><span data-reference-price="${m.id}" hidden></span>${m.status==='open'?`<span class="segment-countdown" data-remaining="${m.id}">${m.remaining}</span>`:''}</div>${queued?'<small>Benchmark set at open</small>':''}</div><div class="card-context"><div class="card-distance" data-distance="${m.id}" ${m.status!=='open'?'hidden':''}>Spot distance unavailable</div><div class="card-bottom">${queued?`<span class="queued-label">Opens at ${m.start}</span>`:settled?`<span>${Number.isFinite(m.close)?'Final '+price(m.close):'Awaiting history'}</span>`:''}</div></div><div class="chance-block" data-chances="${m.id}"><div class="chance-row"><span class="chance-up">↗ Up —</span><span class="chance-down">↘ Down —</span></div></div><span class="segment-predictions" data-predictions="${m.id}" hidden></span></button>`;
+        return `<button type="button" class="market-card ${m.status} ${result?'result-'+result:''} ${m.id===market.id?'selected':''}" data-market="${m.id}" aria-pressed="${m.id===market.id}" aria-label="${minutes} minute market ${m.start} to ${m.end} UTC, ${m.status}"><div class="card-top"><span class="card-time">${m.start} – ${m.end}</span><span class="badge ${queued?'neutral':settled?(result===null?'neutral':result==='up'?'green':'red'):'green'}">${queued?'UPCOMING':settled?(result===null?'CLOSED':result==='up'?'↗ UP WON':'↘ DOWN WON'):'● OPEN'}</span></div><div class="card-benchmark"><div class="segment-price"><span class="initial-price" ${window.PredictModel.coin.feed==='oilpriceapi'&&window.PredictModel.feedMode==='live'&&!window.PredictModel.isHistorical?'hidden':''}>${Number.isFinite(m.strike)?price(m.strike):'—'}</span>${settled&&Number.isFinite(m.close)?`<span class="settlement-separator" aria-label="to">→</span><strong class="settlement-price ${result||''}">${price(m.close)}</strong>`:''}<span data-reference-price="${m.id}" hidden></span>${m.status==='open'?`<span class="segment-countdown" data-remaining="${m.id}">${m.remaining}</span>`:''}</div>${queued?'<small>Benchmark set at open</small>':''}</div><div class="card-context"><div class="card-distance" data-distance="${m.id}" ${m.status!=='open'?'hidden':''}>Spot distance unavailable</div><div class="card-bottom">${queued?`<span class="queued-label">Opens at ${m.start}</span>`:settled?`${Number.isFinite(m.close)?'':'<span>Awaiting history</span>'}`:''}</div></div><div class="chance-block" data-chances="${m.id}"><div class="chance-row">${settled&&result!==null?`<span class="segment-result ${result}" role="img" aria-label="${result==='up'?'Up':'Down'} won" title="${result==='up'?'Up':'Down'} won">${result==='up'?'↑':'↓'}</span>`:''}${settled?'<span class="settled-stamp">No wager</span>':''}<span class="chance-up" ${settled?'hidden':''}>↗ Up —</span><span class="chance-down" ${settled?'hidden':''}>↘ Down —</span></div></div><span class="segment-predictions" data-predictions="${m.id}" hidden></span></button>`;
       }).join('')}</div></div>`;
     }).join('');
     marketElements.clear();
@@ -324,7 +319,7 @@
   sideButtons.forEach(button=>button.addEventListener('click',()=>{side=button.dataset.side;sideButtons.forEach(item=>item.classList.remove('direction-hint'));renderTicket();}));
   stakeButtons.forEach(button=>button.addEventListener('click',()=>{$('stake').value=button.dataset.stake==='max'?budgetAvailable().toFixed(2):button.dataset.stake;renderTicket();}));
   $('stake').addEventListener('input',renderTicket);
-  $('prediction-mode').addEventListener('change',()=>{playMode=$('prediction-mode').value;review=null;$('review-dialog').close();$('stake').value='';$('balance-label').textContent=playMode==='contest'?'Contest allowance':'Practice balance';$('prediction-mode-note').textContent=playMode==='contest'?'Daily close 00:00 GMT · 1,000 per instrument/interval':'Practice does not affect contest rank';renderAccount();});
+  $('prediction-mode').addEventListener('change',()=>{playMode=$('prediction-mode').value;review=null;$('review-dialog').close();$('stake').value='';$('balance-label').textContent=playMode==='contest'?'Contest allowance':'Practice balance';$('prediction-mode-note').textContent=playMode==='contest'?'Hourly close HH:00 GMT · 1,000 total credits per hour':'Practice does not affect contest rank';renderAccount();});
   ['rules-open','rules-inline'].forEach(id=>$(id).addEventListener('click',()=>$('rules-dialog').showModal()));
   document.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',()=>$(button.dataset.close).close()));
   $('prediction-form').addEventListener('submit',event=>{
@@ -359,6 +354,20 @@
     positions=account.predictions.filter(p=>(p.mode||'practice')===playMode).map(p=>({...p,marketId:p.market_id,minutes:Number(p.market_id.split('-')[0]),start:new Date(p.starts_at*1000).toISOString().slice(11,16),end:new Date(p.ends_at*1000).toISOString().slice(11,16),cost:p.cost_cents/100}));
     predictionIndex.clear();
     positions.forEach(p=>{const key=predictionKey(p.coin,p.marketId,p.starts_at*1000);if(!predictionIndex.has(key))predictionIndex.set(key,[]);predictionIndex.get(key).push(p);});
+    const previous=account.lastHourContest;
+    if(previous){
+      const start=new Date(previous.starts_at*1000),end=new Date(previous.ends_at*1000);
+      $('last-hour-range').textContent=`${start.toISOString().slice(0,10)} · ${start.toISOString().slice(11,16)}–${end.toISOString().slice(11,16)} GMT`;
+      const score=previous.score_cents/100;
+      $('last-hour-score').textContent=previous.state==='no_entries'?'—':`${score>0?'+':''}${score.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} credits`;
+      $('last-hour-score').style.color=previous.state==='no_entries'?'var(--muted)':score<0?'var(--red)':score>0?'var(--green)':'var(--text)';
+      $('last-hour-state').textContent=previous.state==='no_entries'?'No contest entries':previous.state==='final'?`Final · ${previous.rank===1?'Winner':'Rank '+previous.rank}`:`Provisional · awaiting settlement${previous.pending?' · '+previous.pending+' pending':''}`;
+    }else{
+      $('last-hour-range').textContent='—';$('last-hour-score').textContent='—';$('last-hour-state').textContent=account.user?'Loading results…':'Log in to see your score';
+    }
+    const wallet=account.contestWallet;
+    $('hourly-tally').hidden=playMode!=='contest';
+    $('hourly-tally').textContent=wallet?.reset_pending?'Previous hour awaiting settlement — credits unlock after winners are final.':`This hour won / lost: ${(wallet?.net_cents||0)>0?'+':''}${((wallet?.net_cents||0)/100).toFixed(2)} credits · ${wallet?.pending||0} pending`;
     $('positions-storage').textContent=account.user?'Live orders only':'Log in to save predictions';
     renderSegmentPredictions();renderPositions();renderTicket();
   }

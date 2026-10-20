@@ -49,3 +49,16 @@ test('show controls toggle password and signup-code visibility without submittin
   click();assert.equal(field.type,'password');assert.equal(toggle.textContent,'Show');assert.equal(attrs['aria-pressed'],'false');
  }
 });
+
+test('login change-password action authenticates before opening the protected form',async()=>{
+ let submit;
+ const form={dataset:{mode:'login'},querySelector:()=>({}),addEventListener:(event,fn)=>submit=fn};
+ const location={href:''};let endpoint;
+ vm.runInNewContext(fs.readFileSync('auth.js','utf8'),{
+  document:{getElementById:id=>id==='auth-form'?form:{},querySelectorAll:()=>[]},location,
+  FormData:class{[Symbol.iterator](){return Object.entries({email:'test@example.com',password:'current-password'})[Symbol.iterator]();}},
+  fetch:async url=>{endpoint=url;return {ok:true,json:async()=>({ok:true})};},SyntaxError
+ });
+ await submit({preventDefault(){},submitter:{dataset:{next:'password.html'}}});
+ assert.equal(endpoint,'/api/login');assert.equal(location.href,'password.html');
+});

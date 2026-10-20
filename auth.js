@@ -12,12 +12,12 @@
     });
   });
   form.addEventListener('submit',async event=>{
-    event.preventDefault();const button=form.querySelector('[type="submit"]');button.disabled=true;error.textContent='';
+    event.preventDefault();const next=form.dataset.mode==='login'&&event.submitter?.dataset?.next==='password.html'?'password.html':'categories.html';const button=form.querySelector('[type="submit"]');button.disabled=true;error.textContent='';
     try {
       const fields=Object.fromEntries(new FormData(form));
       if(form.dataset.mode==='signup'&&fields.password!==fields.confirmPassword)throw Error('Passwords do not match.');
       const response=await fetch('/api/'+form.dataset.mode,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(fields)});
-      const data=await response.json();if(!response.ok)throw Error(data.error||'Unable to sign in.');location.href='categories.html';
+      const data=await response.json();if(!response.ok)throw Error(data.error||'Unable to sign in.');location.href=next;
     } catch(err){error.textContent=err instanceof SyntaxError?'Start the local app with python3 server.py to use accounts.':err.message;}
     finally{button.disabled=false;}
   });

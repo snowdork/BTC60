@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 
-function chartHarness({oil=false,live=false,spotError=false}={}){
+function chartHarness({oil=false,live=false,spotError=false,transformCandles=c=>c}={}){
  const elements=new Map(),now=Date.UTC(2026,9,12,17,25,30),hour=Math.floor(now/3600000)*3600000;
  function element(id){
   if(!elements.has(id))elements.set(id,{textContent:'',hidden:false,dataset:{},style:{setProperty(){}},classList:{},listeners:{},
@@ -25,7 +25,7 @@ function chartHarness({oil=false,live=false,spotError=false}={}){
   const end=Math.min(now,start+3660000);
   const candles=[];
   for(let t=start;t<end;t+=60000) candles.push([t/1000,99,102,100,100+(t-start)/600000,1]);
-  return {ok:true,json:async()=>candles};
+  return {ok:true,json:async()=>transformCandles(candles)};
  };
  class FakeDate extends Date{static now(){return now;}}
  class Socket{constructor(){this.readyState=1;socket=this;}close(){}send(){}}
@@ -118,4 +118,23 @@ test('missing oil credentials show an actionable error without simulated substit
  assert.equal(h.element('feed-message').hidden,false);
  assert.match(h.element('feed-message').textContent,/API key/);
  assert(!Number.isFinite(h.model.spot));
+});
+
+test('completed quarters show a green direction arrow with an outcome-colored dot',async()=>{
+ const h=chartHarness();await flush();
+ const markers=h.element('segment-results').children;
+ assert.equal(markers.length,1);assert.equal(markers[0].textContent,'↑');
+ assert.equal(markers[0].dataset.direction,'up');assert.equal(markers[0].style.left,'12.5%');
+ assert.match(markers[0]['aria-label'],/17:00–17:15 UTC · Up wins/);
+});
+test('falling quarter points down and ties resolve Up',async()=>{
+ for(const [close,direction,arrow] of [[90,'down','↓'],[100,'up','↑']]){
+  const h=chartHarness({transformCandles:rows=>rows.map(row=>row[0]*1000===Date.UTC(2026,9,12,17,14)?[...row.slice(0,4),close,1]:row)});await flush();
+  const marker=h.element('segment-results').children[0];
+  assert.equal(marker.dataset.direction,direction);assert.equal(marker.textContent,arrow);
+ }
+});
+test('missing boundary candle leaves completed segment without an invented winner',async()=>{
+ const h=chartHarness({transformCandles:rows=>rows.filter(row=>row[0]*1000!==Date.UTC(2026,9,12,17,14))});await flush();
+ assert.equal(h.element('segment-results').children.length,0);
 });

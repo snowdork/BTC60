@@ -4,9 +4,17 @@
 (() => {
   let generation=0,loggingOut=false;
   const account={user:null,csrf:null,predictions:[],ready:false,error:null};
-  /** Send an account JSON request with the current CSRF token; invalidate local state on unauthorized responses. */ async function request(path,body){
-    const response=await fetch('/api/'+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','X-CSRF-Token':account.csrf||''},...(body?{body:JSON.stringify(body)}:{})});
+  /** Recover a stale CSRF token once for the same account, without replaying other failures. */ async function request(path,body,retry=true){
+    const started=generation,userId=account.user?.id;
+    const response=await fetch('/api/'+path,{method:body?'POST':'GET',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':account.csrf||''},...(body?{body:JSON.stringify(body)}:{})});
     let data;try{data=await response.json();}catch{throw Error('Start the local app with python3 server.py to use accounts.');}
+    if(body&&retry&&response.status===403&&(data.code==='csrf_mismatch'||data.error==='Refresh the page and try again.')){
+      const fresh=await request('account');
+      if(started!==generation)throw Error('Your session changed. Please sign in again.');
+      update(fresh);
+      if(userId==null||fresh.user?.id!==userId)throw Error('Your signed-in account changed. Review your prediction before trying again.');
+      return request(path,body,false);
+    }
     if(!response.ok){if(response.status===401){Object.assign(account,{user:null,predictions:[],csrf:null,ready:true});window.dispatchEvent(new Event('account-update'));}throw Object.assign(Error(data.error||'Request failed.'),{status:response.status});}return data;
   }
   let snapshot='';

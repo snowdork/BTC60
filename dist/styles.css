@@ -13,7 +13,7 @@
 
 /* Fixed quarter-hour boundaries share the chart's full-hour axis. */
 .interval-guides{position:absolute;left:calc(var(--tier-gutter) + 1px);right:1px;top:35px;bottom:0;z-index:2;pointer-events:none}
-.interval-guide{position:absolute;left:var(--boundary);top:0;bottom:0;border-left:2px dashed #ffd54f;filter:drop-shadow(0 0 3px #ffb30045)}
+.interval-guide{position:absolute;left:var(--boundary);top:0;bottom:0;border-left:2px dashed var(--interval-divider,#fff)}
 @media(max-height:820px){.interval-guides{top:30px}}
 
 /* Direct coin selection with native keyboard-accessible buttons. */
@@ -86,9 +86,9 @@ body:not(.auth-page) main{padding:10px 20px 0}
 
 /* Quarter-hour guides belong to the chart; each row marks only its own ends. */
 .interval-guides{bottom:auto;height:var(--chart-height)}
-.tier[data-duration] .market-card::after{content:'';position:absolute;top:-1px;bottom:-1px;right:-5px;border-left:2px dashed #ffd54f;filter:drop-shadow(0 0 3px #ffb30045);pointer-events:none}
+.tier[data-duration] .market-card::after{content:'';position:absolute;top:-1px;bottom:-1px;right:-5px;border-left:2px dashed var(--interval-divider,#fff);pointer-events:none}
 .tier[data-duration] .market-card:last-child::after{right:-5px}
-.tier[data-duration] .market-card:first-child::before{content:'';position:absolute;top:-1px;bottom:-1px;left:-5px;border-left:2px dashed #ffd54f;filter:drop-shadow(0 0 3px #ffb30045);pointer-events:none}
+.tier[data-duration] .market-card:first-child::before{content:'';position:absolute;top:-1px;bottom:-1px;left:-5px;border-left:2px dashed var(--interval-divider,#fff);pointer-events:none}
 
 .portfolio-icon{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;color:var(--green);border:1px solid #00e67640;border-radius:6px;background:#00e67608;flex-shrink:0}.portfolio-icon:hover{background:#00e67618}.portfolio-icon svg{width:18px;height:18px}.pending-history-link{margin-left:auto;color:var(--green);font-size:9px;white-space:nowrap}.positions-heading{gap:12px}.positions-list-empty{padding:12px 0 2px;color:var(--muted);font-size:10px}@media(max-width:1150px){.positions-heading>.muted{display:none}}
 
@@ -109,7 +109,7 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .segment-price{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px}.segment-predictions{display:inline-flex;flex-wrap:wrap;gap:4px}.segment-prediction{display:inline-flex;align-items:center;gap:4px;padding:2px 5px;border:1px solid currentColor;border-radius:4px;font:600 10px monospace;letter-spacing:0;white-space:nowrap}.segment-prediction.up{color:var(--green);background:#00e67610}.segment-prediction.down{color:var(--red);background:#ff174410}
 
 /* Completed intervals show their confirmed direction at the right edge. */
-.segment-result{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:700 30px monospace;line-height:1;pointer-events:none}.segment-result.up{color:var(--green)}.segment-result.down{color:var(--red)}.market-card.settled .card-benchmark,.market-card.settled .card-context{padding-right:28px}
+.segment-result{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:700 42px monospace;line-height:1;pointer-events:none}.segment-result.up{color:var(--green)}.segment-result.down{color:var(--red)}.market-card.settled .card-benchmark,.market-card.settled .card-context{padding-right:40px}
 
 /* Review repeats the chosen direction in words, an arrow, and color. */
 .review-direction{display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:16px;border:1px solid currentColor;border-radius:8px;color:var(--green);background:#00e6760c}.review-direction.down{color:var(--red);background:#ff17440c}.review-direction>span{font:700 34px monospace;line-height:1}.review-direction>strong{font-size:17px}.review-direction~h2{font-size:18px}#confirm-prediction{justify-content:center;gap:8px}
@@ -355,3 +355,38 @@ body:not(.auth-page) main{padding:10px 20px 0}
 /* Only the banner fractional digits follow the latest one-second price move. */
 #btc-spot .spot-decimals[data-trend="up"]{color:var(--green)}
 #btc-spot .spot-decimals[data-trend="down"]{color:var(--red)}
+
+/* Long settlement arrows sit behind the transparent SVG price trace. */
+.chart-plot{isolation:isolate}
+.chart-plot #btc-chart{position:relative;z-index:1}
+.chart-plot .chart-price-tag,.chart-plot .chart-price-scale,.chart-plot .chart-empty{z-index:2}
+.segment-results{position:absolute;inset:0;pointer-events:none;z-index:0}
+.segment-results .segment-result{position:absolute;right:auto;top:4px;bottom:4px;width:30px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;background:none;color:var(--green);font-size:0;pointer-events:none;opacity:.5}
+.segment-results .segment-result::before{content:'';display:block;flex:0 0 8px;width:8px;border-radius:50%;background:currentColor}
+.segment-results .segment-result::after{content:'';display:block;flex:1;width:28px;min-height:0;background:currentColor;clip-path:polygon(50% 0,100% 30%,65% 30%,65% 100%,35% 100%,35% 30%,0 30%)}
+.segment-results .segment-result[data-direction="down"]{color:var(--red)}
+.segment-results .segment-result[data-direction="down"]::after{transform:rotate(180deg)}
+
+/* Initial and final settlement prices share a theme-aware, high-contrast row. */
+.market-card.settled .card-context,.market-card.settled .card-benchmark{padding-right:0}
+.market-card.settled .segment-price{justify-content:flex-start;gap:5px;padding:5px 7px;border-radius:5px;background:var(--surface);font-size:15px;font-weight:700;line-height:1.4;font-variant-numeric:tabular-nums}
+.market-card.settled .initial-price,.market-card.settled .settlement-separator{color:#fff}
+.market-card.settled .settlement-price{font-size:inherit;font-weight:800;color:#fff}
+.market-card.settled .settlement-price.up{color:#00e676}
+.market-card.settled .settlement-price.down{color:#ff5275}
+[data-theme="light"] .market-card.settled .initial-price,[data-theme="light"] .market-card.settled .settlement-separator,[data-theme="light"] .market-card.settled .settlement-price{color:#000}
+[data-theme="light"] .market-card.settled .settlement-price.up{color:#007c40}
+[data-theme="light"] .market-card.settled .settlement-price.down{color:#c9153e}
+
+/* Settlement arrows belong beside the bottom-left Up/Down result row. */
+.market-card.settled .chance-block{margin-top:auto}
+.market-card .chance-row .segment-result{position:static;transform:none;flex-shrink:0;font-size:42px;line-height:1}
+.market-card.settled .chance-row{gap:6px;flex-wrap:wrap}
+
+/* Completed segments show the player's result beside the direction arrow. */
+.market-card .chance-row .settled-stamp{position:static;transform:none;display:inline;padding:0;border:0;font:800 13px/1.3 Arial,sans-serif;letter-spacing:0;color:#26342d;user-select:auto}
+.market-card .chance-row .settled-stamp.won{color:var(--green)}
+.market-card .chance-row .settled-stamp.lost{color:var(--red)}
+.market-card .chance-row [hidden]{display:none}
+
+.chart-toolbar>div[hidden]{display:none}

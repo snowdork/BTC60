@@ -638,7 +638,8 @@ class Handler(SimpleHTTPRequestHandler):
             user = conn.execute('SELECT id,name,email,balance_cents FROM users WHERE id=?', (session['user_id'],)).fetchone()
             positions = [dict(row) for row in conn.execute("SELECT p.*,CASE WHEN ce.prediction_id IS NULL THEN 'practice' ELSE 'contest' END AS mode,i.category,i.name AS instrument_name,i.unit,ps.provider AS pricing_source,s.close_price,s.outcome,s.payout_cents,s.settled_at,s.source FROM predictions p LEFT JOIN contest_entries ce ON ce.prediction_id=p.id JOIN coins i ON i.symbol=p.coin LEFT JOIN prediction_sources ps ON ps.prediction_id=p.id LEFT JOIN settlements s ON s.prediction_id=p.id WHERE p.user_id=? ORDER BY p.created_at DESC", (session['user_id'],))]
             contest_wallet = contests.wallet(conn, session['user_id'])
-        return {'user': dict(user), 'csrf': session['csrf'], 'predictions': positions, 'contestWallet': contest_wallet}
+            last_hour = contests.last_hour_score(conn, session['user_id'])
+        return {'user': dict(user), 'csrf': session['csrf'], 'predictions': positions, 'contestWallet': contest_wallet, 'lastHourContest': last_hour}
 
     def do_GET(self):
         """Dispatch read endpoints and enforce authentication and the static-file allowlist."""
@@ -649,8 +650,15 @@ class Handler(SimpleHTTPRequestHandler):
             session = self.session()
             if not session:
                 return self.reply(401, {'error': 'Log in to view contests.'})
+            query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            try:
+                before = int(query['before'][0]) if 'before' in query else None
+                if before is not None and not 0 <= before <= 253402300799:
+                    raise ValueError()
+            except (ValueError, TypeError):
+                return self.reply(400, {'error': 'Choose a valid history timestamp.'})
             with connect() as conn:
-                dashboard = contests.dashboard(conn, session['user_id'])
+                dashboard = contests.dashboard(conn, session['user_id'], before=before)
             return self.reply(200, dashboard)
         if path == '/healthz':
             try:
@@ -837,7 +845,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not session:
                 return self.reply(401, {'error': 'Log in to save your predictions.'})
             if not secrets.compare_digest(self.headers.get('X-CSRF-Token', ''), session['csrf']):
-                return self.reply(403, {'error': 'Refresh the page and try again.'})
+                return self.reply(403, {'error': 'Refresh the page and try again.', 'code': 'csrf_mismatch'})
             if path == '/api/logout':
                 with connect() as conn:
                     conn.execute('DELETE FROM sessions WHERE token_hash=?', (session['token_hash'],))

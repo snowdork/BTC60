@@ -4,7 +4,9 @@ Run these commands from the repository root. Install Docker Engine and the
 Compose plugin first. Point your domain at the VPS and allow inbound TCP 80/443
 plus your SSH port. Stop any existing service using ports 80/443 before starting
 Caddy. The Docker subnet 172.30.60.0/24 must not overlap an existing network;
-if changed, update both Caddy's fixed address and P60_TRUSTED_PROXIES together.
+if changed, update both container addresses and P60_TRUSTED_PROXIES together.
+The app uses 172.30.60.3 and Caddy uses 172.30.60.2. Both are explicit so the
+app cannot automatically receive Caddy's address when it starts first.
 
 ```bash
 cp deploy/docker.env.example .env
@@ -35,6 +37,19 @@ restart a running container; monitor public HTTP availability separately.
 See [Docker restart policies](https://docs.docker.com/engine/containers/start-containers-automatically/).
 
 ## Data and upgrades
+
+To stop the VPS containers, rebuild the application, and start everything again:
+
+```bash
+sudo bash scripts/docker-restart.sh
+```
+
+Run this after updating the checkout and making a database backup. The script
+uses the VPS `compose.yaml` and `.env`, checks configuration and Docker access
+before stopping, and retains all database and certificate volumes. The site is
+offline during the build. If the build fails, fix the reported error and rerun
+the script; containers remain stopped. It does not restart the Docker daemon or
+stop unrelated containers. This command does not use `compose.local.yaml`.
 
 The `p60-data` named volume persists `/app/data`, including SQLite and optional
 `odds-calibration.json`. The image never includes your local database or secrets.

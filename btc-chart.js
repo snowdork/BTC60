@@ -242,6 +242,22 @@
     const up=dots.filter(dot=>dot.className.includes(' up')).length,down=dots.filter(dot=>dot.className.includes(' down')).length;
     map.setAttribute('aria-label',`Minute-by-minute direction for this hour: ${up} up, ${down} down, ${60-up-down} pending or unavailable`);
   }
+  /** Mark completed quarters only when both exact settlement boundary candles exist. */
+  function renderSegmentResults(displayTime){
+    const markers=[],closes=new Map(candles.map(c=>[c[0]*1000,Number(c[4])]));
+    for(let index=0;index<4;index++){
+      const start=hour+index*900000,end=start+900000;
+      if(end>displayTime)continue;
+      const opening=closes.get(start-60000),closing=closes.get(end-60000);
+      if(!Number.isFinite(opening)||opening<=0||!Number.isFinite(closing)||closing<=0)continue;
+      const direction=closing>=opening?'up':'down',marker=document.createElement('span');
+      marker.className='segment-result';marker.dataset.direction=direction;
+      marker.style.left=`${index*25+12.5}%`;marker.textContent=direction==='up'?'↑':'↓';
+      marker.title=`${time(start)}–${time(end)} UTC · ${direction==='up'?'Up':'Down'} wins${mode==='demo'?' · Synthetic preview':''}`;
+      marker.setAttribute('role','img');marker.setAttribute('aria-label',marker.title);markers.push(marker);
+    }
+    $('segment-results').replaceChildren(...markers);
+  }
   /** Project valid price points into SVG coordinates and update chart and benchmark labels. */ function draw(now,force=false) {
     const displayTime=historical?hour+3600000:now;
     $('time-cursor').hidden=historical;
@@ -267,13 +283,14 @@
     const valid=points.filter(p=>p.t>=hour&&p.t<=displayTime);
     const hasPoints=valid.length>0;
     renderMinuteHeatmap(displayTime);
+    renderSegmentResults(displayTime);
     $('chart-empty').hidden=hasPoints;
-    $('chart-empty').textContent=coin.feed==='oilpriceapi'&&mode==='live'?'Checking latest spot assessment every 5 seconds…':historical?(historyFailed?'History unavailable. Select Reconnect to retry.':'Loading the selected hour…'):mode==='demo'?'Starting synthetic preview…':lastPriceAt?'Waiting for history…':`Waiting for live ${coin.symbol}/USD · use Synthetic preview if unavailable`;
+    $('chart-empty').textContent=coin.feed==='oilpriceapi'&&mode==='live'?'Checking latest spot assessment every 5 seconds…':historical?(historyFailed?'History unavailable. Refresh the page to retry.':'Loading the selected hour…'):mode==='demo'?'Starting synthetic preview…':lastPriceAt?'Waiting for history…':`Waiting for live ${coin.symbol}/USD`;
     const opening=candles.find(c=>c[0]*1000===hour-60000)?.[4];
     const change=Number.isFinite(lastPrice)&&Number.isFinite(opening)?lastPrice-opening:null;
     $('btc-change').textContent=change===null?'Waiting for price data':`${change>=0?'+':'−'}${money(Math.abs(change))} ${historical?'that hour':'this hour'}`;
     $('btc-change').style.color=change!==null&&change<0?'var(--red)':'var(--green)';
-    if(!hasPoints){$('btc-line').removeAttribute('d');$('btc-area').removeAttribute('d');$('btc-tip').setAttribute('visibility','hidden');$('chart-price-tag').hidden=true;return;}
+    if(!hasPoints){$('btc-line').removeAttribute('d');$('btc-area').removeAttribute('d');$('btc-tip').setAttribute('visibility','hidden');return;}
     let low=Math.min(...valid.map(p=>p.price)),high=Math.max(...valid.map(p=>p.price));
     const pad=Math.max(coin.demoBase*.00012,(high-low)*.18);low-=pad;high+=pad;
     const /** Project a timestamp into the chart horizontal coordinate. */ x=t=>(t-hour)/3600000*1000,/** Project a price into the chart vertical coordinate. */ y=p=>116-(p-low)/(high-low)*102;
@@ -281,8 +298,6 @@
     $('btc-line').setAttribute('d',path);
     $('btc-area').setAttribute('d',`${path} L${x(last.t)},130 L${x(first.t)},130 Z`);
     $('btc-tip').setAttribute('cx',x(last.t));$('btc-tip').setAttribute('cy',y(last.price));$('btc-tip').setAttribute('visibility','visible');
-    $('chart-price-high').textContent=money(high);$('chart-price-low').textContent=money(low);
-    const tag=$('chart-price-tag');tag.hidden=false;tag.textContent=money(last.price);tag.style.left=`${Math.min(90,Math.max(10,x(last.t)/10))}%`;tag.style.top=`${Math.max(10,y(last.price)/130*100)}%`;
     $('chart-description').textContent=historical?`${coin.name} historical price from ${time(hour)} to ${time(hour+3600000)} UTC on ${new Date(hour).toISOString().slice(0,10)}. Last available price ${money(last.price)}. Outcomes are settlement proxies.`:`${mode==='demo'?'Simulated':coin.feed==='oilpriceapi'?'Polled spot assessment (observation times, not market ticks)':sourceLabel()} ${coin.symbol}/USD hourly price. Latest ${money(last.price)}. Red dashed cursor at ${clock(now)} UTC.`;
   }
   /** Advance chart time and repaint when needed without issuing a draw for every unchanged frame. */ function frame(stamp) {

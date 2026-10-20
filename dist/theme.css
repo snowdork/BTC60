@@ -1,5 +1,5 @@
 .theme-toggle{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid var(--border);border-radius:6px;background:var(--raised);color:var(--text);flex-shrink:0;cursor:pointer}.theme-toggle:hover{border-color:var(--green);color:var(--green)}.theme-toggle svg{width:18px;height:18px}
-:root[data-theme="light"]{color-scheme:light;--bg:#f1f5f3;--surface:#fff;--raised:#e7eeea;--border:#142e242b;--text:#152b21;--muted:#586d61;--green:#007c40;--red:#c9153e;--amber:#976500;--cyan:#007b98}
+:root[data-theme="light"]{color-scheme:light;--interval-divider:#000;--bg:#f1f5f3;--surface:#fff;--raised:#e7eeea;--border:#142e242b;--text:#152b21;--muted:#586d61;--green:#007c40;--red:#c9153e;--amber:#976500;--cyan:#007b98}
 [data-theme="light"] .topbar{background:#fff}
 [data-theme="light"] .auth-page{background:radial-gradient(ellipse at 75% 20%,#b9f0cc77,transparent 55%),var(--bg)}
 [data-theme="light"] :is(.market-card,.market-card.settled,.coin-picker,.benchmark,.budget-input,.chart-plot,.auth-card input,.market-status-strip,.outcome,.history-filters button,.stake-presets button,dialog){background:var(--surface);color:var(--text);border-color:var(--border)}

@@ -2,29 +2,27 @@
 
 ## Deploy and rules
 
-Hourly contests close at each HH:00 GMT. Daily contests close at 00:00 GMT,
-when the next daily contest opens. GMT is fixed UTC+00:00, with no daylight-saving
-shift. Existing UTC timestamp calculations already use these exact boundaries.
-Closing a contest ends its scoring period; final winners still wait for settlement.
+Hourly contests close at HH:00 GMT (UTC+00:00). Rule version:
+`hourly-net-credits-v2`. Each user has 1,000 spending credits per hour across all
+instruments, intervals, and directions. Winnings go into the net tally, never
+back into spendable credits. Practice funds remain separate.
 
-Back up before deploying, then rebuild/restart the app. Startup adds contest and
-prize tables without rewriting practice balances or importing historical entries.
-The Docker image includes `contests.py` and `scripts/contest-admin.py`.
+The settlement worker finalizes closed hourly contests and saves winners and
+prize allocations in one transaction. All prior hourly contests must be final
+before the next allowance unlocks. Missing benchmarks delay the reset; retries
+are automatic. Hours remain aligned to GMT even when finalization is delayed.
+Ties share first place, negative highest scores still win, and empty contests
+have no winner. Historical results are immutable after finalization.
 
-Daily contest allowance: 10,000 credits, renewed at 00:00 GMT. This is a fixed
-spending allocation: settled returns affect rank but cannot be spent again.
-The 1,000-credit instrument/interval aggregate limit counts both sides and all
-submissions. Practice retains separate funds. SQLite immediate transactions
-serialize reservations, settlement, finalization, and administrative changes.
-Run one app process against one database.
-
-Scores use settled net credits; pending results remain provisional. The highest
-score wins even if negative. Ties share first rank. Finalization runs with the
-settlement worker and is idempotent. Missing history delays finalization until
-available; no timeout/void behavior is implemented. End-boundary ownership uses
-`ends_at - 1`: an interval ending at 00:00 counts toward yesterday. The displayed
-rule version is `utc-net-credits-v1`; change the version and communicate rules
-before altering future contest behavior.
+Back up before deploying, then rebuild/restart. Startup migrates daily entry
+links to optional fields while retaining old records. No new daily contests,
+entries, or prize pools are created; daily records are archived and hidden.
+Existing hourly entries remain counted, so a user who already spent more than
+1,000 credits before deployment has zero allowance until the next unlocked hour.
+Deploy at an hour boundary when possible. Historical rule versions are retained.
+Run one app process against one database. Immediate transactions serialize entry
+reservations and finalization. The history API uses `before` (exclusive Unix
+seconds), with 24 recorded hours per page and a `next_before` cursor.
 
 ## Sponsor strip
 
@@ -61,7 +59,7 @@ replace it with a real future timestamp and accurate provider/eligibility detail
 
 ```bash
 docker compose exec app python3 scripts/contest-admin.py reserve \
-  --period daily --start FUTURE_UTC_TIMESTAMP \
+  --period hourly --start FUTURE_UTC_TIMESTAMP \
   --kind gift_card --amount 2500 \
   --description 'USD gift card pool; replace with provider, region, eligibility and redemption terms' \
   --funding-reference 'Internal reserve reference'
