@@ -30,3 +30,7 @@ they are exercised. Run the regression suites separately::
 The runner executes all three unit-test suites and writes a colored result log
 to ``/tmp/test_results/test_result_<date_time>.log``. Read saved logs with
 ``less -R`` to display their PASS/FAIL colors.
+
+For Docker startup, persistence, crash recovery, and restore checks, see the
+`test guide <TEST_GUIDE.md>`_. These require a Docker-capable host and are separate
+from the mocked regression suites.

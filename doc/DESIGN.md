@@ -74,13 +74,25 @@ The terminal lists unsettled predictions with countdowns and marks account wager
 | `market-model.js` | Pure quote, estimate, volatility, and readiness logic |
 | `app.js` | Market selection, ticket, live review, wager displays |
 | `btc-chart.js` | Feed, candle history, chart, UTC market lifecycle |
-| `account.js`, `auth.js` | Session/account API and authentication UI |
+| `account.js`, `auth.js`, `password.js` | Session/account API, authentication UI, and password changes |
 | `portfolio.js`, `portfolio-model.js` | Account history, filters, summary calculations |
 | `theme.js`, shared CSS | Persisted theme and responsive presentation |
 | `server.py` | Static serving, catalog/account API, orders, settlements |
 | `scripts/database.py` | Explicit initialization, status, backup, reset |
 
-SQLite stores users, hashed sessions, predictions, settlements, coins, and migration versions. Each account starts with $14,250. Passwords use salted scrypt; sessions use HttpOnly/SameSite cookies and CSRF tokens. Account data persists across browser sessions and server restarts. Local storage holds presentation preferences rather than balances or saved orders.
+SQLite stores users, hashed sessions, predictions, settlements, coins, and migration versions. Each account starts with 10,000 credits. Passwords use salted scrypt; sessions use HttpOnly/SameSite cookies and CSRF tokens. Account data persists across browser sessions and server restarts. Local storage holds presentation preferences rather than balances or saved orders.
+
+Authenticated `POST /api/change-password` requires the session CSRF token and
+`currentPassword`, `newPassword`, and `confirmPassword` fields. It verifies the
+current password (8–128 characters), validates the new password (8–16 characters)
+and confirmation, then atomically replaces the salted scrypt hash and revokes
+all other sessions. Login, signup, and password changes share a per-client-IP
+limit of 20 attempts per minute. Password recovery remains unavailable.
+
+Account requests carry a local generation counter so responses started before
+a completed logout cannot restore signed-in state. Logout treats an already
+expired session as success, clears account and contest-wallet state, and returns
+to the welcome page. Settlement requests pause while logout is in progress.
 
 UI/chart updates run once per second; incoming prices update the model immediately. The controller caches controls, delegates market selection, and avoids rebuilding unchanged rows and totals. Volatility is cached until candles change or a minute closes. Hidden tabs skip rendering and account polling. Static text assets support gzip and ETag revalidation; account/API responses are uncached.
 

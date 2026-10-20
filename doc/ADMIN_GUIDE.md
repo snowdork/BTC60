@@ -6,6 +6,14 @@ server and watchdog. Run them as the same operating-system user that owns the
 server. They do not install boot-time startup, restart a crashed watchdog, or
 check HTTP health after startup.
 
+For boot-time startup and HTTPS on an existing VPS checkout, see the
+[systemd setup helper](../deploy/README.md#enable-https-for-an-existing-checkout).
+Once installed, manage that service with `sudo systemctl restart predict60` and
+`sudo systemctl stop predict60`; inspect logs with `journalctl -u predict60`.
+Stop it with systemctl before database operations requiring a stopped server.
+The watchdog commands below apply to deployments supervised by the development
+scripts.
+
 ## Start, restart, and stop
 
 ```bash
@@ -61,7 +69,7 @@ level. Application logs omit request bodies, passwords, and session cookies.
 Successful settlement records include prediction ID, user ID, instrument,
 outcome, and payout in cents. Deferred settlements remain pending for retry.
 
-The default log is `/tmp/btc60/server.log`. Logs automatically rotate before a
+The default log is `/tmp/p60/server.log`. Logs automatically rotate before a
 write would take a nonempty file past **10 MiB**. Five numbered backups are kept:
 `server.log.1` is newest and `server.log.5` is oldest. Rotation discards older
 backups. Log files are created with mode 0600, and a new log directory with 0700.
@@ -69,7 +77,7 @@ A shared lock coordinates the writer and manual rotation; no cron job is needed.
 
 ```bash
 # Follow the current log; -F follows a replacement file after rotation.
-tail -F /tmp/btc60/server.log
+tail -F /tmp/p60/server.log
 # Apply the size policy without forcing a smaller file to rotate.
 python3 scripts/rotate-logs.py
 # Rotate a nonempty log immediately while the server runs.
@@ -82,7 +90,7 @@ cleared on reboot. To use another directory, set `PREDICT60_LOG_DIR` consistentl
 for restart and rotation commands:
 
 ```bash
-export PREDICT60_LOG_DIR=/tmp/btc60
+export PREDICT60_LOG_DIR=/tmp/p60
 python3 scripts/restart-server.py
 python3 scripts/rotate-logs.py --force
 ```
@@ -107,12 +115,12 @@ overwrites `X-Forwarded-For`; the supplied Caddy configuration does so.
 
 | Path | Purpose |
 | --- | --- |
-| `data/btc60.sqlite3` | Compatibility-preserving default database; override with `PREDICT60_DB`. |
+| `data/p60.sqlite3` | Default for new installations; existing legacy databases remain in use. Override with `PREDICT60_DB`. |
 | `data/server.stopped` | Intentional-stop marker. |
 | `data/server-log-level` | Log level selected by the last successful manual start. |
 | `data/server-control.lock` | Serializes manual start/stop operations. |
 | `data/server-watchdog.lock` | Prevents duplicate watchdogs. |
-| `/tmp/btc60/rotation.lock` | Coordinates log writes and rotation. |
+| `/tmp/p60/rotation.lock` | Coordinates log writes and rotation. |
 
 Lock files can remain after shutdown; their presence alone does not mean a
 process is running. Do not remove lock files to bypass a running process.

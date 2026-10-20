@@ -53,7 +53,7 @@ Catalog migrations seed only missing data to preserve administrator edits.
 Operations
 ----------
 
-``btc60_logging.py`` serializes log writes/rotation with a filesystem lock and
+``p60_logging.py`` serializes log writes/rotation with a filesystem lock and
 moves backup files in descending order. ``scripts/server_control.py`` discovers
 only processes belonging to the checkout. Watchdog loops stop on the explicit
 stop marker and restart unexpected child exits. Maintenance commands use a

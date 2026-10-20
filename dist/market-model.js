@@ -3,6 +3,7 @@
  */
 /* Pure demo market logic, shared by the browser and Node checks. */
 (function(root) {
+  const maxPredictionCredits = 1000;
   const markets = [
     {id:'60-0',minutes:60,start:'17:00',end:'18:00',status:'open',strike:67450,up:68,remaining:'17m 48s'},
     {id:'30-0',minutes:30,start:'17:00',end:'17:30',status:'settled',strike:67450,close:67512,up:54},
@@ -14,7 +15,7 @@
   ];
   /** Validate market state, side, budget, and balance before calculating fractional shares and rounded payout. */ function quote(market,side,budget,balance) {
     const cents = side === 'up' ? market.up : 100-market.up;
-    if (market.status !== 'open' || !Number.isFinite(market.strike) || !['up','down'].includes(side) || !Number.isFinite(budget) || !Number.isFinite(balance) || budget<1 || budget>balance || !Number.isInteger(cents) || cents<=0 || cents>=100) return null;
+    if (market.status !== 'open' || !Number.isFinite(market.strike) || !['up','down'].includes(side) || !Number.isFinite(budget) || !Number.isFinite(balance) || budget<1 || budget>maxPredictionCredits || budget>balance || !Number.isInteger(cents) || cents<=0 || cents>=100) return null;
     const costCents=Math.ceil(budget*100-1e-7);
     if(costCents>Math.round(balance*100))return null;
     const contracts=costCents/cents,payoutCents=Math.ceil(costCents*100/cents);
@@ -82,7 +83,7 @@
     markets.forEach(m=>{m.up=config.quotes[m.id];});model.quoteReady=true;model.settlement=config.settlement;model.calibrations=config.calibrations||{};
   }
   /** Resolve equal or rising benchmark values as Up and falling values as Down. */ function outcome(start,close) { return close >= start ? 'up' : 'down'; }
-  const model={markets,quote,outcome,estimateChances,minuteVolatility,normalCDF,calibratedProbability,dataStatus,configure,quoteReady:false,initialBalance:14250,spot:67528.50,coin:typeof window!=='undefined'?window.PredictCoins.available[0]:null};
+  const model={maxPredictionCredits,markets,quote,outcome,estimateChances,minuteVolatility,normalCDF,calibratedProbability,dataStatus,configure,quoteReady:false,initialBalance:10000,spot:67528.50,coin:typeof window!=='undefined'?window.PredictCoins.available[0]:null};
   if (typeof module !== 'undefined' && module.exports) module.exports=model;
   else root.PredictModel=model;
 })(typeof globalThis!=='undefined'?globalThis:this);

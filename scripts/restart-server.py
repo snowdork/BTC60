@@ -12,7 +12,7 @@ import urllib.request
 from server_control import ROOT, DATA, STOP, stop_server
 
 sys.path.insert(0, str(ROOT))
-from btc60_logging import LOG_PATH, write_or_rotate
+from p60_logging import LOG_PATH, write_or_rotate
 
 
 def main():

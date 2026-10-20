@@ -1,0 +1,70 @@
+name: p60
+services:
+  app:
+    build: .
+    image: p60:${P60_IMAGE_TAG:-local}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      PREDICT60_DB: /app/data/p60.sqlite3
+      P60_SIGNUP_CODE: ${P60_SIGNUP_CODE:-}
+      P60_HOST: https://${P60_DOMAIN:?Set P60_DOMAIN in .env}
+      P60_TRUSTED_PROXIES: 172.30.60.2
+      P60_MAX_REQUESTS: ${P60_MAX_REQUESTS:-32}
+      PREDICT60_LOG_LEVEL: ${PREDICT60_LOG_LEVEL:-normal}
+      P60_SPONSOR_NAME: ${P60_SPONSOR_NAME:-}
+      P60_SPONSOR_URL: ${P60_SPONSOR_URL:-}
+      P60_SPONSOR_MESSAGE: ${P60_SPONSOR_MESSAGE:-}
+      OILPRICE_API_KEY: ${OILPRICE_API_KEY:-}
+      TWELVE_DATA_API_KEY: ${TWELVE_DATA_API_KEY:-}
+    volumes:
+      - p60-data:/app/data
+    networks:
+      - p60
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '5'
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      P60_DOMAIN: ${P60_DOMAIN:?Set P60_DOMAIN in .env}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./deploy/Caddyfile.docker:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      p60:
+        ipv4_address: 172.30.60.2
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '5'
+
+networks:
+  p60:
+    ipam:
+      config:
+        - subnet: 172.30.60.0/24
+
+volumes:
+  p60-data:
+  caddy-data:
+  caddy-config:

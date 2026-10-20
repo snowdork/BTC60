@@ -37,7 +37,7 @@ Path('level').write_text(os.environ['PREDICT60_LOG_LEVEL'])
 with Path('starts').open('a') as f: f.write(str(os.getpid()) + '\\n')
 server.serve_forever()
 ''')
-            shutil.copy(Path(__file__).parent.parent / 'btc60_logging.py', root / 'btc60_logging.py')
+            shutil.copy(Path(__file__).parent.parent / 'p60_logging.py', root / 'p60_logging.py')
             with socket.socket() as sock:
                 sock.bind(('127.0.0.1', 0))
                 port = sock.getsockname()[1]

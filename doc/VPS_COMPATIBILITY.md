@@ -1,6 +1,21 @@
 # LAMP VPS compatibility review
 
-Reviewed October 14, 2026. This is a source review and local test result, not a verification of a connected VPS.
+Docker deployment notes updated October 19, 2026; original capacity review October 14, 2026. This is a source review and local test result, not a verification of a connected VPS.
+
+## Docker deployment
+
+The repository now includes a Dockerfile and Compose stack for one Python app
+container and Caddy. Follow [the VPS guide](../deploy/README.md) and
+[Docker instructions](../deploy/DOCKER.md). Docker Engine and Compose are required;
+PHP and MySQL are not used by this app. Existing Apache listeners on ports 80/443
+must be reconciled with the supplied Caddy port mappings before deployment.
+
+The backend listens on `0.0.0.0` inside its container with no host port published.
+SQLite lives in a named volume and Docker handles process crash recovery.
+Caddy has a fixed private address trusted by the backend. Host systemd deployment
+continues to use a loopback listener. Container build, TLS, crash recovery, and
+VPS load tests still require execution on a Docker-capable host; see the
+[test guide](TEST_GUIDE.md).
 
 ## Compatibility
 
@@ -21,7 +36,7 @@ Apache reverse proxy reference: https://httpd.apache.org/docs/2.4/howto/reverse_
 
 - Configure `P60_HOST=https://predict60.com` in the backend service environment. POST Origin headers must match this exact origin, HTTPS enables Secure cookies and HSTS, and malformed values fail startup.
 - Configure `P60_TRUSTED_PROXIES` with only the direct proxy address. The app accepts one validated `X-Forwarded-For` address from those peers and otherwise uses the socket address for authentication throttling.
-- Keep the backend loopback-only. The supplied Caddy and hardened systemd units provide TLS termination, security headers, health checks, process supervision, and persistent service logs for a controlled beta.
+- Keep the backend private: loopback for the host deployment, or an unpublished port on the Docker network. The supplied Caddy and hardened systemd units provide TLS termination, security headers, health checks, process supervision, and persistent service logs for a controlled beta.
 - The backend still derives from Python `ThreadingHTTPServer`. Complete a production server refactor before treating the service as a high-assurance or large public deployment.
 - Public self-service accounts still need an email provider and flows for email verification and password recovery. Until then, use controlled beta access.
 
@@ -45,11 +60,11 @@ An isolated local HTTP test used 50 client workers, 50 seeded authenticated user
 
 This shows basic local concurrency works, not that the proposed VPS or production deployment has passed a load test.
 
-Code-derived traffic estimates: 50 visible signed-in tabs check settlement every 15 seconds (about 3.3 requests/second on average, potentially synchronized). Fifty oil prediction tabs poll spot every five seconds (about 10 requests/second). Fifty category-selection tabs can poll five grades every five seconds (about 50 requests/second when all five are supported/configured). Initial page loads, history refreshes, orders, and manual actions add traffic. Crypto WebSockets connect directly from browsers to Coinbase.
+Code-derived traffic estimates: 50 visible signed-in tabs check settlement every 15 seconds (about 3.3 requests/second on average, potentially synchronized). If Oil is re-enabled, fifty oil prediction tabs would poll spot every five seconds (about 10 requests/second). The dormant Oil category currently does not request quotes. An enabled implementation with fifty category-selection tabs could poll five grades every five seconds (about 50 requests/second when all five are supported/configured). Initial page loads, history refreshes, orders, and manual actions add traffic. Crypto WebSockets connect directly from browsers to Coinbase.
 
 Remaining capacity concerns:
 
-- Apache currently makes every login appear to come from loopback: the 20-attempt/minute authentication limit would apply to everyone together. Fix trusted client-IP handling or edge throttling before inviting 50 users.
+- Verify forwarded client-IP handling through the actual proxy. Configure only its direct address as trusted and have it overwrite X-Forwarded-For with one client address; otherwise authentication throttling may group users under the proxy address.
 - Crypto order confirmation fetches benchmark and spot from the provider for each order; history cache misses can duplicate provider requests across clients. Test cold starts and synchronized orders against provider quotas and add shared request deduplication where appropriate.
 - OilPriceAPI holds a shared lock during provider fetches. Slow provider responses can queue requests across grades.
 - Account responses return complete prediction history without pagination. Test realistic accumulated history, not only new accounts.

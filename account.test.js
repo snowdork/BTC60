@@ -60,3 +60,23 @@ test('background sync does not settle while the document is hidden',async()=>{
  const count=s.calls.length;s.document.hidden=true;s.intervals[0]();
  assert.equal(s.calls.length,count);
 });
+
+test('a settlement response arriving after logout cannot restore the account',async()=>{
+ let settleCalls=0,finish;
+ const s=setup(url=>{
+  if(url==='/api/logout')return response({ok:true});
+  if(url==='/api/settle'&&++settleCalls>1)return new Promise(resolve=>finish=resolve);
+  return response(signedIn);
+ });await s.account.loaded;
+ const pending=s.account.settle();await s.logout.click();
+ finish(response(signedIn));await pending;
+ assert.equal(s.account.user,null);assert.equal(s.account.csrf,null);
+ assert.equal(s.name.hidden,true);assert.equal(s.logout.hidden,true);
+});
+
+test('logout succeeds locally when another tab has already ended the session',async()=>{
+ const s=setup(url=>url==='/api/logout'?response({error:'Session expired'},false,401):response(signedIn));
+ await s.account.loaded;await s.logout.click();
+ assert.equal(s.account.user,null);assert.equal(s.account.error,null);
+ assert.equal(s.location.href,'welcome.html');
+});

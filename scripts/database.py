@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Predict60 SQLite maintenance. Run with --help for commands."""
 import argparse
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 import fcntl
 import os
@@ -46,8 +46,8 @@ def backup(path, directory=None):
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
     target = directory / f'{path.stem}-{stamp}-{secrets.token_hex(3)}.sqlite3'
     # SQLite's backup API includes committed WAL data, unlike copying the file.
-    with readonly(path) as source:
-        with sqlite3.connect(target) as destination:
+    with closing(readonly(path)) as source:
+        with closing(sqlite3.connect(target)) as destination:
             os.chmod(target, 0o600)
             source.backup(destination)
             if destination.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
@@ -57,7 +57,7 @@ def backup(path, directory=None):
 
 def status(path):
     """Print database integrity, table counts, and enabled instruments for administrator inspection."""
-    with readonly(path) as conn:
+    with closing(readonly(path)) as conn:
         integrity = conn.execute('PRAGMA integrity_check').fetchone()[0]
         print(f'Database: {path}\nIntegrity: {integrity}')
         for table in ['users', 'sessions', 'categories', 'coins', 'instrument_sources', 'predictions', 'prediction_sources', 'settlements']:
@@ -72,7 +72,7 @@ def reset(path):
     """Back up the database before clearing account state and restoring seeded catalogs."""
     with maintenance_lock(path):
         # Build and validate the replacement before touching the existing database.
-        with tempfile.TemporaryDirectory(prefix='btc60-reset-', dir=path.parent) as folder:
+        with tempfile.TemporaryDirectory(prefix='p60-reset-', dir=path.parent) as folder:
             original = server.DB
             fresh = Path(folder) / 'fresh.sqlite3'
             try:
@@ -83,7 +83,7 @@ def reset(path):
             if path.exists():
                 saved = backup(path)
                 print(f'Backup saved: {saved}')
-            with sqlite3.connect(fresh) as source, sqlite3.connect(path) as destination:
+            with closing(sqlite3.connect(fresh)) as source, closing(sqlite3.connect(path)) as destination:
                 source.backup(destination)
             os.chmod(path, 0o600)
     print('Database reset. Users, sessions, predictions, and settlements cleared; category and instrument seeds restored.')
@@ -93,7 +93,7 @@ def main():
     """Parse maintenance commands and enforce locks and explicit reset confirmation."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['init', 'backup', 'status', 'reset'])
-    parser.add_argument('--db', type=Path, default=server.DB, help='SQLite path (default: PREDICT60_DB or project data/btc60.sqlite3)')
+    parser.add_argument('--db', type=Path, default=server.DB, help='SQLite path (default: PREDICT60_DB or project data/p60.sqlite3)')
     parser.add_argument('--confirm-reset', action='store_true', help='Required for reset; clears all account/order data after backup')
     parser.add_argument('--backup-dir', type=Path, help='Optional destination for the backup command')
     args = parser.parse_args()

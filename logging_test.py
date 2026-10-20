@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import btc60_logging as logs
+import p60_logging as logs
 import server
 
 
