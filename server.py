@@ -49,6 +49,7 @@ LOG = logging.getLogger(__name__)
 PUBLIC_ASSETS = {
     'assets/previews/prediction-playfield.png',
     'assets/backgrounds/hourly-markets.webp',
+    'assets/backgrounds/playfield.webp',
     'assets/brand/p60-mark.svg',
     'assets/fonts/manrope-latin.woff2',
     'assets/fonts/space-grotesk-latin.woff2',

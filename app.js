@@ -48,23 +48,7 @@
     $('selected-countdown').textContent=label;
   }
   /** Read the market model readiness checks used to block invalid order submission. */ function health(){return window.PredictModel.dataStatus(window.PredictModel,market);}
-  /** Render prediction context from the latest account, market, and interface state. */ function renderPredictionContext(){
-    const model=window.PredictModel,closed=market.status==='settled',queued=market.status==='queued';
-    const benchmark=Number.isFinite(market.strike)?market.strike:null;
-    const age=Date.now()-model.priceUpdatedAt;
-    const fresh=model.feedMode==='demo'||(model.feedConnection==='connected'&&model.priceUpdatedAt>0&&age>=-5000&&age<=(model.coin.maxPriceAgeMs||15000));
-    const value=closed?market.close:!queued&&fresh?model.spot:null;
-    const available=Number.isFinite(value)&&benchmark!==null;
-    const delta=available?value-benchmark:null;
-    $('ticket-comparison').textContent=queued?'Benchmark available at open':!available?'Comparison unavailable':`${delta===0?'At the benchmark':`${price(Math.abs(delta))} ${delta>0?'above':'below'} benchmark`} (${delta>=0?'+':''}${(delta/benchmark*100).toFixed(3)}%)`;
-    $('ticket-comparison').style.color=delta===null?'var(--muted)':delta>=0?'var(--green)':'var(--red)';
-    $('ticket-up-rule').textContent=benchmark===null?'↗ Up: close ≥ benchmark':`↗ Up: close ≥ ${price(benchmark)}`;
-    $('ticket-down-rule').textContent=benchmark===null?'↘ Down: close < benchmark':`↘ Down: close < ${price(benchmark)}`;
-    const context=document.querySelector('.prediction-context');
-    context.dataset.side=side||'';
-  }
   /** Render execution state from the latest account, market, and interface state. */ function renderExecutionState(){
-    renderPredictionContext();
     const model=window.PredictModel,state=health();
     const chance=market.status==='open'&&(state.ready||model.feedMode==='demo')?model.estimateChances(market,model.spot,model.now,model.volatility):null;
     $('up-chance').textContent=chance?`${chance.up}%`:'—';
@@ -79,9 +63,6 @@
     $('submit-prediction').textContent=!state.ready?state.reason:side===null?'Pick Up or Down':!account.user?'Log in to predict →':`Review ${side==='up'?'Up':'Down'} prediction →`;
     sideButtons.forEach(button=>{button.disabled=market.status!=='open'||!state.ready;});
     $('confirm-prediction').disabled=submitting||!state.ready||reviewExpired();
-    const delta=model.spot-market.strike;
-    $('ticket-delta').textContent=(model.isHistorical||market.status==='settled')&&Number.isFinite(market.close)&&Number.isFinite(market.strike)?(market.close>=market.strike?'+':'−')+price(Math.abs(market.close-market.strike)):state.age!==null&&state.age<=15&&Number.isFinite(delta)&&Number.isFinite(market.strike)?(delta>=0?'+':'−')+price(Math.abs(delta)):'—';
-    $('ticket-delta').style.color=delta>=0?'var(--green)':'var(--red)';
     if(review&&!reviewExpired()&&!state.ready&&!submitting){review=null;$('review-dialog').close();notify('Data unavailable. Wait for reconnection and review again.');}
   }
   /** Check whether the reviewed interval has reached its final thirty-second order cutoff. */ function reviewExpired(){return !!review&&Date.now()>=review.endsAt-30000;}
@@ -243,8 +224,6 @@
     $('ticket-status').className='badge '+(open?'green':'neutral');
     $('ticket-time').textContent=`${market.start} – ${market.end} UTC`;
     $('ticket-question').textContent=open?`${window.PredictModel.coin.name} up or down?`:window.PredictModel.coin.name;
-    $('ticket-strike').textContent=queued?'Set at open':Number.isFinite(market.strike)?price(market.strike):'Loading…';
-    $('ticket-delta-label').textContent=(window.PredictModel.isHistorical||market.status==='settled')?'SETTLED VS BENCHMARK':'SPOT VS BENCHMARK';
     sideButtons.forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.side===side));button.disabled=!open;});
     $('stake').disabled=!open;$('stake').max=budgetAvailable().toFixed(2);
     stakeButtons.forEach(button=>{button.disabled=!open;const amount=button.dataset.stake==='max'?budgetAvailable():Number(button.dataset.stake);button.classList.toggle('selected',Number($('stake').value)===amount);button.setAttribute('aria-pressed',String(Number($('stake').value)===amount));});
@@ -252,7 +231,7 @@
     $('submit-prediction').classList.toggle('bear',side==='down');
     $('submit-prediction').classList.toggle('pick-direction',side===null);
     $('ticket-note').textContent=!open?(queued?'Select an open market to make a prediction.':Number.isFinite(market.strike)&&Number.isFinite(market.close)?`Settlement: ${outcome(market.strike,market.close)==='up'?'Up':'Down'} at ${price(market.close)}.`:'Waiting for market history.'):!q?(side===null?'Choose Up or Down to review your prediction.':'Enter 1–1,000 credits within your available balance.'):'Bets close 30s before interval end · No real money';
-    $('settlement-description').textContent=!Number.isFinite(market.strike)&&!queued?'Waiting for a benchmark from minute history.':queued?'The starting benchmark is set when this interval opens.':`Up wins if the closing minute-candle close is at least ${price(market.strike)}. An unchanged price resolves Up. ${window.PredictModel.coin.feed==='twelvedata'?'Twelve Data oil minute close · USD/barrel':window.PredictModel.coin.feed==='simulated'?'Simulated oil benchmark · USD/barrel':'Coinbase proxy · not a 60-second average'}. `;
+    $('settlement-description').textContent=!Number.isFinite(market.strike)&&!queued?'Waiting for a benchmark from minute history.':queued?'The starting benchmark is set when this interval opens.':`Up wins if the closing minute-candle close is at least ${price(market.strike)}. An unchanged price resolves Up.${window.PredictModel.coin.feed==='twelvedata'?' Twelve Data oil minute close · USD/barrel.':window.PredictModel.coin.feed==='simulated'?' Simulated oil benchmark · USD/barrel.':''}`;
     $('balance').textContent=money(balance());
     renderExecutionState();
   }

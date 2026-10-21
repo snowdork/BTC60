@@ -3,7 +3,7 @@
  */
 (() => {
   const account=window.Predict60Account,model=window.Predict60Portfolio,/** Find an interface element by its stable DOM identifier. */ $=id=>document.getElementById(id);
-  let playMode='practice',filter='all',category='all',coins=[],lastRender='',sortColumn='window',sortDirection='desc';
+  let filter='all',category='all',coins=[],lastRender='',sortColumn='window',sortDirection='desc';
   const currency=new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   const shareFormatter=new Intl.NumberFormat('en-US',{maximumFractionDigits:2});
   const /** Format stored hundredths as game credits. */ money=cents=>currency.format(cents/100)+' credits';
@@ -16,11 +16,11 @@
     $('portfolio-message').textContent=account.user?account.error||'Account history synced. Settlements update automatically.':account.error||'';
     $('portfolio-content').hidden=!account.user;$('portfolio-login').hidden=!!account.user;$('portfolio-refresh').disabled=!account.user;
     if(!account.user){$('portfolio-message').textContent=account.error||'';return;}
-    const signature=JSON.stringify([account.user,account.contestWallet,account.predictions,playMode,filter,category,sortColumn,sortDirection,coins,account.predictions.filter(p=>p.settled_at==null).map(p=>model.result(p))]);
+    const signature=JSON.stringify([account.user,account.contestWallet,account.predictions,filter,category,sortColumn,sortDirection,coins,account.predictions.filter(p=>p.settled_at==null).map(p=>model.result(p))]);
     if(signature===lastRender)return;lastRender=signature;
-    const categoryPredictions=account.predictions.filter(p=>(p.mode||'practice')===playMode&&(category==='all'||p.category===category));
+    const categoryPredictions=account.predictions.filter(p=>p.mode==='contest'&&(category==='all'||p.category===category));
     const stats=model.summary(categoryPredictions);
-    $('portfolio-balance').textContent=money(playMode==='contest'?account.contestWallet?.remaining_cents||0:account.user.balance_cents);$('portfolio-profit').textContent=signed(stats.profitCents);$('portfolio-profit').style.color=stats.profitCents>=0?'var(--green)':'var(--red)';
+    $('portfolio-balance').textContent=money(account.contestWallet?.remaining_cents||0);$('portfolio-profit').textContent=signed(stats.profitCents);$('portfolio-profit').style.color=stats.profitCents>=0?'var(--green)':'var(--red)';
     $('portfolio-record').textContent=`${stats.wins} / ${stats.losses}`;$('portfolio-rate').textContent=stats.winRate==null?'No settled predictions':`${stats.winRate}% win rate`;
     $('portfolio-pending').textContent=stats.pending;$('portfolio-exposure').textContent=money(stats.pendingCostCents)+' committed';
     const predictions=model.sortPredictions(categoryPredictions.filter(p=>filter==='all'||(filter==='pending'?p.settled_at==null:model.result(p)===filter)),sortColumn,sortDirection);
@@ -44,7 +44,6 @@
   document.querySelectorAll('[data-filter]').forEach(button=>button.addEventListener('click',()=>{filter=button.dataset.filter;document.querySelectorAll('[data-filter]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));render();}));
   document.querySelectorAll('[data-sort]').forEach(button=>button.addEventListener('click',()=>{const column=button.dataset.sort;sortDirection=column===sortColumn?(sortDirection==='asc'?'desc':'asc'):(['window','cost','return','profit','benchmark'].includes(column)?'desc':'asc');sortColumn=column;render();}));
   $('portfolio-refresh').addEventListener('click',async()=>{const button=$('portfolio-refresh');button.disabled=true;$('portfolio-message').textContent='Checking closed predictions…';try{await account.settle();}catch(error){$('portfolio-message').textContent=error.message;}finally{button.disabled=false;}});
-  $('portfolio-mode').addEventListener('change',event=>{playMode=event.target.value;render();});
   $('portfolio-category').addEventListener('change',event=>{category=event.target.value;render();});
   Promise.all(['/api/coins','/api/categories'].map(async url=>{const response=await fetch(url);if(!response.ok)throw Error('Market catalog unavailable');return response.json();})).then(([catalog,data])=>{
     coins=catalog.coins;

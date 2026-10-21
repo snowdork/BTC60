@@ -1,4 +1,41 @@
-# VPS deployment
+# VPS and local operation
+
+## Choose an operating mode
+
+| Environment | Start/update | Persistent data | Logs |
+| --- | --- | --- | --- |
+| Local Python | `python3 server.py` | `data/p60.sqlite3` by default | Terminal |
+| Local Docker, no Compose | `bash scripts/docker-restart.sh --local` | `p60-local-data` volume | `docker logs p60-local` |
+| Local Compose | `docker compose -f compose.local.yaml --env-file .env.local up -d --build` | `p60-local-data` volume | Compose logs |
+| VPS Docker + HTTPS | `bash deploy/start-docker.sh` initially; `bash scripts/docker-restart.sh` for updates | Compose `p60-data` volume | Compose logs |
+| VPS systemd + HTTPS | `sudo systemctl restart predict60` | Configured database path | systemd journal |
+
+Use one supervisor per deployment and one app process per database. Local Docker
+and local Compose share a volume/container name: stop the previous mode before
+switching. See [local operation](LOCAL.md) for setup, backups, and troubleshooting,
+and [Docker operation](DOCKER.md) for VPS upgrades and rollback.
+
+Source files in the repository root are served by Python and copied into Docker.
+`dist/` is only a static export; editing it does not update the running app.
+After source changes, regenerate it with `python3 scripts/build-static.py` if you
+need a synchronized export. Static hosting alone cannot run accounts or trading.
+
+## VPS capacity and upkeep
+
+Keep the default 32 request handlers initially. Measure memory, CPU, HTTP 503s,
+response latency, disk space, and settlement delay before changing
+`P60_MAX_REQUESTS`. Increasing handlers can worsen SQLite writer contention and
+provider throttling. Do not add app replicas against the same SQLite database.
+The existing server is a bounded Python HTTP server behind Caddy, not a measured
+high-traffic platform; see the [performance review](../doc/VPS_PERFORMANCE.md).
+
+Keep Python, Docker, Caddy, and the OS patched. For container base-image updates,
+use `docker compose build --pull app` and `docker compose pull caddy`, then
+`docker compose up -d --no-build --wait --wait-timeout 120`, with a database backup
+and retained image tag first. Health checks verify the app/database, not provider
+freshness or successful settlement: check those in the UI after each deployment.
+
+
 
 ## Docker Compose deployment
 

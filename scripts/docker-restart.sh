@@ -33,6 +33,14 @@ if [[ ${1:-} == --local ]]; then
   docker run -d \
     --name p60-local \
     --restart unless-stopped \
+    --stop-timeout 30 \
+    --read-only \
+    --tmpfs /tmp:size=64m \
+    --cap-drop ALL \
+    --security-opt no-new-privileges:true \
+    --log-driver local \
+    --log-opt max-size=10m \
+    --log-opt max-file=5 \
     -p 127.0.0.1:8080:8000 \
     --env-file .env.local \
     -e P60_HOST=http://localhost:8080 \
@@ -60,24 +68,21 @@ if [[ ! -f .env ]]; then
 fi
 compose=(docker compose --project-directory "$root" --env-file "$root/.env" -f "$root/compose.yaml")
 
-# Check configuration and permissions before taking the running site offline.
+# Check configuration and permissions before rebuilding.
 "${compose[@]}" config --quiet
 if ! docker info >/dev/null 2>&1; then
   echo 'Cannot access Docker. Start the daemon and run this script with sudo or Docker group access.' >&2
   exit 1
 fi
 
-echo 'Stopping the VPS containers. Database and certificate volumes will be preserved.'
-"${compose[@]}" down
-
 echo 'Rebuilding the application image...'
 if ! "${compose[@]}" build app; then
-  echo 'Build failed; the site is stopped and its data volumes are intact. Fix the build error and rerun this script.' >&2
+  echo 'Build failed; existing containers were left running. Fix the build error and rerun this script.' >&2
   exit 1
 fi
 
 echo 'Starting the app and HTTPS proxy...'
-if ! "${compose[@]}" up -d --wait --wait-timeout 120; then
+if ! "${compose[@]}" up -d --no-build --wait --wait-timeout 120; then
   "${compose[@]}" ps -a >&2
   echo 'Startup failed. Inspect: sudo docker compose logs --tail=100 app caddy' >&2
   exit 1

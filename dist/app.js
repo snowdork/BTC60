@@ -15,7 +15,6 @@
   const shareFormatter=new Intl.NumberFormat('en-US',{maximumFractionDigits:2});
   const /** Format fractional prediction shares for display. */ shares=value=>shareFormatter.format(value);
   const account=window.Predict60Account;
-  let playMode='contest';
   let positions=[];
   const predictionIndex=new Map();
   const /** Build an instrument, interval, and start-time key to distinguish orders in repeated hours. */ predictionKey=(coin,id,start)=>`${coin}:${id}:${start}`;
@@ -25,9 +24,8 @@
   }
   const /** Update a DOM text node only when the displayed value changes. */ setText=(element,value)=>{if(element.textContent!==value)element.textContent=value;};
   let market=markets.find(m=>m.id==='15-2'),side=null,review=null,initialMarketChosen=false,submitting=false,budgetMarketKey=null;
-  const /** Return the signed-in account balance in credits or the initial preview balance. */ balance=()=>account.user?(playMode==='contest'?(account.contestWallet?.remaining_cents||0):account.user.balance_cents)/100:initialBalance;
+  const /** Return the signed-in account balance in credits or the initial preview balance. */ balance=()=>account.user?(account.contestWallet?.remaining_cents||0)/100:initialBalance;
   /** Limit contest spending by remaining allowance and aggregate instrument/interval exposure. */ function budgetAvailable(selected=market){
-    if(playMode!=='contest')return Math.min(balance(),maxPredictionCredits);
     const spent=account.predictions.filter(p=>p.mode==='contest'&&p.coin===window.PredictModel.coin.symbol&&p.starts_at*1000===selected.startsAt&&p.ends_at*1000===selected.endsAt).reduce((total,p)=>total+p.cost_cents,0)/100;
     return Math.max(0,Math.min(balance(),maxPredictionCredits-spent));
   }
@@ -50,38 +48,7 @@
     $('selected-countdown').textContent=label;
   }
   /** Read the market model readiness checks used to block invalid order submission. */ function health(){return window.PredictModel.dataStatus(window.PredictModel,market);}
-  /** Render prediction context from the latest account, market, and interface state. */ function renderPredictionContext(){
-    const model=window.PredictModel,closed=market.status==='settled',queued=market.status==='queued';
-    const benchmark=Number.isFinite(market.strike)?market.strike:null;
-    const age=Date.now()-model.priceUpdatedAt;
-    const fresh=model.feedMode==='demo'||(model.feedConnection==='connected'&&model.priceUpdatedAt>0&&age>=-5000&&age<=(model.coin.maxPriceAgeMs||15000));
-    const value=closed?market.close:!queued&&fresh?model.spot:null;
-    const available=Number.isFinite(value)&&benchmark!==null;
-    $('ticket-spot-label').textContent=model.coin.feed==='oilpriceapi'?'SPOT ASSESSMENT · USD / BARREL':closed?'CLOSING BENCHMARK':model.feedMode==='demo'?'SYNTHETIC SPOT':model.coin.feed==='simulated'?'SIMULATED · USD / BARREL':model.coin.feed==='twelvedata'?'LIVE SPOT · USD / BARREL':'LIVE SPOT';
-    $('ticket-spot').textContent=Number.isFinite(value)?price(value):'—';
-    $('ticket-price-time').hidden=closed;
-    $('ticket-price-time').textContent=closed?'':queued?'Starting benchmark is set when this interval opens':model.feedMode==='demo'?'Synthetic preview · no account orders':fresh?`Source update ${new Date(model.priceUpdatedAt).toISOString().slice(11,19)} UTC`: 'Waiting for a connected, fresh price';
-    const start=market.startsAt,end=market.endsAt;
-    if(Number.isFinite(start)&&Number.isFinite(end)){
-      const hour=Math.floor(start/3600000)*3600000;
-      const /** Format an interval timestamp as UTC hour and minute. */ utc=t=>new Date(t).toISOString().slice(11,16);
-      $('ticket-hour-selection').style.left=`${(start-hour)/3600000*100}%`;
-      $('ticket-hour-selection').style.width=`${market.minutes/60*100}%`;
-      $('ticket-hour-start').textContent=utc(hour);$('ticket-hour-end').textContent=utc(hour+3600000);
-      $('ticket-hour-map').setAttribute('aria-label',`Selected ${market.minutes}-minute interval ${utc(start)} to ${utc(end)} UTC within the hour`);
-      $('ticket-interval-timing').textContent=closed?'Interval complete':queued?`Opens ${utc(start)} UTC`:`${market.remaining} left`;
-    }
-    const delta=available?value-benchmark:null;
-    $('ticket-spot').style.color=closed&&delta!==null?(delta>=0?'var(--green)':'var(--red)'):'';
-    $('ticket-comparison').textContent=queued?'Benchmark available at open':!available?'Comparison unavailable':`${delta===0?'At the benchmark':`${price(Math.abs(delta))} ${delta>0?'above':'below'} benchmark`} (${delta>=0?'+':''}${(delta/benchmark*100).toFixed(3)}%)`;
-    $('ticket-comparison').style.color=delta===null?'var(--muted)':delta>=0?'var(--green)':'var(--red)';
-    $('ticket-up-rule').textContent=benchmark===null?'↗ Up: close ≥ benchmark':`↗ Up: close ≥ ${price(benchmark)}`;
-    $('ticket-down-rule').textContent=benchmark===null?'↘ Down: close < benchmark':`↘ Down: close < ${price(benchmark)}`;
-    const context=document.querySelector('.prediction-context');
-    context.dataset.side=side||'';
-  }
   /** Render execution state from the latest account, market, and interface state. */ function renderExecutionState(){
-    renderPredictionContext();
     const model=window.PredictModel,state=health();
     const chance=market.status==='open'&&(state.ready||model.feedMode==='demo')?model.estimateChances(market,model.spot,model.now,model.volatility):null;
     $('up-chance').textContent=chance?`${chance.up}%`:'—';
@@ -96,9 +63,6 @@
     $('submit-prediction').textContent=!state.ready?state.reason:side===null?'Pick Up or Down':!account.user?'Log in to predict →':`Review ${side==='up'?'Up':'Down'} prediction →`;
     sideButtons.forEach(button=>{button.disabled=market.status!=='open'||!state.ready;});
     $('confirm-prediction').disabled=submitting||!state.ready||reviewExpired();
-    const delta=model.spot-market.strike;
-    $('ticket-delta').textContent=(model.isHistorical||market.status==='settled')&&Number.isFinite(market.close)&&Number.isFinite(market.strike)?(market.close>=market.strike?'+':'−')+price(Math.abs(market.close-market.strike)):state.age!==null&&state.age<=15&&Number.isFinite(delta)&&Number.isFinite(market.strike)?(delta>=0?'+':'−')+price(Math.abs(delta)):'—';
-    $('ticket-delta').style.color=delta>=0?'var(--green)':'var(--red)';
     if(review&&!reviewExpired()&&!state.ready&&!submitting){review=null;$('review-dialog').close();notify('Data unavailable. Wait for reconnection and review again.');}
   }
   /** Check whether the reviewed interval has reached its final thirty-second order cutoff. */ function reviewExpired(){return !!review&&Date.now()>=review.endsAt-30000;}
@@ -260,8 +224,6 @@
     $('ticket-status').className='badge '+(open?'green':'neutral');
     $('ticket-time').textContent=`${market.start} – ${market.end} UTC`;
     $('ticket-question').textContent=open?`${window.PredictModel.coin.name} up or down?`:window.PredictModel.coin.name;
-    $('ticket-strike').textContent=queued?'Set at open':Number.isFinite(market.strike)?price(market.strike):'Loading…';
-    $('ticket-delta-label').textContent=(window.PredictModel.isHistorical||market.status==='settled')?'SETTLED VS BENCHMARK':'SPOT VS BENCHMARK';
     sideButtons.forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.side===side));button.disabled=!open;});
     $('stake').disabled=!open;$('stake').max=budgetAvailable().toFixed(2);
     stakeButtons.forEach(button=>{button.disabled=!open;const amount=button.dataset.stake==='max'?budgetAvailable():Number(button.dataset.stake);button.classList.toggle('selected',Number($('stake').value)===amount);button.setAttribute('aria-pressed',String(Number($('stake').value)===amount));});
@@ -269,7 +231,7 @@
     $('submit-prediction').classList.toggle('bear',side==='down');
     $('submit-prediction').classList.toggle('pick-direction',side===null);
     $('ticket-note').textContent=!open?(queued?'Select an open market to make a prediction.':Number.isFinite(market.strike)&&Number.isFinite(market.close)?`Settlement: ${outcome(market.strike,market.close)==='up'?'Up':'Down'} at ${price(market.close)}.`:'Waiting for market history.'):!q?(side===null?'Choose Up or Down to review your prediction.':'Enter 1–1,000 credits within your available balance.'):'Bets close 30s before interval end · No real money';
-    $('settlement-description').textContent=!Number.isFinite(market.strike)&&!queued?'Waiting for a benchmark from minute history.':queued?'The starting benchmark is set when this interval opens.':`Up wins if the closing minute-candle close is at least ${price(market.strike)}. An unchanged price resolves Up. ${window.PredictModel.coin.feed==='twelvedata'?'Twelve Data oil minute close · USD/barrel':window.PredictModel.coin.feed==='simulated'?'Simulated oil benchmark · USD/barrel':'Coinbase proxy · not a 60-second average'}. `;
+    $('settlement-description').textContent=!Number.isFinite(market.strike)&&!queued?'Waiting for a benchmark from minute history.':queued?'The starting benchmark is set when this interval opens.':`Up wins if the closing minute-candle close is at least ${price(market.strike)}. An unchanged price resolves Up.${window.PredictModel.coin.feed==='twelvedata'?' Twelve Data oil minute close · USD/barrel.':window.PredictModel.coin.feed==='simulated'?' Simulated oil benchmark · USD/barrel.':''}`;
     $('balance').textContent=money(balance());
     renderExecutionState();
   }
@@ -319,19 +281,18 @@
   sideButtons.forEach(button=>button.addEventListener('click',()=>{side=button.dataset.side;sideButtons.forEach(item=>item.classList.remove('direction-hint'));renderTicket();}));
   stakeButtons.forEach(button=>button.addEventListener('click',()=>{$('stake').value=button.dataset.stake==='max'?budgetAvailable().toFixed(2):button.dataset.stake;renderTicket();}));
   $('stake').addEventListener('input',renderTicket);
-  $('prediction-mode').addEventListener('change',()=>{playMode=$('prediction-mode').value;review=null;$('review-dialog').close();$('stake').value='';$('balance-label').textContent=playMode==='contest'?'Contest allowance':'Practice balance';$('prediction-mode-note').textContent=playMode==='contest'?'Hourly close HH:00 GMT · 1,000 total credits per hour':'Practice does not affect contest rank';renderAccount();});
   ['rules-open','rules-inline'].forEach(id=>$(id).addEventListener('click',()=>$('rules-dialog').showModal()));
   document.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',()=>$(button.dataset.close).close()));
   $('prediction-form').addEventListener('submit',event=>{
     event.preventDefault();if(side===null){highlightDirections();notify('Choose Up or Down to review your prediction.');return;}if(!account.user){location.href='login.html';return;}if(!health().ready){notify(health().reason);return;}const q=currentQuote();if(!q)return;
-    review={mode:playMode,requestId:crypto.randomUUID(),startsAt:market.startsAt,endsAt:market.endsAt,coin:window.PredictModel.coin.symbol,marketId:market.id,start:market.start,end:market.end,minutes:market.minutes,strike:market.strike,hour:window.PredictModel.hour,side,budget:Number($('stake').value),...q};
+    review={mode:'contest',requestId:crypto.randomUUID(),startsAt:market.startsAt,endsAt:market.endsAt,coin:window.PredictModel.coin.symbol,marketId:market.id,start:market.start,end:market.end,minutes:market.minutes,strike:market.strike,hour:window.PredictModel.hour,side,budget:Number($('stake').value),...q};
     const down=review.side==='down',arrow=down?'↓':'↑',direction=down?'Down':'Up';
     $('review-direction').classList.toggle('down',down);
     $('review-arrow').textContent=arrow;
     $('review-side').textContent=`Predict ${direction}`;
     $('confirm-prediction').classList.toggle('bear',down);
     $('confirm-prediction').textContent=down?'Predict DOWN Now':'Predict UP Now';
-    $('review-title').textContent=`${playMode==='contest'?'Contest':'Practice'} · ${side==='up'?'Up':'Down'} · ${window.PredictModel.coin.name} ${market.minutes} min`;
+    $('review-title').textContent=`Contest · ${side==='up'?'Up':'Down'} · ${window.PredictModel.coin.name} ${market.minutes} min`;
     $('review-detail').textContent=`${market.start} – ${market.end} UTC · Benchmark ${price(market.strike)}`;
     renderReviewSummary(q);
     $('review-error').textContent='';
@@ -346,12 +307,12 @@
     if(!q||review.coin!==window.PredictModel.coin.symbol||review.hour!==window.PredictModel.hour){$('review-dialog').close();review=null;notify('Market changed. Review your prediction again.');return;}
     Object.assign(review,q,{strike:m.strike});renderReviewSummary(q);
     const button=$('confirm-prediction'),buttonLabel=button.textContent;submitting=true;button.disabled=true;button.textContent='Saving prediction…';$('review-error').textContent='';
-    try{await account.place({...review});review=null;side=null;$('stake').value='';$('review-dialog').close();renderTicket();notify('Prediction saved to your '+playMode+' history.');}
+    try{await account.place({...review});review=null;side=null;$('stake').value='';$('review-dialog').close();renderTicket();notify('Prediction saved to your contest history.');}
     catch(error){$('review-error').textContent=error.message;notify(error.message);}
     finally{submitting=false;button.textContent=buttonLabel;renderExecutionState();renderReviewChance();}
   });
   /** Render account from the latest account, market, and interface state. */ function renderAccount(){
-    positions=account.predictions.filter(p=>(p.mode||'practice')===playMode).map(p=>({...p,marketId:p.market_id,minutes:Number(p.market_id.split('-')[0]),start:new Date(p.starts_at*1000).toISOString().slice(11,16),end:new Date(p.ends_at*1000).toISOString().slice(11,16),cost:p.cost_cents/100}));
+    positions=account.predictions.filter(p=>p.mode==='contest').map(p=>({...p,marketId:p.market_id,minutes:Number(p.market_id.split('-')[0]),start:new Date(p.starts_at*1000).toISOString().slice(11,16),end:new Date(p.ends_at*1000).toISOString().slice(11,16),cost:p.cost_cents/100}));
     predictionIndex.clear();
     positions.forEach(p=>{const key=predictionKey(p.coin,p.marketId,p.starts_at*1000);if(!predictionIndex.has(key))predictionIndex.set(key,[]);predictionIndex.get(key).push(p);});
     const previous=account.lastHourContest;
@@ -365,9 +326,6 @@
     }else{
       $('last-hour-range').textContent='—';$('last-hour-score').textContent='—';$('last-hour-state').textContent=account.user?'Loading results…':'Log in to see your score';
     }
-    const wallet=account.contestWallet;
-    $('hourly-tally').hidden=playMode!=='contest';
-    $('hourly-tally').textContent=wallet?.reset_pending?'Previous hour awaiting settlement — credits unlock after winners are final.':`This hour won / lost: ${(wallet?.net_cents||0)>0?'+':''}${((wallet?.net_cents||0)/100).toFixed(2)} credits · ${wallet?.pending||0} pending`;
     $('positions-storage').textContent=account.user?'Live orders only':'Log in to save predictions';
     renderSegmentPredictions();renderPositions();renderTicket();
   }

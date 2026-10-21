@@ -53,6 +53,9 @@ sessions. See the [user guide](doc/USER_GUIDE.md#change-your-password).
 
 ## Run locally
 
+See [local operation](deploy/LOCAL.md) for Python/Docker lifecycle commands and
+[deployment modes](deploy/README.md#choose-an-operating-mode) for VPS setup.
+
 Requires Python 3.10+ on Linux/macOS; no Python packages or frontend build are needed.
 
 ```bash

@@ -94,3 +94,33 @@ uses CPU/memory, so test login bursts as well as reads. Monitor 503 responses,
 p95 latency, RSS, CPU, open descriptors, SQLite contention, provider rate limits,
 and settlement lag through HTTPS on the real VPS before raising concurrency.
 Keep the single app replica: its settlement worker and database lock rely on it.
+
+## October 21, 2026 maintenance review
+
+- VPS rebuilds now build before replacing the app, preserving the running site
+  on build failure. The restart helper no longer tears down Caddy/the network
+  before building. Single-instance replacement still causes a brief interruption.
+- Plain-Docker local operation now uses the same read-only root, 64 MiB tmpfs,
+  dropped capabilities, and bounded local logs as Compose. The data volume
+  remains writable and persistent.
+- Removed unused welcome-page illustration CSS after removing that pane.
+  Regenerated the static export from root source to eliminate stale copies.
+- Retained the existing concurrency limit, database indexes, and history-fetch
+  coalescing. No unmeasured increase in worker count or SQLite replicas was made.
+
+Validation: the complete runner reported 165 passes and three failures out of
+168 tests. All three failures also reproduce from a clean archive of committed
+HEAD: `test_account_prediction_settlement_lifecycle`,
+`test_prediction_credit_cap_is_enforced_without_debiting_rejections`, and
+`test_win_loss_settlement_credits_once_and_is_user_scoped`. Their expectations
+assert debits/payouts on the practice balance while the current endpoint places
+contest orders. Resolve the intended wallet behavior and align those tests before
+claiming a fully green release. This review did not change credit accounting.
+Three additional focused restart-script tests pass, covering build failure,
+service replacement ordering, and local container restrictions.
+
+Docker Engine's client is present, but daemon access and the Compose plugin are
+unavailable in this environment. No live container rollout or VPS load test was
+performed. Verify the public health endpoint and a complete prediction/settlement
+cycle after deployment. The deployment docs now separate local Python, local
+Docker/Compose, and VPS Docker/systemd workflows.
