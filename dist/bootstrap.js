@@ -35,6 +35,44 @@
       if(coin.icon){const icon=document.createElement('img');icon.src=coin.icon;icon.alt='';icon.width=24;icon.height=24;icon.addEventListener('error',()=>{icon.hidden=true;});button.append(icon);}
       const label=document.createElement('span');label.textContent=coin.symbol;button.append(label);return button;
     }));
+    const coinButtons=[...picker.querySelectorAll('[data-coin]')];
+    const hourlyPredictions=new Map();
+    /** Index contest directions by hour when account data changes, including settled orders. */ function updateCoinPredictions(){
+      hourlyPredictions.clear();
+      const account=window.Predict60Account;
+      for(const prediction of account.user?account.predictions||[]:[]){
+        if(prediction.mode!=='contest'||!Number.isFinite(prediction.starts_at))continue;
+        if(prediction.side!=='up'&&prediction.side!=='down')continue;
+        const hour=Math.floor(prediction.starts_at/3600)*3600;
+        if(!hourlyPredictions.has(hour))hourlyPredictions.set(hour,new Map());
+        const states=hourlyPredictions.get(hour);
+        states.set(prediction.coin,(states.get(prediction.coin)||0)|(prediction.side==='up'?1:2));
+      }
+      renderCoinPredictions();
+    }
+    /** Show predictions for the displayed hour independently of the selected coin's inner highlight. */ function renderCoinPredictions(){
+      const model=window.PredictModel;
+      const displayedStart=model?.markets?.find(m=>m.minutes===60)?.startsAt;
+      const hour=Number.isFinite(displayedStart)?displayedStart/1000:Math.floor(Date.now()/3600000)*3600;
+      const states=model?.feedMode==='demo'?null:hourlyPredictions.get(hour);
+      for(const button of coinButtons){
+        const state=states?.get(button.dataset.coin)||0;
+        const direction=state===3?'Up and Down':state===1?'Up':state===2?'Down':'';
+        const coin=window.PredictCoins.getCoin(button.dataset.coin);
+        const marker=state===3?'mixed':state===1?'up':state===2?'down':'none';
+        if(button.dataset.prediction===marker)continue;
+        button.dataset.prediction=marker;
+        const detail=direction?` · ${direction} prediction${state===3?'s':''} in this hour`:'';
+        button.title=`${coin.name} (${coin.symbol})${detail}`;
+        button.setAttribute('aria-label',`Select ${coin.name}${detail}`);
+      }
+    }
+    window.addEventListener('account-update',updateCoinPredictions);
+    window.addEventListener('btc-market-update',renderCoinPredictions);
+    window.addEventListener('coin-change',renderCoinPredictions);
+    updateCoinPredictions();
+    const coinPredictionTimer=setInterval(renderCoinPredictions,1000);
+    window.addEventListener('pagehide',()=>clearInterval(coinPredictionTimer),{once:true});
     for(const src of ['market-model.js','app.js','btc-chart.js'])await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=/** Handle the load event for the current transport or resource. */ ()=>{try{if(src==='market-model.js')window.PredictModel.configure(window.Predict60MarketConfig);resolve();}catch(error){reject(error);}};script.onerror=/** Handle the error event for the current transport or resource. */ ()=>reject(Error('Unable to load the terminal.'));document.head.append(script);});
   }catch(error){
     picker.textContent='Markets unavailable';

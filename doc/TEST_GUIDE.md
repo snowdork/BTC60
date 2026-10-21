@@ -43,7 +43,7 @@ manual procedure explicitly says to use a live feed.
 | Suite files | Coverage |
 | --- | --- |
 | `account.test.js`, `auth.test.js`, `password.test.js` | Restored/expired sessions, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery and bounded retries. |
-| `bootstrap.test.js`, `coins.test.js`, `categories.test.js` | Catalog-first startup, offline/static-server failures, instrument selection, category configuration and coming-soon availability. |
+| `bootstrap.test.js`, `coins.test.js`, `categories.test.js` | Catalog-first startup, offline/static-server failures, instrument selection, category configuration, coming-soon availability and displayed-hour coin prediction rings (direction, settled retention, hour navigation and logout). |
 | `btc-chart.test.js` | Minute history and heat maps, current/historical-hour navigation, stale response rejection, benchmark/quote freshness and oil-feed error states. |
 | `market-model.test.js`, `portfolio-model.test.js` | Interval layout, Up/Down outcomes, probability and volatility calculations, cutoff rules, credit limits, payout rounding, settled P/L and numeric history sorting. |
 | `community.test.js`, `contests.test.js`, `sponsor.test.js` | Community polling recovery, hourly score states, contest history and lookup, pending resets, safe sponsor links and absent/failed sponsor configuration. |
@@ -107,6 +107,9 @@ The tests substitute a fake Docker executable and exercise
 - A failed build leaves the running deployment untouched: no stop, remove,
   recreate or run command occurs afterward.
 - VPS mode builds before `up -d --no-build --wait` and never calls `down`.
+- Both modes stop an installed `predict60.service` after the build and before
+  replacing/starting Docker. An absent service is skipped; a failed service stop
+  aborts Docker replacement. The systemctl commands are mocked.
 - Local mode includes a read-only root, 64 MiB temporary filesystem, dropped
   capabilities, no-new-privileges and bounded local logs.
 
@@ -282,3 +285,22 @@ Use a rendered browser at desktop and narrow mobile widths, in both themes:
 
 Static-hosting checks cover exported presentation only; account and game flows
 require the Python API. Automated DOM tests do not replace these visual checks.
+
+## Coin prediction outlines
+
+Run `node --test bootstrap.test.js` for marker-state regressions. Contest
+predictions are grouped by the hour of their interval start, including settled
+orders. The outer ring describes the hour displayed in the playfield, across all
+coins; it does not disappear when a shorter interval ends or settles. Tests cover
+Up, Down and mixed directions, exclusion of practice orders, new orders, settlement
+retention, logout, hour rollover, historical navigation and synthetic preview.
+
+In the rendered terminal, verify an outside green ring for Up, red for Down and a
+split green/red ring when both directions were predicted in that hour. Selecting
+a coin adds a separate inside white highlight in dark mode or black highlight in
+light mode. The outer direction ring must remain visible while selected. Switch
+coins, themes and hours; previous-hour marks should reappear only when that hour
+is displayed. Check horizontal scrolling on mobile so the outside ring is not
+clipped, and verify hover/focus do not hide the direction ring. Tooltips and
+accessible labels should describe predictions in the displayed hour. Synthetic
+preview must not show real prediction rings.

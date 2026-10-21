@@ -8,7 +8,7 @@ import unittest
 
 
 class DockerRestartTest(unittest.TestCase):
-    def run_restart(self, fail_build=False, local=False):
+    def run_restart(self, fail_build=False, local=False, service_present=True, fail_stop=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'scripts').mkdir()
@@ -24,9 +24,21 @@ if 'build' in sys.argv and os.environ.get('DOCKER_TEST_FAIL') == '1':
     sys.exit(1)
 ''')
             docker.chmod(0o755)
+            systemctl = root / 'systemctl'
+            systemctl.write_text('''#!/usr/bin/env python3
+import os, sys
+with open(os.environ['DOCKER_TEST_LOG'], 'a') as log:
+    log.write('systemctl ' + ' '.join(sys.argv[1:]) + '\\n')
+if sys.argv[1] == 'show':
+    print('loaded' if os.environ['SERVICE_PRESENT'] == '1' else 'not-found')
+if sys.argv[1] == 'stop' and os.environ['SERVICE_STOP_FAIL'] == '1':
+    sys.exit(1)
+''')
+            systemctl.chmod(0o755)
             log = root / 'calls'
             env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ['PATH'],
-                       DOCKER_TEST_LOG=str(log), DOCKER_TEST_FAIL=str(int(fail_build)))
+                       DOCKER_TEST_LOG=str(log), DOCKER_TEST_FAIL=str(int(fail_build)),
+                       SERVICE_PRESENT=str(int(service_present)), SERVICE_STOP_FAIL=str(int(fail_stop)))
             result = subprocess.run(['bash', str(root / 'scripts/restart-docker.sh'),
                                      *(['--local'] if local else [])], env=env,
                                     capture_output=True, text=True, timeout=10)
@@ -57,3 +69,30 @@ if 'build' in sys.argv and os.environ.get('DOCKER_TEST_FAIL') == '1':
                      '--log-opt max-size=10m', '--log-opt max-file=5',
                      '--cap-drop ALL', '--security-opt no-new-privileges:true'):
             self.assertIn(flag, run)
+
+    def test_host_service_stops_after_build_before_docker_replacement(self):
+        for local in (False, True):
+            with self.subTest(local=local):
+                result, calls = self.run_restart(local=local)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                build = next(i for i, call in enumerate(calls) if 'build' in call.split())
+                stop = calls.index('systemctl stop predict60.service')
+                replacement = next(i for i, call in enumerate(calls) if set(call.split()) & {'up', 'run', 'rm'})
+                self.assertLess(build, stop)
+                self.assertLess(stop, replacement)
+
+    def test_missing_host_service_does_not_block_docker(self):
+        for local in (False, True):
+            with self.subTest(local=local):
+                result, calls = self.run_restart(local=local, service_present=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotIn('systemctl stop predict60.service', calls)
+
+    def test_failed_service_stop_prevents_docker_replacement(self):
+        for local in (False, True):
+            with self.subTest(local=local):
+                result, calls = self.run_restart(local=local, fail_stop=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('systemctl stop predict60.service', calls)
+                self.assertFalse(any(set(call.split()) & {'up', 'run', 'rm'} for call in calls))
+                self.assertIn('sudo', result.stderr)

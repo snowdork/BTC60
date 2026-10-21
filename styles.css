@@ -390,3 +390,14 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .market-card .chance-row [hidden]{display:none}
 
 .chart-toolbar>div[hidden]{display:none}
+
+/* Outer direction ring and inner selection ring remain visible together. */
+:root .topbar .coin-button{position:relative}
+:root .topbar .coin-button[data-prediction="up"]{--coin-ring:var(--green)}
+:root .topbar .coin-button[data-prediction="down"]{--coin-ring:var(--red)}
+:root .topbar .coin-button[data-prediction="mixed"]{--coin-ring:var(--green) var(--red) var(--red) var(--green)}
+:root .topbar .coin-button:is([data-prediction="up"],[data-prediction="down"],[data-prediction="mixed"]):after{content:'';position:absolute;inset:-3px;border:2px solid;border-color:var(--coin-ring);border-radius:calc(6px + 3px);pointer-events:none}
+:root .topbar .coin-button[aria-pressed="true"]{border-color:var(--border);box-shadow:inset 0 0 0 2px #fff}
+:root[data-theme="light"] .topbar .coin-button[aria-pressed="true"]{border-color:var(--border);box-shadow:inset 0 0 0 2px #000}
+
+.ticket .wager-limit{margin:0 0 8px;color:var(--muted);font-size:11px;line-height:1.5}.ticket .wager-limit strong{color:var(--text);font-weight:600}

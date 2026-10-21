@@ -48,6 +48,14 @@ chmod 600 .env.local
 bash scripts/restart-docker.sh --local
 ```
 
+After a successful build, the restart helper stops `predict60.service` when it
+is installed, before replacing/starting the Docker app. Run the helper with
+`sudo` for this handoff. If stopping the service fails, Docker replacement is
+aborted. A failed build leaves the host service running. Stopping the service
+does not disable its boot startup; use `sudo systemctl disable predict60` if
+Docker will permanently replace the host service.
+
+
 Open **http://localhost:8080** (use this hostname to match the configured origin).
 This path needs Docker Engine but not Compose. It builds before replacing the
 container, keeps accounts in `p60-local-data`, limits logs, and uses a read-only

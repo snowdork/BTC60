@@ -10,6 +10,19 @@ fi
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
 
+# Hand supervision to Docker only after a successful image build.
+stop_host_service() {
+  local load_state
+  command -v systemctl >/dev/null 2>&1 || return 0
+  load_state=$(systemctl show predict60.service --property=LoadState --value 2>/dev/null) || return 0
+  [[ $load_state != not-found && -n $load_state ]] || return 0
+  echo 'Stopping host predict60.service before starting Docker...'
+  if ! systemctl stop predict60.service; then
+    echo 'Cannot stop predict60.service. Rerun this script with sudo; Docker was not started.' >&2
+    return 1
+  fi
+}
+
 if ! command -v docker >/dev/null 2>&1; then
   echo 'Install Docker Engine and the Docker Compose plugin first.' >&2
   exit 1
@@ -26,6 +39,7 @@ if [[ ${1:-} == --local ]]; then
   fi
   # Build first so a failed build leaves the existing local app available.
   docker build -t p60:local .
+  stop_host_service
   if docker container inspect p60-local >/dev/null 2>&1; then
     docker stop p60-local
     docker rm p60-local
@@ -80,6 +94,8 @@ if ! "${compose[@]}" build app; then
   echo 'Build failed; existing containers were left running. Fix the build error and rerun this script.' >&2
   exit 1
 fi
+
+stop_host_service
 
 echo 'Starting the app and HTTPS proxy...'
 if ! "${compose[@]}" up -d --no-build --wait --wait-timeout 120; then
