@@ -123,10 +123,11 @@ OilPriceAPI mode shows dated physical spot assessments for all five crudes. Thes
 
 ## Hourly contests
 
-The terminal defaults to **Hourly contest**. Each user gets 1,000 spending credits
-per GMT hour across all instruments and intervals. Winnings do not refill the
-allowance; settled returns minus costs form that hour's gain/loss tally. Unspent
-credits do not carry forward. Practice retains a separate 10,000-credit starting balance.
+The game uses **Hourly contest** only. Each user starts with 1,000 credits
+per GMT hour across all instruments and intervals. Settled payouts refill the
+balance and can be spent again that hour. Losses reduce the balance; the final
+score is ending credits minus 1,000. Unspent
+credits do not carry forward. Practice mode is no longer available.
 
 At HH:00 GMT the contest closes. Final winners and results are saved after all
 predictions settle, then the next hourly allowance unlocks. If a price benchmark

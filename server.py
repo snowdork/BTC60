@@ -49,6 +49,7 @@ LOG = logging.getLogger(__name__)
 PUBLIC_ASSETS = {
     'assets/previews/prediction-playfield.png',
     'assets/backgrounds/hourly-markets.webp',
+    'assets/backgrounds/playfield.webp',
     'assets/brand/p60-mark.svg',
     'assets/fonts/manrope-latin.woff2',
     'assets/fonts/space-grotesk-latin.woff2',
@@ -954,9 +955,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def predict(self, session, data):
         """Validate order timing and budget, freeze the provider quote, and atomically debit and save an idempotent order."""
-        mode = data.get('mode', 'practice')
-        if mode not in ('practice', 'contest'):
-            raise ValueError('Choose practice or contest mode.')
+        mode = data.get('mode', 'contest')
+        if mode != 'contest':
+            raise ValueError('Practice mode is no longer available. Use hourly contests.')
         coin, market_id, side = data.get('coin'), data.get('marketId'), data.get('side')
         budget, request_id = data.get('budget'), data.get('requestId')
         if not isinstance(coin, str) or not isinstance(market_id,str) or not isinstance(side,str):
@@ -1003,10 +1004,6 @@ class Handler(SimpleHTTPRequestHandler):
             else:
                 if time.time() >= end - 30:
                     raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
-                if mode == 'practice':
-                    changed = conn.execute('UPDATE users SET balance_cents=balance_cents-? WHERE id=? AND balance_cents>=?', (cost, session['user_id'], cost)).rowcount
-                    if not changed or contracts <= 0:
-                        raise ValueError('Insufficient credits.')
                 conn.execute('INSERT INTO predictions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', (secrets.token_hex(16), session['user_id'], request_id, coin, market_id, side, start, end, strike, cents, contracts, cost, now))
                 conn.execute('INSERT INTO prediction_sources VALUES(?,?,?)',(conn.execute('SELECT id FROM predictions WHERE user_id=? AND request_id=?',(session['user_id'],request_id)).fetchone()['id'],source['feed'],source['product']))
                 if mode == 'contest':

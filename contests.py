@@ -5,7 +5,7 @@ from urllib.parse import urlsplit
 
 HOURLY_CREDITS = 1000
 WINDOW_CAP_CREDITS = 1000
-RULE_VERSION = 'hourly-net-credits-v2'
+RULE_VERSION = 'hourly-reinvested-credits-v3'
 
 
 def initialize(conn):
@@ -95,7 +95,7 @@ def ensure_period(conn, kind, starts_at):
 
 
 def enter(conn, prediction_id, user_id, coin, starts_at, ends_at, cost_cents):
-    """Reserve the hourly spending allowance inside the prediction transaction."""
+    """Reserve credits from the hourly balance inside the prediction transaction."""
     hour = (ends_at - 1) // 3600 * 3600
     if not hour <= starts_at < ends_at <= hour + 3600:
         raise ValueError('Contest predictions must fit within one GMT hour.')
@@ -104,10 +104,8 @@ def enter(conn, prediction_id, user_id, coin, starts_at, ends_at, cost_cents):
     hourly = ensure_period(conn, 'hourly', hour)
     if hourly['finalized_at'] is not None:
         raise ValueError('This contest is finalized.')
-    spent = conn.execute('SELECT COALESCE(SUM(p.cost_cents),0) FROM contest_entries e JOIN predictions p ON p.id=e.prediction_id WHERE e.hourly_id=? AND p.user_id=?',
-                         (hourly['id'], user_id)).fetchone()[0]
-    if spent + cost_cents > HOURLY_CREDITS * 100:
-        raise ValueError('Hourly contest allowance exhausted. Maximum 1,000 credits across all instruments and intervals.')
+    if cost_cents > wallet(conn, user_id, hour)['remaining_cents']:
+        raise ValueError('Hourly contest balance exhausted. Wait for segment winnings or the next hourly reset.')
     conn.execute('INSERT INTO contest_entries VALUES(?,?,?)', (prediction_id, None, hourly['id']))
 
 
@@ -163,10 +161,11 @@ def finalize(conn, now=None):
 
 
 def wallet(conn, user_id, now=None):
-    """Keep each hour's spend and net tally separate; unlock only after finalization."""
+    """Return spendable credits including settled payouts; reset after finalization."""
     now = int(time.time()) if now is None else now
     hour = now // 3600 * 3600
     totals = conn.execute("""SELECT COALESCE(SUM(p.cost_cents),0) AS spent,
+      COALESCE(SUM(s.payout_cents),0) AS returned,
       COALESCE(SUM(CASE WHEN s.prediction_id IS NOT NULL THEN s.payout_cents-p.cost_cents ELSE 0 END),0) AS net,
       COALESCE(SUM(CASE WHEN s.prediction_id IS NULL THEN 1 ELSE 0 END),0) AS pending
       FROM contest_entries e JOIN contests c ON c.id=e.hourly_id
@@ -174,7 +173,7 @@ def wallet(conn, user_id, now=None):
       WHERE c.starts_at=? AND p.user_id=?""", (hour, user_id)).fetchone()
     blocker = reset_blocker(conn, hour)
     return {'hourlyCredits': HOURLY_CREDITS,
-            'remaining_cents': 0 if blocker else max(0, HOURLY_CREDITS * 100 - totals['spent']),
+            'remaining_cents': 0 if blocker else max(0, HOURLY_CREDITS * 100 - totals['spent'] + totals['returned']),
             'spent_cents': totals['spent'], 'net_cents': totals['net'], 'pending': totals['pending'],
             'starts_at': hour, 'resets_at': hour + 3600,
             'reset_pending': blocker is not None,

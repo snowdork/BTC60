@@ -38,7 +38,7 @@ See [Docker restart policies](https://docs.docker.com/engine/containers/start-co
 
 ## Data and upgrades
 
-To stop the VPS containers, rebuild the application, and start everything again:
+To build an updated image and recreate changed VPS containers:
 
 ```bash
 sudo bash scripts/docker-restart.sh
@@ -46,9 +46,12 @@ sudo bash scripts/docker-restart.sh
 
 Run this after updating the checkout and making a database backup. The script
 uses the VPS `compose.yaml` and `.env`, checks configuration and Docker access
-before stopping, and retains all database and certificate volumes. The site is
-offline during the build. If the build fails, fix the reported error and rerun
-the script; containers remain stopped. It does not restart the Docker daemon or
+before building, and retains all database and certificate volumes. Existing
+containers continue serving during the build. If the build fails, they remain
+untouched. After a successful build, Compose recreates changed services and waits
+for readiness. Expect a brief interruption while the single app instance is
+replaced; this is not a zero-downtime deployment. Caddy is left running unless its
+configuration changed. It does not restart the Docker daemon or
 stop unrelated containers. This command does not use `compose.local.yaml`.
 
 The `p60-data` named volume persists `/app/data`, including SQLite and optional
@@ -130,3 +133,42 @@ For Docker, edit the root `.env` and run `docker compose up -d` to recreate the
 app with the new environment. For systemd, edit `/etc/predict60/predict60.env`
 and restart `predict60.service`. A local `python3 server.py` process needs the
 variable exported in its shell; it does not automatically load `.env`.
+
+## Routine operation
+
+Run from the checkout containing `.env`. Use `sudo` if Docker requires it.
+
+```bash
+# Status and bounded log inspection
+docker compose ps
+docker compose logs --tail=100 app caddy
+docker stats --no-stream
+
+# Apply application code changes after taking a backup
+bash scripts/docker-restart.sh
+
+# Apply .env changes without rebuilding the image
+docker compose up -d --no-build --wait --wait-timeout 120
+
+# Stop intentionally; keep all volumes
+docker compose stop
+# Resume
+docker compose up -d --no-build --wait --wait-timeout 120
+```
+
+`docker compose restart` restarts the existing container; it does **not** apply
+changed environment variables. `up` recreates containers when their configuration
+or image changes ([Compose up](https://docs.docker.com/reference/cli/docker/compose/up/),
+[Compose restart](https://docs.docker.com/reference/cli/docker/compose/restart/)).
+A failed readiness check leaves containers available for diagnosis and does not
+roll back the image or database automatically.
+
+For an image rollback, set `P60_IMAGE_TAG` back to the retained tag and use
+`docker compose up -d --no-build --wait --wait-timeout 120`. Do not run a build
+against the old tag: that would overwrite it with the current checkout. Restore
+the matching backup first if the older code cannot read the migrated schema.
+
+Review disk usage with `df -h` and `docker system df`. Copy backups off-host and
+remove expired backups according to your retention policy; neither Docker log
+rotation nor the app removes database backups. Keep the last known-good image.
+Avoid volume pruning on a deployment that stores its accounts in Docker volumes.

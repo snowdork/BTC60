@@ -35,6 +35,10 @@ class ContestTest(unittest.TestCase):
         if payout is not None:
             conn.execute('INSERT INTO settlements VALUES(?,?,?,?,?,?)', (identifier, 101, 'up', payout, start + 3601, 'test'))
 
+    def test_practice_predictions_are_disabled(self):
+        with self.assertRaisesRegex(ValueError, 'Practice mode is no longer available'):
+            server.Handler.predict(None, {'user_id': 1}, {'mode': 'practice'})
+
     def test_hourly_allowance_does_not_depend_on_practice_balance(self):
         with server.connect() as conn:
             conn.execute('UPDATE users SET balance_cents=0 WHERE id=1')
@@ -62,19 +66,26 @@ class ContestTest(unittest.TestCase):
         with server.connect() as conn:
             self.assertEqual(conn.execute('SELECT count(*) FROM predictions').fetchone()[0], 1)
 
-    def test_hourly_cap_covers_all_coins_and_winnings_do_not_refill(self):
+    def test_winnings_can_be_reused_and_final_score_is_balance_minus_start(self):
         with server.connect() as conn:
             self.entry(conn, 'first', cost=60000, payout=120000)
             self.entry(conn, 'second', cost=40000, coin='ETH', payout=0)
             wallet = contests.wallet(conn, 1, self.day + 100)
-            self.assertEqual(wallet['remaining_cents'], 0)
+            self.assertEqual(wallet['remaining_cents'], 120000)
             self.assertEqual(wallet['net_cents'], 20000)
+            self.entry(conn, 'reinvested', coin='SOL', cost=100000)
+            self.assertEqual(contests.wallet(conn, 1, self.day + 200)['remaining_cents'], 20000)
         with self.assertRaisesRegex(ValueError, 'Hourly contest'):
             with server.connect() as conn:
-                self.entry(conn, 'over-hour', coin='SOL', cost=100)
+                self.entry(conn, 'over-hour', coin='SOL', cost=20001)
         with server.connect() as conn:
+            conn.execute('INSERT INTO settlements VALUES(?,?,?,?,?,?)', ('reinvested', 99, 'down', 0, self.day + 3599, 'test'))
+            ending = contests.wallet(conn, 1, self.day + 3599)
+            self.assertEqual(ending['net_cents'], ending['remaining_cents'] - 100000)
             self.assertTrue(contests.wallet(conn, 1, self.day + 3600)['reset_pending'])
             contests.finalize(conn, self.day + 3601)
+            result = conn.execute('SELECT score_cents FROM contest_results WHERE user_id=1').fetchone()
+            self.assertEqual(result['score_cents'], -80000)
             next_wallet = contests.wallet(conn, 1, self.day + 3601)
             self.assertFalse(next_wallet['reset_pending'])
             self.assertEqual(next_wallet['remaining_cents'], 100000)
