@@ -123,11 +123,12 @@ these checks; do not treat mocked tests as a live-feed or capacity test.
 Run `python3 -m unittest contests_test` for backend and HTTP checks. In a browser,
 use two disposable accounts and confirm:
 
-1. The terminal defaults to Hourly contest. Practice mode displays its separate
-   balance and never changes a contest score.
+1. The terminal uses Hourly contest only. There is no play mode selector, and
+   the API rejects new practice predictions.
 2. A 600-credit contest entry leaves 400 across all instruments and intervals.
-   Winnings affect the tally only. MAX reflects this; API bypass attempts are rejected.
-3. Contest history and practice history remain separate in the portfolio filter.
+   Settled payouts refill the balance and can be reused that hour. MAX reflects
+   the balance and interval cap; overspending through the API is rejected.
+3. The portfolio displays contest history and the current hourly balance.
 4. Closed hourly periods show final winners only after all entries
    settle; ties retain equal rank. Old practice predictions never appear.
 5. At the hour boundary, missing settlement blocks new contest entries and the

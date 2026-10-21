@@ -108,3 +108,30 @@ button,a,input{touch-action:manipulation}
 .score-history-button{padding:9px 10px;border:1px solid var(--border);border-radius:7px;background:var(--raised);font-size:11px;white-space:nowrap}
 .score-history-button:hover{border-color:var(--green);color:var(--green)}
 @media(max-width:650px){.score-hud{flex-wrap:wrap;gap:8px}.score-history-button{flex-basis:100%;text-align:center}.score-hud-result strong{font-size:17px}}
+
+
+/* Share one compact overview row with the previous hour's result. */
+.terminal-page .terminal-overview .overview-top{display:grid;grid-template-columns:minmax(150px,1fr) auto auto minmax(210px,auto);align-items:center;gap:10px}
+.terminal-page .terminal-overview .price-clock{grid-column:auto;grid-row:auto;flex-direction:column;gap:3px;padding:0 10px}
+.terminal-page .terminal-overview .price-clock strong{font-size:13px}
+.terminal-page .terminal-overview .clock-divider{display:none}
+.terminal-page .terminal-overview .hour-window{grid-column:auto;grid-row:auto;width:auto;min-width:0}
+.terminal-page .terminal-overview .hour-time-navigation{gap:4px}
+.terminal-page .terminal-overview .hour-time-navigation>#hour-window-label{font-size:14px}
+.terminal-page .terminal-overview .score-hud{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;margin:0;padding:0 0 0 12px;border:0;border-left:1px solid var(--border);border-radius:0;background:transparent}
+.terminal-page .terminal-overview .score-hud .eyebrow{font-size:9px}
+.terminal-page .terminal-overview .score-hud-result{margin:0;text-align:right}
+.terminal-page .terminal-overview .score-hud-result strong{font-size:16px}
+.terminal-page .terminal-overview .score-history-button{grid-column:1/-1;justify-self:end;padding:3px 0;border:0;background:transparent;font-size:10px}
+@media(max-width:1200px){
+ .terminal-page .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto}
+ .terminal-page .terminal-overview .price-clock{grid-column:2;grid-row:1;border:0;padding:0}
+ .terminal-page .terminal-overview .hour-window{grid-column:1;grid-row:2;align-items:flex-start}
+ .terminal-page .terminal-overview .score-hud{grid-column:2;grid-row:2;max-width:300px}
+}
+@media(max-width:480px){
+ .terminal-page .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr)}
+ .terminal-page .terminal-overview .price-clock{grid-column:1;grid-row:2;flex-direction:row;justify-content:flex-start;gap:12px}
+ .terminal-page .terminal-overview .hour-window{grid-column:1;grid-row:3}
+ .terminal-page .terminal-overview .score-hud{grid-column:1;grid-row:4;max-width:none;border-left:0;border-top:1px solid var(--border);padding:8px 0 0}
+}

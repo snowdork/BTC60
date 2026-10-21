@@ -3,9 +3,9 @@
 ## Deploy and rules
 
 Hourly contests close at HH:00 GMT (UTC+00:00). Rule version:
-`hourly-net-credits-v2`. Each user has 1,000 spending credits per hour across all
-instruments, intervals, and directions. Winnings go into the net tally, never
-back into spendable credits. Practice funds remain separate.
+`hourly-reinvested-credits-v3`. Each user starts with 1,000 credits per hour across all
+instruments, intervals, and directions. Settled payouts return to spendable
+credits and can be reused that hour. Final score is ending credits minus 1,000. Practice funds remain separate.
 
 The settlement worker finalizes closed hourly contests and saves winners and
 prize allocations in one transaction. All prior hourly contests must be final
@@ -17,8 +17,7 @@ have no winner. Historical results are immutable after finalization.
 Back up before deploying, then rebuild/restart. Startup migrates daily entry
 links to optional fields while retaining old records. No new daily contests,
 entries, or prize pools are created; daily records are archived and hidden.
-Existing hourly entries remain counted, so a user who already spent more than
-1,000 credits before deployment has zero allowance until the next unlocked hour.
+Existing hourly entries and settled payouts remain counted in the available balance.
 Deploy at an hour boundary when possible. Historical rule versions are retained.
 Run one app process against one database. Immediate transactions serialize entry
 reservations and finalization. The history API uses `before` (exclusive Unix

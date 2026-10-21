@@ -12,7 +12,7 @@ Predict60 is a buildless web app for exploring hourly direction predictions with
 - **Live market context:** Coinbase Exchange ticker updates and minute-candle history, with separate spot freshness, history, and order-readiness indicators.
 - **Demo predictions:** choose Up or Down, set a budget, and review whole-contract cost, possible return, and potential profit. Model percentages determine simulated contract prices.
 - **Live confirmation:** review follows the market; the server executes at its current model price within your budget. Final quantity and return can differ from review.
-- **Persistent accounts:** signup/login, password changes, 10,000 starting credits, saved predictions, and automatic settlement backed by SQLite.
+- **Persistent accounts:** signup/login, password changes, 1,000 hourly contest credits, saved predictions, and automatic settlement backed by SQLite.
 - **Portfolio tracking:** pending orders, wins, losses, returns, and realized profit/loss, with committed funds shown separately.
 - **Display controls:** light/dark themes, responsive layouts, chart pause, reconnect, and an explicit synthetic preview mode.
 
@@ -34,7 +34,8 @@ BTC · ETH · SOL · XRP · DOGE · ADA · LTC. The database catalog controls av
 
 Prediction budgets are limited to **1–1,000 credits** per submission, enforced by
 the server and browser. Credits are game points; market prices remain USD.
-Hourly contests provide 1,000 spending credits per user, a separate net gain/loss tally,
+Hourly contests start with 1,000 credits per user. Settled winnings can be reused during
+the hour; the final score is ending credits minus 1,000, with a live net gain/loss tally
 and final winners. Daily contests are disabled. New hourly credits unlock after prior
 winners are finalized; missing benchmarks delay the reset.
 Open **Contests & winners** to play or inspect results. Sponsor and prize setup is
