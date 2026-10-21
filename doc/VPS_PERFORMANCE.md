@@ -124,3 +124,23 @@ unavailable in this environment. No live container rollout or VPS load test was
 performed. Verify the public health endpoint and a complete prediction/settlement
 cycle after deployment. The deployment docs now separate local Python, local
 Docker/Compose, and VPS Docker/systemd workflows.
+
+### Follow-up code and performance review
+
+- Password changes now read credentials and perform both scrypt operations before
+  acquiring SQLite's writer lock. The short update transaction checks the original
+  password hash/salt and the live session before replacing credentials and revoking
+  other sessions. A concurrent password change or logout rejects the stale update.
+  Responses are sent after releasing the database transaction.
+- Added regression checks that acquire an independent writer lock during each
+  hash, and simulate password replacement/session revocation during hashing.
+- Updated the three legacy practice-balance assertions to verify hourly contest
+  spending, payouts, and idempotent retries. Account tests now use a fresh database
+  per scenario: advancing time to finalize a contest no longer contaminates later
+  tests. Order tests use a fixed open point within the hour to avoid cutoff timing.
+- Remaining scaling concerns are unchanged: account polling returns all saved
+  predictions, and contest dashboards build full standings before trimming leaders.
+  These need pagination/query changes if account history or participation grows.
+
+Validation: `python3 scripts/run_tests.py` passes all 170 tests. This is local
+regression coverage with mocked market providers, not a live Docker/VPS load test.

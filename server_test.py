@@ -11,6 +11,10 @@ import server
 
 class AccountsTest(unittest.TestCase):
     def setUp(self):
+        # Settlement tests advance time and finalize contests; isolate each scenario.
+        server.DB = Path(self.temp.name) / f'{self._testMethodName}.sqlite3'
+        server.initialize()
+        server.AUTH_ATTEMPTS.clear()
         self.signup_environment = patch.dict(server.os.environ, {'P60_SIGNUP_CODE': '777'})
         self.signup_environment.start()
         self.addCleanup(self.signup_environment.stop)
@@ -20,6 +24,7 @@ class AccountsTest(unittest.TestCase):
         cls.oil_config=patch('oilprice_api.configured',return_value=False)
         cls.oil_config.start()
         cls.temp = tempfile.TemporaryDirectory()
+        cls.original_db = server.DB
         server.DB = Path(cls.temp.name) / 'test.sqlite3'
         server.initialize()
         cls.http = server.Predict60HTTPServer(('127.0.0.1', 0), server.Handler)
@@ -30,6 +35,7 @@ class AccountsTest(unittest.TestCase):
         cls.http.shutdown()
         cls.http.server_close()
         cls.temp.cleanup()
+        server.DB = cls.original_db
         cls.oil_config.stop()
 
     def request(self, method, path, data=None, cookie='', csrf='', extra_headers=None):
@@ -63,9 +69,12 @@ class AccountsTest(unittest.TestCase):
             unchanged = self.request('GET', '/api/account', cookie=cookie)[1]
             self.assertEqual(unchanged['user']['balance_cents'], before['user']['balance_cents'])
             self.assertEqual(unchanged['predictions'], [])
+            self.assertEqual(unchanged['contestWallet']['spent_cents'], 0)
             status, accepted, _ = self.request('POST', '/api/predictions', dict(order, budget=1000), cookie, csrf)
             self.assertEqual(status, 201, accepted)
-            self.assertEqual(accepted['user']['balance_cents'], before['user']['balance_cents'] - 100000)
+            self.assertEqual(accepted['user']['balance_cents'], before['user']['balance_cents'])
+            self.assertEqual(accepted['contestWallet']['remaining_cents'], 0)
+            self.assertEqual(accepted['contestWallet']['spent_cents'], 100000)
 
     def test_signup_requires_exact_secret_code_and_creates_nothing_on_failure(self):
         server.AUTH_ATTEMPTS.clear()
@@ -156,6 +165,52 @@ class AccountsTest(unittest.TestCase):
         with patch.dict(server.AUTH_ATTEMPTS, {'127.0.0.1': [server.time.time()] * 20}, clear=True):
             self.assertEqual(self.request('POST', '/api/change-password', payload, cookie, csrf)[0], 429)
         server.AUTH_ATTEMPTS.clear()
+
+    def test_password_hashing_allows_other_database_writers(self):
+        server.AUTH_ATTEMPTS.clear()
+        credentials = {'email': 'hash-lock@example.com', 'password': 'old-password'}
+        status, _, cookie = self.request('POST', '/api/signup', dict(credentials, name='Hash lock', signupCode='777', confirmPassword='old-password'))
+        self.assertEqual(status, 200)
+        account = self.request('GET', '/api/account', cookie=cookie)[1]
+        original = server.hashlib.scrypt
+
+        def hashing(*args, **kwargs):
+            with server.connect() as conn:
+                conn.execute('PRAGMA busy_timeout=10')
+                conn.execute('BEGIN IMMEDIATE')
+            return original(*args, **kwargs)
+
+        payload = {'currentPassword': 'old-password', 'newPassword': 'new-password', 'confirmPassword': 'new-password'}
+        with patch('server.hashlib.scrypt', side_effect=hashing) as hashed:
+            self.assertEqual(self.request('POST', '/api/change-password', payload, cookie, account['csrf'])[0], 200)
+            self.assertEqual(hashed.call_count, 2)
+
+    def test_password_change_rejects_concurrent_credentials_or_session_change(self):
+        original = server.hashlib.scrypt
+        for revoke in (False, True):
+            with self.subTest(revoke=revoke):
+                server.AUTH_ATTEMPTS.clear()
+                credentials = {'email': f'hash-race-{revoke}@example.com', 'password': 'old-password'}
+                status, _, cookie = self.request('POST', '/api/signup', dict(credentials, name='Hash race', signupCode='777', confirmPassword='old-password'))
+                self.assertEqual(status, 200)
+                account = self.request('GET', '/api/account', cookie=cookie)[1]
+                calls = 0
+
+                def hashing(*args, **kwargs):
+                    nonlocal calls
+                    calls += 1
+                    if calls == 2:
+                        with server.connect() as conn:
+                            if revoke:
+                                conn.execute('DELETE FROM sessions WHERE user_id=?', (account['user']['id'],))
+                            else:
+                                conn.execute("UPDATE users SET password_hash='concurrent-change' WHERE id=?", (account['user']['id'],))
+                    return original(*args, **kwargs)
+
+                payload = {'currentPassword': 'old-password', 'newPassword': 'new-password', 'confirmPassword': 'new-password'}
+                with patch('server.hashlib.scrypt', side_effect=hashing):
+                    self.assertEqual(self.request('POST', '/api/change-password', payload, cookie, account['csrf'])[0], 409)
+                self.assertEqual(self.request('POST', '/api/login', dict(credentials, password='new-password'))[0], 401)
 
     def test_health_check_verifies_database(self):
         status, payload, _ = self.request('GET', '/healthz')
@@ -272,7 +327,7 @@ class AccountsTest(unittest.TestCase):
         self.assertEqual(self.request('POST', '/api/login', {'email': 'one@example.com', 'password': 'wrong-password'})[0], 401)
         self.assertEqual(self.request('POST', '/api/signup', {'confirmPassword': 'pass-123', 'signupCode': '777', 'name': 'Again', 'email': 'ONE@example.com', 'password': 'pass-123'})[0], 409)
         self.assertEqual(self.request('POST', '/api/login', {'email': 'one@example.com', 'password': 'pass-123'})[0], 200)
-        now = int(server.time.time())
+        now = int(server.time.time()) // 3600 * 3600 + 300
         start = now // 3600 * 3600
         order = {'coin': 'BTC', 'marketId': '60-0', 'side': 'up', 'budget': 50, 'requestId': 'test-request-00000001', 'startsAt': start * 1000, 'strike': 100, 'cents': 68}
         with patch('server.time.time', return_value=now), patch('server.candle_close', return_value=100), patch('server.fresh_spot', side_effect=ValueError('Price feed stale')):
@@ -283,10 +338,13 @@ class AccountsTest(unittest.TestCase):
         with patch('server.time.time', return_value=now), patch('server.candle_close', return_value=100), patch('server.fresh_spot',return_value=101), patch('server.market_up',return_value=68):
             status, account, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
             self.assertEqual(status, 201, account)
-            self.assertEqual(account['user']['balance_cents'], 1000000 - 5000)
+            self.assertEqual(account['user']['balance_cents'], 1000000)
+            self.assertEqual(account['contestWallet']['remaining_cents'], 95000)
             self.assertEqual(len(account['predictions']), 1)
             status, replay, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
             self.assertEqual(replay['user']['balance_cents'], account['user']['balance_cents'])
+            self.assertEqual(replay['contestWallet'], account['contestWallet'])
+            self.assertEqual(len(replay['predictions']), 1)
             bad = dict(order, requestId='test-request-00000002', budget=0)
             self.assertEqual(self.request('POST', '/api/predictions', bad, cookie, csrf)[0], 400)
             bad = dict(order, requestId='test-request-00000003', startsAt=0)
@@ -299,7 +357,9 @@ class AccountsTest(unittest.TestCase):
             server.settle_due()
             server.settle_due()
         _, settled, _ = self.request('GET', '/api/account', cookie=cookie)
-        self.assertEqual(settled['user']['balance_cents'], 1000000 - 5000 + 7353)
+        self.assertEqual(settled['user']['balance_cents'], 1000000)
+        self.assertEqual(settled['predictions'][0]['payout_cents'], 7353)
+        self.assertEqual(settled['predictions'][0]['mode'], 'contest')
         self.assertEqual(settled['predictions'][0]['outcome'], 'up')
         status, _, other_cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-456', 'signupCode': '777', 'name': 'Other', 'email': 'other@example.com', 'password': 'pass-456'})
         self.assertEqual(status, 200)
@@ -416,8 +476,8 @@ class AccountsTest(unittest.TestCase):
         self.assertEqual(status,200)
         _, account, _ = self.request('GET','/api/account',cookie=cookie)
         user_id=account['user']['id'];csrf=account['csrf']
-        now=int(server.time.time());start=now//3600*3600
-        with patch('server.candle_close',return_value=100),patch('server.fresh_spot',return_value=101), patch('server.market_up',return_value=68):
+        now=int(server.time.time())//3600*3600+300;start=now//3600*3600
+        with patch('server.time.time', return_value=now),patch('server.candle_close',return_value=100),patch('server.fresh_spot',return_value=101), patch('server.market_up',return_value=68):
             for side,cents in [('up',68),('down',32)]:
                 order={'coin':'BTC','marketId':'60-0','side':side,'budget':50,'requestId':'settlement-request-'+side,'startsAt':start*1000,'strike':100,'cents':cents}
                 status, account, _ = self.request('POST','/api/predictions',order,cookie,csrf)
@@ -434,7 +494,10 @@ class AccountsTest(unittest.TestCase):
         self.assertEqual(up['payout_cents'],(up['cost_cents']*100+up['cents']-1)//up['cents'])
         self.assertEqual(down['payout_cents'],0)
         self.assertIsNotNone(down['settled_at'])
-        self.assertEqual(settled['user']['balance_cents'],1000000-cost+up['payout_cents'])
+        self.assertEqual(settled['user']['balance_cents'],1000000)
+        with patch('server.time.time', return_value=now):
+            wallet = self.request('GET','/api/account',cookie=cookie)[1]['contestWallet']
+        self.assertEqual(wallet['remaining_cents'], 100000-cost+up['payout_cents'])
         with server.connect() as conn:
             self.assertEqual(conn.execute('SELECT count(*) FROM settlements s JOIN predictions p ON p.id=s.prediction_id WHERE p.user_id=?',(user_id,)).fetchone()[0],2)
 

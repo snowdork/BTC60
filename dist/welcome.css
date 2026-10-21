@@ -27,12 +27,16 @@ body.welcome-page main.welcome-main{padding:0}
 body.welcome-page footer.welcome-footer{padding:25px 0 35px}
 body.welcome-page footer.welcome-footer>span:last-child{display:block}
 
-/* Playfield splash backdrop, shaded independently for each theme. */
+/* Shared crypto, oil, and weather backdrop for welcome and categories. */
 .welcome-page{position:relative;isolation:isolate}
-.welcome-page:before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(90deg,#101611f2 0%,#101611c7 45%,#10161170 100%),linear-gradient(0deg,#101611e6,transparent 65%),url('assets/backgrounds/playfield.webp') center top/cover no-repeat}
-html[data-theme="light"] .welcome-page:before{background-image:linear-gradient(90deg,#f6f6eef5 0%,#f6f6eedb 45%,#f6f6ee99 100%),linear-gradient(0deg,#f6f6eeee,transparent 65%),url('assets/backgrounds/playfield.webp')}
+.welcome-page:before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(90deg,#101611f2 0%,#101611c7 45%,#10161170 100%),linear-gradient(0deg,#101611e6,transparent 65%),url('assets/backgrounds/hourly-markets.webp') center top/cover no-repeat}
+html[data-theme="light"] .welcome-page:before{background-image:linear-gradient(90deg,#f6f6eef5 0%,#f6f6eedb 45%,#f6f6ee99 100%),linear-gradient(0deg,#f6f6eeee,transparent 65%),url('assets/backgrounds/hourly-markets.webp')}
 @media(max-width:680px){.welcome-page:before{background-position:35% top}}
 
-/* Keep the welcome copy open against the playfield background. */
-.welcome-page .welcome-hero{grid-template-columns:1fr}
+/* The game splash is a contained preview on the welcome screen only. */
 .welcome-page .welcome-copy{max-width:600px}
+.welcome-preview{width:100%;max-width:440px;min-width:0;margin:0;justify-self:center;padding:10px;border:1px solid var(--welcome-line);border-radius:16px;background:var(--welcome-panel);box-shadow:0 20px 60px #0003}
+.welcome-preview img{display:block;width:100%;height:auto;border-radius:9px}
+.welcome-preview figcaption{display:flex;flex-direction:column;gap:3px;padding:13px 8px 6px;color:var(--welcome-muted);font-size:11px;line-height:1.6}
+.welcome-preview figcaption strong{color:var(--welcome-text);font-size:13px;font-weight:700}
+@media(max-width:680px){.welcome-preview{max-width:400px}}

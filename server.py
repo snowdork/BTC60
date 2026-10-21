@@ -896,15 +896,27 @@ class Handler(SimpleHTTPRequestHandler):
         if not isinstance(confirmation, str) or not secrets.compare_digest(password.encode(), confirmation.encode()):
             raise ValueError('Passwords do not match.')
         with connect() as conn:
-            conn.execute('BEGIN IMMEDIATE')
             user = conn.execute('SELECT password_hash,salt FROM users WHERE id=?', (session['user_id'],)).fetchone()
-            digest = hashlib.scrypt(current.encode(), salt=bytes.fromhex(user['salt']), n=16384, r=8, p=1).hex()
-            if not secrets.compare_digest(digest, user['password_hash']):
-                return self.reply(403, {'error': 'Current password is incorrect.'})
-            salt = secrets.token_hex(16)
-            digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
-            conn.execute('UPDATE users SET password_hash=?,salt=? WHERE id=?', (digest, salt, session['user_id']))
-            conn.execute('DELETE FROM sessions WHERE user_id=? AND token_hash<>?', (session['user_id'], session['token_hash']))
+        if user is None:
+            return self.reply(401, {'error': 'Log in to change your password.'})
+        digest = hashlib.scrypt(current.encode(), salt=bytes.fromhex(user['salt']), n=16384, r=8, p=1).hex()
+        if not secrets.compare_digest(digest, user['password_hash']):
+            return self.reply(403, {'error': 'Current password is incorrect.'})
+        salt = secrets.token_hex(16)
+        digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
+        # Hash outside the writer lock; reject stale credentials or a revoked session
+        # if another password change/logout completed while hashing.
+        with connect() as conn:
+            conn.execute('BEGIN IMMEDIATE')
+            changed = conn.execute(
+                'UPDATE users SET password_hash=?,salt=? WHERE id=? AND password_hash=? AND salt=? '
+                'AND EXISTS(SELECT 1 FROM sessions WHERE token_hash=? AND user_id=users.id AND expires_at>?)',
+                (digest, salt, session['user_id'], user['password_hash'], user['salt'], session['token_hash'], int(time.time())),
+            ).rowcount
+            if changed:
+                conn.execute('DELETE FROM sessions WHERE user_id=? AND token_hash<>?', (session['user_id'], session['token_hash']))
+        if not changed:
+            return self.reply(409, {'error': 'Your credentials or session changed. Sign in again before retrying.'})
         return self.reply(200, {'ok': True})
 
     def authenticate(self, path, data):

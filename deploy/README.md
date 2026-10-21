@@ -5,9 +5,9 @@
 | Environment | Start/update | Persistent data | Logs |
 | --- | --- | --- | --- |
 | Local Python | `python3 server.py` | `data/p60.sqlite3` by default | Terminal |
-| Local Docker, no Compose | `bash scripts/docker-restart.sh --local` | `p60-local-data` volume | `docker logs p60-local` |
+| Local Docker, no Compose | `bash scripts/restart-docker.sh --local` | `p60-local-data` volume | `docker logs p60-local` |
 | Local Compose | `docker compose -f compose.local.yaml --env-file .env.local up -d --build` | `p60-local-data` volume | Compose logs |
-| VPS Docker + HTTPS | `bash deploy/start-docker.sh` initially; `bash scripts/docker-restart.sh` for updates | Compose `p60-data` volume | Compose logs |
+| VPS Docker + HTTPS | `bash deploy/start-docker.sh` initially; `bash scripts/restart-docker.sh` for updates | Compose `p60-data` volume | Compose logs |
 | VPS systemd + HTTPS | `sudo systemctl restart predict60` | Configured database path | systemd journal |
 
 Use one supervisor per deployment and one app process per database. Local Docker

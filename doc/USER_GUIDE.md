@@ -9,8 +9,8 @@ You do not need to install Python or Docker on your own computer. New signups
 require the secret signup code provided by the organizer, an 8–16-character
 password, and a matching verification password. Show/Hide controls reveal or
 conceal the signup code and password fields. Existing accounts can
-log in without the code. Sign up or log in, then choose **Crypto** from the category screen. New accounts receive 10,000
-credits. Accounts and saved predictions belong to that installation;
+log in without the code. Sign up or log in, then choose **Crypto** from the category screen. Players receive 1,000 contest credits each hour, with the next allowance
+unlocking after prior results are finalized. Accounts and saved predictions belong to that installation;
 a separate local installation does not automatically share them.
 
 For local use, run `python3 server.py` from the project folder and open
@@ -127,7 +127,7 @@ The game uses **Hourly contest** only. Each user starts with 1,000 credits
 per GMT hour across all instruments and intervals. Settled payouts refill the
 balance and can be spent again that hour. Losses reduce the balance; the final
 score is ending credits minus 1,000. Unspent
-credits do not carry forward. Practice mode is no longer available.
+credits do not carry forward.
 
 At HH:00 GMT the contest closes. Final winners and results are saved after all
 predictions settle, then the next hourly allowance unlocks. If a price benchmark

@@ -71,7 +71,7 @@ Without the Compose plugin, use the plain-Docker restart script:
 ```bash
 cp -n deploy/local.env.example .env.local
 chmod 600 .env.local
-sudo bash scripts/docker-restart.sh --local
+sudo bash scripts/restart-docker.sh --local
 ```
 
 Repeat the last command after edits. It builds first, replaces `p60-local`,
@@ -239,7 +239,7 @@ Tests cover market calculations, catalog/bootstrap behavior, portfolio summaries
 
 ## Data and catalog
 
-New installations use `data/p60.sqlite3`; `PREDICT60_DB` or `P60_DB` selects another path. Existing `data/btc60.sqlite3` databases remain in use when the new default does not exist. Legacy `BTC60_*` environment variables remain fallbacks after `PREDICT60_*` and `P60_*`. Session cookies and browser theme storage now use the `p60_` prefix; users must sign in again and reselect their theme after upgrading. Startup creates missing tables and applies catalog migrations. Accounts start with 10,000 game credits. Browser-only positions are not imported. Database files and backups are excluded from Git.
+New installations use `data/p60.sqlite3`; `PREDICT60_DB` or `P60_DB` selects another path. Existing `data/btc60.sqlite3` databases remain in use when the new default does not exist. Legacy `BTC60_*` environment variables remain fallbacks after `PREDICT60_*` and `P60_*`. Session cookies and browser theme storage now use the `p60_` prefix; users must sign in again and reselect their theme after upgrading. Startup creates missing tables and applies catalog migrations. Players receive 1,000 contest credits per hour, with the next allowance unlocking after prior results are finalized. Browser-only positions are not imported. Database files and backups are excluded from Git.
 
 The database `coins` table is authoritative. The crypto seed has ten records: BTC, ETH, SOL, XRP, DOGE, ADA, and LTC enabled; LINK, TRUMP, and AVAX disabled. Existing databases can have administrator edits. Triggers allow at most eight enabled instruments per category. Disabling a coin blocks new orders while preserving history and settlement. Keep referenced symbols and product mappings stable.
 

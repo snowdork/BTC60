@@ -5,7 +5,7 @@
 Hourly contests close at HH:00 GMT (UTC+00:00). Rule version:
 `hourly-reinvested-credits-v3`. Each user starts with 1,000 credits per hour across all
 instruments, intervals, and directions. Settled payouts return to spendable
-credits and can be reused that hour. Final score is ending credits minus 1,000. Practice funds remain separate.
+credits and can be reused that hour. Final score is ending credits minus 1,000.
 
 The settlement worker finalizes closed hourly contests and saves winners and
 prize allocations in one transaction. All prior hourly contests must be final

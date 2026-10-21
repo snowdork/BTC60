@@ -45,7 +45,7 @@ levels. For startup at boot on a VPS use systemd or Docker.
 cp -n deploy/local.env.example .env.local
 chmod 600 .env.local
 # Edit .env.local; change the example signup code if desired.
-bash scripts/docker-restart.sh --local
+bash scripts/restart-docker.sh --local
 ```
 
 Open **http://localhost:8080** (use this hostname to match the configured origin).

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 if [[ $# -gt 1 || (${1:-} != '' && ${1:-} != '--local') ]]; then
-  echo 'Usage: sudo bash scripts/docker-restart.sh [--local]' >&2
+  echo 'Usage: sudo bash scripts/restart-docker.sh [--local]' >&2
   exit 1
 fi
 

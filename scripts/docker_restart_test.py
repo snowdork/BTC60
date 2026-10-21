@@ -12,7 +12,7 @@ class DockerRestartTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'scripts').mkdir()
-            shutil.copy2(Path(__file__).with_name('docker-restart.sh'), root / 'scripts')
+            shutil.copy2(Path(__file__).with_name('restart-docker.sh'), root / 'scripts')
             (root / '.env').write_text('P60_DOMAIN=example.test\n')
             (root / '.env.local').write_text('P60_SIGNUP_CODE=test\n')
             docker = root / 'docker'
@@ -27,7 +27,7 @@ if 'build' in sys.argv and os.environ.get('DOCKER_TEST_FAIL') == '1':
             log = root / 'calls'
             env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ['PATH'],
                        DOCKER_TEST_LOG=str(log), DOCKER_TEST_FAIL=str(int(fail_build)))
-            result = subprocess.run(['bash', str(root / 'scripts/docker-restart.sh'),
+            result = subprocess.run(['bash', str(root / 'scripts/restart-docker.sh'),
                                      *(['--local'] if local else [])], env=env,
                                     capture_output=True, text=True, timeout=10)
             return result, log.read_text().splitlines()

@@ -25,14 +25,52 @@ For focused checks:
 python3 -m unittest server_test logging_test
 python3 -m unittest discover -s scripts -p '*_test.py'
 python3 -m unittest docs_test
-node --test '*.test.js'
+node --test *.test.js
 python3 server.py --help
 git diff --check
 ```
 
-Use `node --test *.test.js` if your Node version does not expand the quoted glob.
 The help output should show `--bind` with default `127.0.0.1`. Docker overrides
 that address with `0.0.0.0`; this does not publish the port on the VPS.
+
+## Automated coverage map
+
+The JavaScript suites execute browser logic with mocked DOM/network state; they
+are not rendered browser or end-to-end tests. Python HTTP tests start a loopback
+server against temporary SQLite databases. Provider calls are mocked unless a
+manual procedure explicitly says to use a live feed.
+
+| Suite files | Coverage |
+| --- | --- |
+| `account.test.js`, `auth.test.js`, `password.test.js` | Restored/expired sessions, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery and bounded retries. |
+| `bootstrap.test.js`, `coins.test.js`, `categories.test.js` | Catalog-first startup, offline/static-server failures, instrument selection, category configuration and coming-soon availability. |
+| `btc-chart.test.js` | Minute history and heat maps, current/historical-hour navigation, stale response rejection, benchmark/quote freshness and oil-feed error states. |
+| `market-model.test.js`, `portfolio-model.test.js` | Interval layout, Up/Down outcomes, probability and volatility calculations, cutoff rules, credit limits, payout rounding, settled P/L and numeric history sorting. |
+| `community.test.js`, `contests.test.js`, `sponsor.test.js` | Community polling recovery, hourly score states, contest history and lookup, pending resets, safe sponsor links and absent/failed sponsor configuration. |
+| `server_test.py` | HTTP accounts, signup code, password changes, CSRF/origin/proxy/cookie rules, credit cap, idempotent predictions, settlement, health, catalog, community, protected pages and static allowlist/compression/HEAD. |
+| `contests_test.py` | Shared hourly wallet, concurrent spending, reusable winnings, hour boundaries, blocked resets, finalization, ties, history, migration, gift-card pools and private-reference isolation. |
+| `categories_test.py` | Idempotent catalog migrations and preservation of legacy simulated settlement sources. |
+| `odds_test.py` | Browser/server parity, volatility response, calibration, settlement horizon and resumable/deduplicated history downloads. |
+| `live_oil_test.py`, `oilprice_api_test.py`, `weather_test.py` | Provider timestamps, exact observation boundaries, unavailable/stale/mismatched data, credential/error handling and dormant category behavior. These tests do not enable Oil or Weather trading. |
+| `performance_test.py` | Bounded HTTP concurrency, database lifecycle, constant catalog query counts, history coalescing and settlement retry deduplication. |
+| `logging_test.py`, `docs_test.py` | Log levels/rotation and source documentation coverage/control-flow ownership. |
+| `scripts/build_static_test.py`, `scripts/database_test.py` | Public-only static builds, preservation after a missing source, database initialization/backup/reset and process locking. |
+| `scripts/server_control_test.py`, `scripts/docker_restart_test.py` | Watchdog crash/stop lifecycle and Docker restart command ordering/container options. Docker calls are mocked. |
+| `scripts/run_tests_test.py` | Timestamped result filenames and Node/Python summary parsing. |
+
+## Account test isolation and deterministic time
+
+Each `server_test.AccountsTest` scenario initializes its own temporary database
+and clears authentication-attempt state. The HTTP server is shared by the class,
+but accounts, contests and finalized results are not shared between scenarios.
+This prevents a settlement test that advances time and finalizes an hourly
+contest from closing the contest used by a later test. The original database
+selection is restored when the class finishes.
+
+Order scenarios use a mocked open point within the hour where appropriate.
+Keep cutoff-specific cases separate: an order is accepted before the final
+30 seconds and rejected at the cutoff. Do not make a successful-order assertion
+depend on the wall clock being outside the last 30 seconds of the hour.
 
 ## Credit limits
 
@@ -41,10 +79,39 @@ above the cap, including fractional overages and unchanged balances after a
 rejection. In the browser, check that MAX selects the smaller of 1,000 and the
 available balance. Confirm account/portfolio values show credits while live
 crypto prices and settlement benchmarks still show USD. Existing amounts are
-preserved in hundredths of a credit. Contest tests cover allowance limits, concurrent entries, UTC rollover, score
+preserved in hundredths of a credit.
+
+The HTTP regression assertions use `contestWallet.remaining_cents` and
+`contestWallet.spent_cents` for new orders. A successful contest prediction must
+not debit the legacy `user.balance_cents` practice balance. Replaying the same
+request ID must preserve both the wallet and the single saved prediction. Winning
+payouts are checked once, losing payouts are zero, and settlement is user-scoped.
+A rejected over-cap order must create no prediction and spend no contest credits.
+
+Contest tests cover allowance limits, concurrent entries, UTC rollover, score
 finalization, ties, prize allocation retries, and private-reference isolation.
 External gift-card delivery is not implemented. Gift cards are the only supported
 prize type; tests reject other types on both new and existing database schemas.
+
+## Docker restart helper regressions
+
+Run without a Docker daemon:
+
+```bash
+python3 -m unittest discover -s scripts -p 'docker_restart_test.py'
+```
+
+The tests substitute a fake Docker executable and exercise
+`scripts/restart-docker.sh` in local and VPS modes. Expected behavior:
+
+- A failed build leaves the running deployment untouched: no stop, remove,
+  recreate or run command occurs afterward.
+- VPS mode builds before `up -d --no-build --wait` and never calls `down`.
+- Local mode includes a read-only root, 64 MiB temporary filesystem, dropped
+  capabilities, no-new-privileges and bounded local logs.
+
+These assertions verify generated commands and ordering. Real image builds,
+volume ownership, readiness and recovery require the manual Docker checks below.
 
 ## Docker configuration and startup
 
@@ -109,14 +176,14 @@ or subnet conflicts. Confirm the saved account, balances, and predictions match
 the backup. Never overwrite a live database or delete the production volume to
 perform this test. Keep both the pre-upgrade image and database backup for rollback.
 
-## Validation status
+## Recording a test run
 
-Local app startup with `--bind 0.0.0.0`, temporary database initialization, the
-health endpoint, and YAML parsing have been checked. Docker is not installed in
-the development environment used to prepare these files, so image build,
-container restart behavior, HTTPS issuance, and VPS reboot/restore checks remain
-unverified. Record the release commit, host, commands, and results when running
-these checks; do not treat mocked tests as a live-feed or capacity test.
+Keep execution results in a separate report, not in this guide. Record the date
+and timezone, repository/commit and dirty-worktree status, commands, suite totals,
+failures/skips, complete log location and checks not performed. For performance
+measurements, also record the dataset, concurrency, environment and whether
+providers were mocked. A successful mocked run does not establish live-feed
+availability, rendered layout, Docker recovery or production capacity.
 
 ## Contest and sponsor acceptance checks
 
@@ -175,6 +242,8 @@ Run the focused browser regressions with:
 ```bash
 node --test account.test.js password.test.js
 python3 -m unittest server_test.AccountsTest.test_change_password_validation_and_session_revocation
+python3 -m unittest server_test.AccountsTest.test_password_hashing_allows_other_database_writers
+python3 -m unittest server_test.AccountsTest.test_password_change_rejects_concurrent_credentials_or_session_change
 ```
 
 Browser tests cover CSRF submission, confirmation mismatch, retry after an
@@ -183,7 +252,33 @@ after another tab ends the session. API coverage checks authentication, CSRF,
 password lengths, confirmation, current-password verification, other-session
 revocation, old/new login credentials, and throttling.
 
+The database-contention regression acquires an independent SQLite writer lock
+during each of the two scrypt operations. Both acquisitions must succeed: password
+hashing must not own the writer lock. The race regression changes the stored
+password or revokes the caller's session during hashing. The stale password-change
+request must return HTTP 409, and its proposed new password must not become valid.
+The final credential update and other-session revocation remain atomic.
+
 On a disposable installation, sign in with two separate browser profiles. Open
 **Change password** in one and submit a valid change. Confirm that this profile
 stays signed in, the other must log in again, the old password fails, and the new
 password succeeds. Check the link from Markets, the terminal, and the portfolio.
+
+## Welcome and category visual acceptance
+
+Use a rendered browser at desktop and narrow mobile widths, in both themes:
+
+1. Open the welcome page while signed out. Confirm crypto/oil/weather artwork
+   fills the background and text/actions remain readable.
+2. Confirm the playfield image is a smaller, uncropped preview with its caption,
+   beside the welcome copy on desktop and below it on mobile. It must not cause
+   horizontal scrolling or obscure signup/login actions.
+3. Sign in and open category selection. Confirm the market artwork is present,
+   the playfield preview is absent, and Crypto remains usable while Oil/Weather
+   remain coming soon.
+4. Verify keyboard focus, theme switching and signed-in redirection. Rebuild the
+   Docker image after source edits; regenerate `dist/` with
+   `python3 scripts/build-static.py` when validating the static export.
+
+Static-hosting checks cover exported presentation only; account and game flows
+require the Python API. Automated DOM tests do not replace these visual checks.

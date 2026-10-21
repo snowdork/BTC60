@@ -41,7 +41,7 @@ See [Docker restart policies](https://docs.docker.com/engine/containers/start-co
 To build an updated image and recreate changed VPS containers:
 
 ```bash
-sudo bash scripts/docker-restart.sh
+sudo bash scripts/restart-docker.sh
 ```
 
 Run this after updating the checkout and making a database backup. The script
@@ -145,7 +145,7 @@ docker compose logs --tail=100 app caddy
 docker stats --no-stream
 
 # Apply application code changes after taking a backup
-bash scripts/docker-restart.sh
+bash scripts/restart-docker.sh
 
 # Apply .env changes without rebuilding the image
 docker compose up -d --no-build --wait --wait-timeout 120
