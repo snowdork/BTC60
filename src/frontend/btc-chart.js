@@ -5,6 +5,7 @@
 (() => {
   'use strict';
   const model=window.PredictModel,/** Find an interface element by its stable DOM identifier. */ $=id=>document.getElementById(id);
+  const PRICE_UPDATE_MS=2000;
   let coin=model.coin;
   const /** Report whether the selected instrument uses the deterministic simulation feed. */ simulated=()=>coin.feed==='simulated';
   const /** Choose server polling for simulated and oil-provider instruments. */ serverFeed=()=>simulated()||['twelvedata','oilpriceapi'].includes(coin.feed);
@@ -22,11 +23,13 @@
   let hour=hourOf(Date.now()),points=[],candles=[],lastPriceAt=0,lastPrice=null,lastHistoryAt=0,lastSpotPollAt=-Infinity,backoff=1000;
   let demoEpoch=Date.now(),demoStart=new Date().setUTCHours(17,42,12,0),demoSecond=-1,lastDraw=0;
   let lastPlotAt=-Infinity;
-  let previousBannerPrice,bannerTrend='';
+  let previousBannerPrice,bannerTrend='',lastBannerUpdate=-Infinity;
   /** Render banner price from the latest account, market, and interface state. */ function renderBannerPrice(){
     const state=historical?(Number.isFinite(lastPrice)?'ready':historyFailed?'unavailable':'loading'):model.spotStatus;
     const value=state==='ready'&&Number.isFinite(lastPrice)?lastPrice:null,banner=$('btc-spot');
     if(value===previousBannerPrice&&banner.dataset.state===state)return;
+    if(!historical&&state==='ready'&&banner.dataset.state===state&&Number.isFinite(previousBannerPrice)&&Date.now()-lastBannerUpdate<PRICE_UPDATE_MS)return;
+    lastBannerUpdate=Date.now();
     if(value!==null&&Number.isFinite(previousBannerPrice)){
       bannerTrend=value>previousBannerPrice?'up':'down';
     }
@@ -88,7 +91,7 @@
     }
     lastPrice=price;lastPriceAt=Date.now();model.priceUpdatedAt=t;model.spot=price;model.spotStatus='ready';
     renderBannerPrice();
-    if(Date.now()-lastPriceBroadcast>=1000){lastPriceBroadcast=Date.now();broadcast('btc-price-update');}
+    if(Date.now()-lastPriceBroadcast>=PRICE_UPDATE_MS){lastPriceBroadcast=Date.now();broadcast('btc-price-update');}
   }
   /** Calculate an illustrative synthetic price; these values cannot execute orders. */ function demoPrice(minute,second=0){return coin.demoBase*(1+(minute*1.5+Math.sin(minute*.48)*19+Math.sin(minute*1.8)*4+Math.sin(second*.5)*1.4)/67450);}
   /** Populate the synthetic preview hour with deterministic chart points. */ function demoHistory(now) {
@@ -367,6 +370,11 @@
   });
   document.addEventListener('visibilitychange',()=>{if(historical){if(!document.hidden){syncMarkets(currentTime());draw(currentTime());}return;}if(!document.hidden&&!paused){const now=currentTime();if(hourOf(now)!==hour)resetHour(now);syncMarkets(now,true);draw(now);if(mode==='live')loadHistory();}});
   window.addEventListener('pagehide',()=>{stopped=true;disconnect();clearTimeout(frameId);});
+  window.addEventListener('pageshow',event=>{
+    if(!event.persisted||!stopped)return;
+    stopped=false;lastDraw=0;setMode(mode,historical?hour:undefined);
+    frameId=setTimeout(()=>frame(performance.now()),1000);
+  });
   /** Switch instrument, persist its category preference, and reset feed/history state. */ function selectCoin(symbol){
     coin=window.PredictCoins.getCoin(symbol);model.coin=coin;
     document.querySelectorAll('[data-coin]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.coin===coin.symbol)));

@@ -1,6 +1,6 @@
 # Predict60 — Hourly prediction terminal
 
-Predict60 is a buildless web app for exploring hourly direction predictions with game credits. See a complete UTC hour at once: one 60-minute market, two 30-minute markets, and four 15-minute markets, with a live chart and a persistent order ticket.
+Predict60 is a buildless web app for exploring hourly direction predictions with game credits. See a complete UTC hour at once: one 60-minute market, two 30-minute markets, and four 15-minute markets, with a live chart and prediction popups.
 
 ![Predict60 terminal with an hourly chart, aligned prediction intervals, and an order ticket](src/frontend/assets/previews/prediction-playfield.png)
 
@@ -10,7 +10,7 @@ Predict60 is a buildless web app for exploring hourly direction predictions with
 
 - **Complete-hour workspace:** inspect open, upcoming, and completed intervals without hiding duration tiers; navigate previous hours and return to the current hour.
 - **Live market context:** Coinbase Exchange ticker updates and minute-candle history, with separate spot freshness, history, and order-readiness indicators.
-- **Demo predictions:** choose Up or Down, set a budget, and review whole-contract cost, possible return, and potential profit. Model percentages determine simulated contract prices.
+- **Points predictions:** choose Up or Down, set a budget, and review fractional shares, cost, possible return, and potential profit. Model percentages determine simulated contract prices.
 - **Live confirmation:** review follows the market; the server executes at its current model price within your budget. Final quantity and return can differ from review.
 - **Persistent accounts:** signup/login, password changes, 1,000 hourly contest credits, saved predictions, and automatic settlement backed by SQLite.
 - **Portfolio tracking:** pending orders, wins, losses, returns, and realized profit/loss, with committed funds shown separately.

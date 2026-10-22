@@ -13,7 +13,7 @@
   let locked=false,ownsFullscreen=false,busy=false;
 
   /** Reflect actual device orientation and the view requested by this control. */ function render(){
-    label.textContent=locked?'Auto rotate':ownsFullscreen?'Exit full screen':landscape.matches?'Landscape':'Sideways';
+    label.textContent=locked?'Auto rotate':ownsFullscreen?'Exit full screen':landscape.matches?'Landscape':'Rotate';
     button.disabled=busy||(landscape.matches&&!locked&&!ownsFullscreen);
     button.setAttribute('aria-pressed',String(locked||ownsFullscreen||landscape.matches));
     button.setAttribute('aria-busy',String(busy));

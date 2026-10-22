@@ -68,3 +68,33 @@ test('reused hourly winnings allow further orders in an interval up to the per-p
   context.available=0;
   assert.equal(vm.runInContext('budgetAvailable()',context),0);
 });
+
+test('countdown updates visit pending predictions without scanning settled history',()=>{
+  const start=source.indexOf('function renderPendingTimes()');
+  const end=source.indexOf('  /** Render positions',start);
+  const label={textContent:''},lookups=[];
+  const pending={id:'pending',start:'12:00',end:'13:00',starts_at:1800000000,ends_at:1800003600};
+  const history=Array.from({length:10000},()=>({get settled_at(){throw Error('Countdown scanned settled history');}}));
+  const context={positions:history,pendingPositions:[pending],document:{hidden:false,getElementById:id=>{lookups.push(id);return label;}}};
+  vm.runInNewContext(source.slice(start,end)+';renderPendingTimes();',context);
+  assert.deepEqual(lookups,['pending-time-pending']);
+  assert.match(label.textContent,/12:00–13:00 UTC/);
+  assert.match(label.textContent,/left|Awaiting settlement/);
+});
+
+test('account updates refresh pending countdowns and remove settled or signed-out predictions',()=>{
+  const start=source.indexOf('function renderAccount()');
+  const end=source.indexOf("  window.addEventListener('account-update'",start);
+  const prediction={id:'one',coin:'BTC',market_id:'60-0',mode:'contest',starts_at:1800000000,ends_at:1800003600,cost_cents:100,settled_at:null};
+  const context={account:{user:{id:1},predictions:[prediction]},pendingPositions:[],predictionIndex:new Map(),
+    predictionKey:(...parts)=>parts.join(':'),$:()=>({}),renderLastHourScore(){},renderSegmentPredictions(){},renderPositions(){},renderTicket(){}};
+  vm.createContext(context);vm.runInContext(source.slice(start,end),context);
+  context.renderAccount();assert.equal(context.pendingPositions.length,1);
+  assert.equal(context.pendingPositions[0].id,'one');
+  prediction.settled_at=1800003601;
+  context.renderAccount();assert.equal(context.pendingPositions.length,0);
+  assert.equal(context.predictionIndex.size,1,'settled results remain available in the segment index');
+  context.account.user=null;
+  context.renderAccount();assert.equal(context.pendingPositions.length,0);
+  assert.equal(context.predictionIndex.size,0);
+});

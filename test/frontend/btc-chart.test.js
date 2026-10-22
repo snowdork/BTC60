@@ -16,7 +16,7 @@ function chartHarness({oil=false,live=false,spotError=false,transformCandles=c=>
  const coins=oil?[coin]:[coin,{...coin,symbol:'ETH',name:'Ethereum',product:'ETH-USD'}];
  const buttons=coins.map(c=>{const button=element(`coin-${c.symbol}`);button.dataset.coin=c.symbol;return button;});
  const model={...require('../../src/frontend/market-model.js'),markets:require('../../src/frontend/market-model.js').markets.map(m=>({...m})),coin};
- const pending=[],timers=[],requests=[];let socket;
+ const pending=[],timers=[],requests=[],events={};let socket;
  let frameStamp=0;
  const fetch=async (url,options)=>{
   requests.push(url);
@@ -33,12 +33,26 @@ function chartHarness({oil=false,live=false,spotError=false,transformCandles=c=>
  };
  class FakeDate extends Date{static now(){return now;}}
  class Socket{constructor(){this.readyState=1;socket=this;}close(){}send(){}}
- const window={PredictModel:model,PredictCoins:{available:coins,getCoin:symbol=>coins.find(c=>c.symbol===symbol)||coin,formatPrice:v=>'$'+v.toFixed(2)},dispatchEvent(){},addEventListener(){}};
+ const window={PredictModel:model,PredictCoins:{available:coins,getCoin:symbol=>coins.find(c=>c.symbol===symbol)||coin,formatPrice:v=>'$'+v.toFixed(2)},dispatchEvent(){},addEventListener:(name,fn)=>{events[name]=fn;}};
  const context={window,document:{getElementById:element,querySelector:s=>s.startsWith('[data-remaining')?null:element(s),querySelectorAll:s=>s==='[data-coin]'?buttons:[],addEventListener(){},createElement:()=>({dataset:{},style:{setProperty(){}},setAttribute(k,v){this[k]=v;}})},Date:FakeDate,Intl,URLSearchParams,fetch,AbortController,WebSocket:Socket,Event:class{},localStorage:{getItem(){return null;},setItem(){}},setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout(){},performance:{now:()=>frameStamp},console};
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../../src/frontend/btc-chart.js'),'utf8'),context);
- return {element,pending,model,hour,requests,select(symbol){element(`coin-${symbol}`).listeners.click();},step(){now+=1000;frameStamp+=1000;timers.at(-1)();},tick(price){frameStamp+=1000;socket.onmessage({data:JSON.stringify({type:'ticker',product_id:model.coin.product,price:String(price),time:new Date(now).toISOString()})});timers.at(-1)();}};
+ return {element,pending,model,hour,requests,events,select(symbol){element(`coin-${symbol}`).listeners.click();},step(){now+=1000;frameStamp+=1000;timers.at(-1)();},tick(price,elapsed=0){now+=elapsed;frameStamp+=Math.max(1000,elapsed);socket.onmessage({data:JSON.stringify({type:'ticker',product_id:model.coin.product,price:String(price),time:new Date(now).toISOString()})});timers.at(-1)();}};
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
+
+test('returning through the browser page cache restarts live quotes and the chart clock',async()=>{
+ let price=108;
+ const h=chartHarness({quote:({now})=>({price:String(price),time:new Date(now).toISOString()})});await flush();
+ const calls=h.requests.length;
+ h.events.pageshow({persisted:false});await flush();assert.equal(h.requests.length,calls);
+ h.events.pagehide();price=123;
+ h.events.pageshow({persisted:true});await flush();
+ assert.equal(h.model.spot,123);
+ const refreshed=h.requests.length;
+ h.events.pageshow({persisted:true});await flush();assert.equal(h.requests.length,refreshed);
+ const clock=h.element('workspace-clock').textContent;
+ h.step();assert.notEqual(h.element('workspace-clock').textContent,clock);
+});
 
 test('initial selection loads a validated price without waiting for a WebSocket trade',async()=>{
  const h=chartHarness();
@@ -176,20 +190,32 @@ test('returning to current hour restores history and ignores old pricing respons
  assert.equal(h.element('btc-line').d,currentPath);
 });
 
- test('banner fractional digits follow second-to-second moves and reset on navigation',async()=>{
+ test('banner fractional digits follow price moves and reset on navigation',async()=>{
  const h=chartHarness();await flush();
  const digits=()=>h.element('btc-spot').children[1];
  h.tick(108.00);assert.equal(digits().dataset.trend,'');
- h.tick(110.25);
+ h.tick(110.25,2000);
  assert.equal(digits().textContent,'25');
  assert.equal(digits().dataset.trend,'up');
  assert.equal(h.element('btc-spot').children[0],'$110.');
- h.tick(109.75);assert.equal(digits().dataset.trend,'down');
+ h.tick(109.75,2000);assert.equal(digits().dataset.trend,'down');
  const unchangedDigits=digits();
- h.tick(109.75);assert.equal(digits().dataset.trend,'down');
+ h.tick(109.75,2000);assert.equal(digits().dataset.trend,'down');
  assert.equal(digits(),unchangedDigits,'unchanged price preserves the existing DOM node');
  h.element('previous-hour').listeners.click();await flush();
  assert.equal(digits().dataset.trend,'');
+});
+
+test('live banner prices update every two seconds while clocks keep ticking each second',async()=>{
+ const h=chartHarness();await flush();
+ const digits=()=>h.element('btc-spot').children;
+ const initial=digits(),clock=h.element('workspace-clock').textContent;
+ h.tick(110.25);h.step();
+ assert.equal(digits(),initial,'one-second update retains the displayed price');
+ assert.notEqual(h.element('workspace-clock').textContent,clock);
+ h.step();assert.equal(digits()[0],'$110.');assert.equal(digits()[1].textContent,'25');
+ h.tick(112.75);h.step();assert.equal(digits()[0],'$110.');
+ h.step();assert.equal(digits()[0],'$112.');assert.equal(digits()[1].textContent,'75');
 });
 
 test('oil uses server simulated prices and history through the shared chart',async()=>{

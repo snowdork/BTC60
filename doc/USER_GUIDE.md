@@ -51,6 +51,8 @@ Choose a coin using the icon grid beside the price. The default choices are BTC,
 
 Selecting a coin immediately requests a current price and shows **Loading…** while it arrives. If no valid, recent quote is available, the price reads **Data Not Available**. The terminal retries automatically; you do not need to refresh or switch coins again. Historical candles never substitute for a current quote, and predictions remain blocked until the required price and benchmark data are ready.
 
+The live price display updates every two seconds. Clocks and betting countdowns continue to update every second. Selecting another coin or reporting unavailable data updates the price state immediately.
+
 Each UTC hour shows one 60-minute interval, two 30-minute intervals, and four 15-minute intervals. Select any card to inspect its benchmark and details in the ticket. Open cards accept predictions when data is ready. Upcoming and completed cards are read-only. A red dashed cursor shows the current UTC time across the chart and markets.
 
 Up/Down percentages are heuristic model estimates, not calibrated odds. They also set simulated contract prices: 70% Up means an Up contract costs 0.70 credits. Percentages and prices change with spot, time remaining, and recent volatility. Upcoming cards hide percentages; completed cards show results when candle history is available.
@@ -139,7 +141,7 @@ segment to see its outcome and your returns. **Details** describes an upcoming
 segment. Popups scroll on short screens; use the close button or Escape to close
 them. The hourly balance and last-hour results remain in the header.
 
-On a phone, tap **Sideways** above the market summary to request landscape view.
+On a phone, tap **Rotate** in the top title bar to request landscape view.
 If the browser permits it, the page enters full screen and rotates. Tap
 **Auto rotate** to release the orientation lock and leave full screen. On
 browsers without automatic rotation support, follow the on-screen prompt to

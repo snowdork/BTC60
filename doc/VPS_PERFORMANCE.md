@@ -154,3 +154,51 @@ quote. Prediction creation avoids two redundant ID lookups. The complete local
 suite passes 180 tests, with TAP totals now included correctly in the reporter.
 Full account-history payloads and complete dashboard standings remain the main
 identified growth limits; no VPS capacity or Docker runtime claim is made.
+
+## October 22, 2026 code review
+
+Finalized dashboard standings now load the first 100 leaders and the caller's
+rank directly from indexed results. Aggregate queries retain participant/winner
+counts, and all tied winners are still returned even when there are more than
+100. Live/provisional standings continue to use the complete score calculation.
+
+Pending countdowns now iterate a list rebuilt only on account updates, rather
+than filtering the full prediction history every second. Settlements and logout
+clear the list as appropriate; historical results remain indexed for segment views.
+
+Account requests, including JSON body reads, have a 30-second timeout so stalled
+settlement requests release their in-flight guard. A timed-out prediction is not
+automatically replayed. Returning through the browser's page cache restarts the
+chart transport and clock after the existing page-hide cleanup.
+
+Live banner prices update at most every two seconds; clocks and betting
+countdowns still tick each second. Coin selection and unavailable-data states
+remain immediate. Incoming quotes continue to be validated as they arrive.
+
+Synthetic comparison: 5,000 players, 24 finalized stored hours (23 included in
+the dashboard beside the current hour), seven measured calls per variant on
+the same temporary indexed database. The baseline is the committed dashboard
+implementation before this review; complete response objects compare equal.
+Python allocation peaks were measured separately with `tracemalloc`.
+
+| Dashboard measurement | Before | After |
+| --- | ---: | ---: |
+| Median local computation | 174.25 ms | 11.38 ms |
+| Peak traced Python allocation | 5,031,164 bytes | 883,935 bytes |
+
+The regression fixture with 250 unique-ranked players materializes 101 ranking
+rows: 100 leaders plus a caller below the displayed list. Cases with 125 or 250
+tied winners preserve all winners, alongside empty and absent-player cases.
+Timings measure local computation, not public HTTP latency or VPS capacity.
+
+Validation on October 22, 2026 (America/Denver), based on commit `9d0a469` with
+an edited worktree and existing Rotate-button changes retained:
+`python3 scripts/run_tests.py` passes **208 tests** (115 JavaScript,
+78 Python application, 15 Python scripts), with zero failures/skips. The log is
+`/tmp/test_results/test_result_2026-10-22_15-30-03_485221.log`.
+Providers are mocked. The static export is regenerated from `src/frontend/`.
+No VPS rollout or live-provider load test was performed.
+
+Remaining growth limits are full account-history responses, complete live or
+provisional standings, and potentially large lists when many players tie for
+first. Pagination requires an API/UI change; it was not introduced in this review.

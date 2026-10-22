@@ -15,7 +15,8 @@ and local Compose share a volume/container name: stop the previous mode before
 switching. See [local operation](LOCAL.md) for setup, backups, and troubleshooting,
 and [Docker operation](DOCKER.md) for VPS upgrades and rollback.
 
-Source files in the repository root are served by Python and copied into Docker.
+Python serves the files in `src/frontend/`; server code lives in `src/backend/`.
+Docker copies the `src/` tree into the image.
 `dist/` is only a static export; editing it does not update the running app.
 After source changes, regenerate it with `python3 scripts/build-static.py` if you
 need a synchronized export. Static hosting alone cannot run accounts or trading.

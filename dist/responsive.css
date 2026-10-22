@@ -236,7 +236,8 @@ button,a,input{touch-action:manipulation}
  .terminal-page main{padding:8px 10px 0}
  .terminal-page .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;padding:8px 10px;gap:6px 10px!important}
  .terminal-page .topbar>.brand{grid-column:1;grid-row:1;font-size:17px}
- .terminal-page .topbar>.account-link{grid-column:2;grid-row:1;min-height:44px;display:flex;align-items:center;font-size:11px}
+ .terminal-page .topbar>.phone-view-controls{grid-column:2;grid-row:1;justify-self:end}
+ .terminal-page .topbar>.account-link{grid-column:1/-1;grid-row:3;justify-self:end;min-height:44px;display:flex;align-items:center;font-size:11px}
  .terminal-page .topbar-right{grid-column:1/-1;grid-row:2;flex-basis:auto;width:100%;margin:0;gap:6px}
  .terminal-page .topbar-right .community-counts{display:none}
  .terminal-page .account-balance{order:-1;margin-right:auto}
@@ -330,18 +331,17 @@ button,a,input{touch-action:manipulation}
 [data-theme="light"] .terminal-page .market-card.open:hover{background:#eef1f3}
 
 
-/* Offer phone rotation without crowding the account and instrument controls. */
+/* Keep phone rotation beside the title, with guidance below the header. */
 .phone-view-controls{display:none}
 @media(max-width:600px),(max-width:1000px) and (pointer:coarse),(max-height:600px) and (pointer:coarse){
- .phone-view-controls{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-bottom:8px}
+ .phone-view-controls{display:flex;align-items:center;margin-left:auto;flex-shrink:0}
  .landscape-button{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:8px;min-height:44px;padding:8px 12px;border:1px solid var(--muted);border-radius:7px;background:var(--raised);color:var(--text);font-size:12px;font-weight:600}
  .landscape-button svg{width:24px;height:24px;flex-shrink:0}
  .landscape-button:hover:not(:disabled){border-color:var(--text)}
  .landscape-button[aria-pressed="true"]{border-color:var(--text)}
  .landscape-button:disabled{opacity:.75}
- .landscape-hint{margin:0;max-width:38ch;color:var(--muted);font-size:12px;line-height:1.5}
+ .landscape-hint{margin:0 0 8px;max-width:38ch;color:var(--muted);font-size:12px;line-height:1.5}
 }
-@media(max-width:400px){.phone-view-controls{flex-wrap:wrap}.landscape-hint{flex-basis:100%;max-width:none}}
 
 
 /* A five-column coin grid shares the live price panel. */

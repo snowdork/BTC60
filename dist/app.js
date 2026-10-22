@@ -15,7 +15,7 @@
   const shareFormatter=new Intl.NumberFormat('en-US',{maximumFractionDigits:2});
   const /** Format fractional prediction shares for display. */ shares=value=>shareFormatter.format(value);
   const account=window.Predict60Account;
-  let positions=[];
+  let pendingPositions=[];
   const predictionIndex=new Map();
   const /** Build an instrument, interval, and start-time key to distinguish orders in repeated hours. */ predictionKey=(coin,id,start)=>`${coin}:${id}:${start}`;
   /** Find saved predictions matching an instrument and exact interval start. */ function segmentPredictions(selected){
@@ -240,7 +240,7 @@
   let pendingSignature='';
   /** Render pending times from the latest account, market, and interface state. */ function renderPendingTimes(){
     if(document.hidden)return;
-    positions.filter(p=>p.settled_at==null).forEach(p=>{
+    pendingPositions.forEach(p=>{
       const label=document.getElementById(`pending-time-${p.id}`);if(!label)return;
       const seconds=Math.max(0,Math.ceil(p.ends_at-Date.now()/1000));
       const status=seconds?`${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s left`:'Awaiting settlement';
@@ -248,7 +248,7 @@
     });
   }
   /** Render positions from the latest account, market, and interface state. */ function renderPositions() {
-    const pending=positions.filter(p=>p.settled_at==null);
+    const pending=pendingPositions;
     const signature=JSON.stringify([!!account.user,pending.map(p=>p.id)]);
     if(signature===pendingSignature){renderPendingTimes();return;}pendingSignature=signature;
     $('position-count').textContent=pending.length;
@@ -329,7 +329,8 @@
     }
   }
   /** Render account from the latest account, market, and interface state. */ function renderAccount(){
-    positions=account.predictions.filter(p=>p.mode==='contest').map(p=>({...p,marketId:p.market_id,minutes:Number(p.market_id.split('-')[0]),start:new Date(p.starts_at*1000).toISOString().slice(11,16),end:new Date(p.ends_at*1000).toISOString().slice(11,16),cost:p.cost_cents/100}));
+    const positions=account.user?account.predictions.filter(p=>p.mode==='contest').map(p=>({...p,marketId:p.market_id,minutes:Number(p.market_id.split('-')[0]),start:new Date(p.starts_at*1000).toISOString().slice(11,16),end:new Date(p.ends_at*1000).toISOString().slice(11,16),cost:p.cost_cents/100})):[];
+    pendingPositions=positions.filter(p=>p.settled_at==null);
     predictionIndex.clear();
     positions.forEach(p=>{const key=predictionKey(p.coin,p.marketId,p.starts_at*1000);if(!predictionIndex.has(key))predictionIndex.set(key,[]);predictionIndex.get(key).push(p);});
     renderLastHourScore();

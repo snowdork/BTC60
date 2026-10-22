@@ -42,9 +42,10 @@ manual procedure explicitly says to use a live feed.
 
 | Suite files | Coverage |
 | --- | --- |
-| `test/frontend/account.test.js`, `test/frontend/auth.test.js`, `test/frontend/password.test.js` | Restored/expired sessions, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery and bounded retries. |
+| `test/frontend/account.test.js`, `test/frontend/auth.test.js`, `test/frontend/password.test.js` | Restored/expired sessions, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery, bounded retries, and request/body timeouts without automatic order replay. |
 | `test/frontend/bootstrap.test.js`, `test/frontend/coins.test.js`, `test/frontend/categories.test.js` | Catalog-first startup, offline/static-server failures, instrument selection, category configuration, coming-soon availability and displayed-hour coin prediction rings (direction, settled retention, hour navigation and logout). |
-| `test/frontend/btc-chart.test.js` | Minute history and heat maps, current/historical-hour navigation, stale response rejection, benchmark/quote freshness and oil-feed error states. |
+| `test/frontend/btc-chart.test.js` | Minute history and heat maps, current/historical-hour navigation, page-cache restoration, two-second price display with one-second clocks, stale response rejection, benchmark/quote freshness and oil-feed error states. |
+| `test/frontend/app.test.js` | Segment popups, winner badges, per-prediction budgets, and pending countdowns that skip settled history and clear after settlement/logout. |
 | `test/frontend/market-model.test.js`, `test/frontend/portfolio-model.test.js` | Interval layout, Up/Down outcomes, probability and volatility calculations, cutoff rules, credit limits, payout rounding, settled P/L and numeric history sorting. |
 | `test/frontend/community.test.js`, `test/frontend/contests.test.js`, `test/frontend/sponsor.test.js` | Community polling recovery, hourly score states, contest history and lookup, pending resets, safe sponsor links and absent/failed sponsor configuration. |
 | `server_test.py` | HTTP accounts, signup code, password changes, CSRF/origin/proxy/cookie rules, credit cap, idempotent predictions, settlement, health, catalog, community, protected pages and static allowlist/compression/HEAD. |
@@ -52,7 +53,7 @@ manual procedure explicitly says to use a live feed.
 | `categories_test.py` | Idempotent catalog migrations and preservation of legacy simulated settlement sources. |
 | `odds_test.py` | Browser/server parity, volatility response, calibration, settlement horizon and resumable/deduplicated history downloads. |
 | `live_oil_test.py`, `oilprice_api_test.py`, `weather_test.py` | Provider timestamps, exact observation boundaries, unavailable/stale/mismatched data, credential/error handling and dormant category behavior. These tests do not enable Oil or Weather trading. |
-| `performance_test.py` | Bounded HTTP concurrency, database lifecycle, constant catalog query counts, history coalescing and settlement retry deduplication. |
+| `performance_test.py` | Bounded HTTP concurrency, database lifecycle, constant catalog query counts, bounded finalized leaderboard reads with complete tied winners/personal ranks, history coalescing and settlement retry deduplication. |
 | `logging_test.py`, `docs_test.py` | Log levels/rotation and source documentation coverage/control-flow ownership. |
 | `test/scripts/build_static_test.py`, `test/scripts/database_test.py` | Public-only static builds, preservation after a missing source, database initialization/backup/reset and process locking. |
 | `test/scripts/server_control_test.py`, `test/scripts/docker_restart_test.py` | Watchdog crash/stop lifecycle and Docker restart command ordering/container options. Docker calls are mocked. |

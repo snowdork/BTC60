@@ -5,15 +5,15 @@ const fs=require('node:fs');
 const signedIn={user:{name:'Taylor <admin>'},csrf:'token',predictions:[]};
 const response=(data,ok=true,status=200)=>({ok,status,json:async()=>data});
 function setup(fetch,attributes=[]){
- const events={},calls=[],redirects=[],intervals=[];
+ const events={},calls=[],redirects=[],intervals=[],timers=new Map();let nextTimer=0;
  const node=()=>({hidden:false,textContent:'',addEventListener(name,fn){this[name]=fn;}});
  const name=node(),logout=node(),login=node(),content=node(),status=node();
  const nodes={'[data-account-name]':[name],'[data-logout]':[logout],'[data-login]':[login],'[data-authenticated]':[content]};
  const window={addEventListener:(key,fn)=>(events[key]??=[]).push(fn),dispatchEvent:e=>(events[e.type]||[]).forEach(fn=>fn())};
  const document={hidden:false,body:{hasAttribute:key=>attributes.includes(key)},querySelectorAll:key=>nodes[key]||[],getElementById:()=>status,addEventListener(){}};
  const location={href:'',replace:url=>redirects.push(url)};
- vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../../src/frontend/account.js'),'utf8'),{window,document,location,Event,setInterval:fn=>intervals.push(fn),fetch:async(url,options)=>{calls.push({url,options});return fetch(url,options);}});
- return {account:window.Predict60Account,name,logout,login,content,status,redirects,location,calls,document,intervals};
+ vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../../src/frontend/account.js'),'utf8'),{window,document,location,Event,AbortController,setTimeout:fn=>{timers.set(++nextTimer,fn);return nextTimer;},clearTimeout:id=>timers.delete(id),setInterval:fn=>intervals.push(fn),fetch:async(url,options)=>{calls.push({url,options});return fetch(url,options);}});
+ return {account:window.Predict60Account,name,logout,login,content,status,redirects,location,calls,document,intervals,timers};
 }
 test('restored session renders a plain-text name and skips welcome',async()=>{
  const s=setup(()=>response(signedIn),['data-redirect-authenticated']);
@@ -59,6 +59,46 @@ test('background sync does not settle while the document is hidden',async()=>{
  const s=setup(()=>response(signedIn));await s.account.loaded;
  const count=s.calls.length;s.document.hidden=true;s.intervals[0]();
  assert.equal(s.calls.length,count);
+});
+
+test('a stalled settlement releases its request guard after timeout and can retry',async()=>{
+ let stalled=false;
+ const s=setup((url,options)=>stalled&&url==='/api/settle'?new Promise((resolve,reject)=>{
+  options.signal.addEventListener('abort',()=>reject(Error('Aborted')));
+ }):response(signedIn));await s.account.loaded;
+ assert.equal(s.timers.size,0);
+ stalled=true;
+ const pending=s.account.settle();
+ const rejected=assert.rejects(pending,/timed out.*Refresh your account/);
+ assert.equal(s.timers.size,1);
+ [...s.timers.values()][0]();await rejected;
+ assert.equal(s.timers.size,0);
+ stalled=false;await s.account.settle();
+ assert.equal(s.account.user.name,signedIn.user.name);
+});
+
+test('a timed out prediction is not automatically submitted twice',async()=>{
+ const s=setup((url,options)=>url==='/api/predictions'?new Promise((resolve,reject)=>{
+  options.signal.addEventListener('abort',()=>reject(Error('Aborted')));
+ }):response(signedIn));await s.account.loaded;
+ const pending=s.account.place({requestId:'same-order',budget:10});
+ const rejected=assert.rejects(pending,/timed out/);
+ [...s.timers.values()][0]();await rejected;
+ assert.equal(s.calls.filter(call=>call.url==='/api/predictions').length,1);
+ assert.equal(s.account.user.name,signedIn.user.name);
+});
+
+test('response body timeouts are reported as timeouts rather than invalid server data',async()=>{
+ let stalled=false;
+ const s=setup((url,options)=>stalled?{ok:true,json:()=>new Promise((resolve,reject)=>{
+  options.signal.addEventListener('abort',()=>reject(Error('Aborted')));
+ })}:response(signedIn));await s.account.loaded;
+ stalled=true;
+ const pending=s.account.refresh();
+ const rejected=assert.rejects(pending,/Account request timed out/);
+ await new Promise(resolve=>setImmediate(resolve));
+ [...s.timers.values()][0]();await rejected;
+ assert.equal(s.timers.size,0);
 });
 
 test('a settlement response arriving after logout cannot restore the account',async()=>{

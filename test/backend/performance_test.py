@@ -92,6 +92,43 @@ class ResourceTest(unittest.TestCase):
                 self.assertFalse(reader.in_transaction)
                 self.assertFalse(any(s.startswith(('INSERT', 'UPDATE', 'DELETE')) for s in statements))
 
+    def test_final_dashboard_bounds_leaders_without_losing_personal_ranks_or_tied_winners(self):
+        now = 86400 * 20000
+        with server.connect() as conn:
+            conn.executemany('INSERT INTO users(id,name,email,password_hash,salt,created_at) VALUES(?,?,?,?,?,?)',
+                             [(uid, f'Player {uid}', f'{uid}@example.com', '', '', now) for uid in range(1, 251)])
+            period = contests.ensure_period(conn, 'hourly', now - 3600)
+            conn.execute('UPDATE contests SET finalized_at=? WHERE id=?', (now, period['id']))
+            period = conn.execute('SELECT * FROM contests WHERE id=?', (period['id'],)).fetchone()
+            for winner_count in (1, 125, 250, 0):
+                with self.subTest(winners=winner_count):
+                    conn.execute('DELETE FROM contest_results')
+                    conn.executemany('INSERT INTO contest_results VALUES(?,?,?,?,?)',
+                                     [(period['id'], uid, 1 if uid <= winner_count else uid,
+                                       1000 if uid <= winner_count else -uid, 2)
+                                      for uid in range(1, 251)] if winner_count else [])
+                    expected = contests.standings(conn, period)
+                    materialized = []
+
+                    def counted_row(cursor, values):
+                        row = sqlite3.Row(cursor, values)
+                        if 'rank' in row.keys():
+                            materialized.append(row)
+                        return row
+
+                    conn.row_factory = counted_row
+                    result = contests.dashboard(conn, 250, now)
+                    conn.row_factory = sqlite3.Row
+                    actual = next(item for item in result['contests'] if item['id'] == period['id'])
+                    self.assertEqual(actual['leaders'], expected[:100])
+                    self.assertEqual(actual['mine'], next((row for row in expected if row['user_id'] == 250), None))
+                    self.assertEqual(actual['winners'], [row for row in expected if row['rank'] == 1])
+                    self.assertEqual(actual['winnerCount'], winner_count)
+                    self.assertEqual(actual['participants'], len(expected))
+                    if winner_count == 1:
+                        self.assertEqual(len(materialized), 101)
+                    self.assertIsNone(contests.dashboard_standings(conn, period, 999)['mine'])
+
     def test_failed_settlement_benchmark_is_requested_once_per_pass_and_retried(self):
         start = int(server.time.time()) // 3600 * 3600 - 3600
         with server.connect() as conn:

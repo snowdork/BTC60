@@ -336,7 +336,7 @@ body:not(.auth-page) main{padding:10px 20px 0}
  .terminal-overview .price-clock{grid-row:3}
 }
 
-/* Only the banner fractional digits follow the latest one-second price move. */
+/* Only the banner fractional digits follow the latest displayed price move. */
 .spot>#btc-spot[data-state="loading"],.spot>#btc-spot[data-state="unavailable"]{font-size:14px;line-height:1.4;color:var(--muted);overflow-wrap:anywhere}
 #btc-spot .spot-decimals[data-trend="up"]{color:var(--green)}
 #btc-spot .spot-decimals[data-trend="down"]{color:var(--red)}

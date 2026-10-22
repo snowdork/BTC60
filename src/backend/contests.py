@@ -195,6 +195,29 @@ def last_hour_score(conn, user_id, now=None):
     return result
 
 
+def dashboard_standings(conn, contest, user_id):
+    """Load bounded final leaders and the caller, preserving every tied winner and participant counts."""
+    if contest['finalized_at'] is None:
+        rows = standings(conn, contest)
+        return {'leaders': rows[:100], 'winners': [], 'winnerCount': 0,
+                'mine': next((row for row in rows if row['user_id'] == user_id), None),
+                'participants': len(rows)}
+    query = ('SELECT r.user_id,u.name,r.rank,r.score_cents,r.predictions,0 AS pending '
+             'FROM contest_results r JOIN users u ON u.id=r.user_id WHERE r.contest_id=?')
+    leaders = [dict(row) for row in conn.execute(query + ' ORDER BY r.rank,r.user_id LIMIT 100', (contest['id'],))]
+    totals = conn.execute('SELECT COUNT(*) AS participants,COALESCE(SUM(rank=1),0) AS winners '
+                          'FROM contest_results WHERE contest_id=?', (contest['id'],)).fetchone()
+    mine = next((row for row in leaders if row['user_id'] == user_id), None)
+    if mine is None:
+        row = conn.execute(query + ' AND r.user_id=?', (contest['id'], user_id)).fetchone()
+        mine = dict(row) if row is not None else None
+    winners = [row for row in leaders if row['rank'] == 1]
+    if len(winners) < totals['winners']:
+        winners = [dict(row) for row in conn.execute(query + ' AND r.rank=1 ORDER BY r.user_id', (contest['id'],))]
+    return {'leaders': leaders, 'winners': winners, 'winnerCount': totals['winners'],
+            'mine': mine, 'participants': totals['participants']}
+
+
 def dashboard(conn, user_id, now=None, before=None):
     """Return current/recent contests, the caller's awards, and public prize descriptions."""
     now = int(time.time()) if now is None else now
@@ -214,13 +237,8 @@ def dashboard(conn, user_id, now=None, before=None):
     result = []
     for period in selected:
         entry = dict(period)
-        rows = standings(conn, period)
         entry['state'] = 'final' if period['finalized_at'] is not None else 'upcoming' if period['starts_at'] > now else 'open' if period['ends_at'] > now else 'awaiting_settlement'
-        entry['leaders'] = rows[:100]
-        entry['winners'] = [row for row in rows if row['rank'] == 1] if period['finalized_at'] is not None else []
-        entry['mine'] = next((row for row in rows if row['user_id'] == user_id), None)
-        entry['participants'] = len(rows)
-        entry['winnerCount'] = sum(row['rank'] == 1 for row in rows) if period['finalized_at'] is not None else 0
+        entry.update(dashboard_standings(conn, period, user_id))
         entry['prizes'] = pools.get(period['id'], [])
         result.append(entry)
     prizes = [dict(row) for row in conn.execute("SELECT id,contest_id,kind,amount,description,status,updated_at FROM contest_prizes WHERE user_id=? AND kind='gift_card' ORDER BY id DESC", (user_id,))]

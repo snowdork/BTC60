@@ -29,7 +29,7 @@ function setup(options={}){
 
 test('landscape request enters fullscreen, locks orientation, and is reversible',async()=>{
  const s=setup();
- assert.equal(s.label.textContent,'Sideways');
+ assert.equal(s.label.textContent,'Rotate');
  await s.click();
  assert.deepEqual(s.calls,['fullscreen','landscape']);
  assert.equal(s.label.textContent,'Auto rotate');
@@ -37,7 +37,7 @@ test('landscape request enters fullscreen, locks orientation, and is reversible'
  assert.equal(s.button.disabled,false);
  await s.click();
  assert.deepEqual(s.calls,['fullscreen','landscape','unlock','exit']);
- assert.equal(s.label.textContent,'Sideways');
+ assert.equal(s.label.textContent,'Rotate');
  assert.equal(s.attributes['aria-pressed'],'false');
 });
 test('unsupported browsers receive physical rotation guidance without entering fullscreen',async()=>{
@@ -64,7 +64,7 @@ test('denied fullscreen displays guidance without attempting a lock',async()=>{
  const s=setup({fullscreenFails:true});await s.click();
  assert.deepEqual(s.calls,['fullscreen']);
  assert.equal(s.hint.hidden,false);
- assert.equal(s.label.textContent,'Sideways');
+ assert.equal(s.label.textContent,'Rotate');
 });
 test('an existing landscape view is reflected without forcing rotation',()=>{
  const s=setup({landscape:true});
@@ -73,13 +73,13 @@ test('an existing landscape view is reflected without forcing rotation',()=>{
  assert.deepEqual(s.calls,[]);
  s.media.matches=false;s.windowEvents.resize();
  assert.equal(s.button.disabled,false);
- assert.equal(s.label.textContent,'Sideways');
+ assert.equal(s.label.textContent,'Rotate');
 });
 test('exiting fullscreen through browser controls clears the requested orientation',async()=>{
  const s=setup();await s.click();
  s.document.fullscreenElement=null;s.documentEvents.fullscreenchange();
  assert.deepEqual(s.calls,['fullscreen','landscape','unlock']);
- assert.equal(s.label.textContent,'Sideways');
+ assert.equal(s.label.textContent,'Rotate');
  assert.equal(s.attributes['aria-pressed'],'false');
 });
 test('restoring rotation preserves fullscreen entered by another control',async()=>{
@@ -95,6 +95,6 @@ test('orientation can be requested without fullscreen when the browser permits i
 test('leaving the page releases rotation before a restored page is used again',async()=>{
  const s=setup();await s.click();s.windowEvents.pagehide();
  assert.deepEqual(s.calls,['fullscreen','landscape','unlock']);
- assert.equal(s.label.textContent,'Sideways');
+ assert.equal(s.label.textContent,'Rotate');
  assert.equal(s.attributes['aria-pressed'],'false');
 });
