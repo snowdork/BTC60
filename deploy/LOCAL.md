@@ -111,6 +111,13 @@ Never append `--volumes` to routine shutdown commands.
 
 ## Stop and reset commands
 
+Use `scripts/stop.sh` to stop Predict60 Docker containers, `predict60.service`
+when installed, and this checkout's Python server/watchdog. It attempts every
+shutdown even if one fails, and exits nonzero if any shutdown fails. Run
+`sudo bash scripts/stop.sh` if Docker or systemd requires elevated permissions.
+Containers and volumes are preserved; the Docker daemon and unrelated containers
+keep running. It stops the service without disabling boot startup.
+
 ```bash
 scripts/stop-server.sh  # Stop this checkout's Python server and watchdog.
 scripts/stop-docker.sh  # Stop Predict60 Docker containers, including Compose Caddy.
@@ -132,7 +139,8 @@ scripts/reset-database.sh --confirm-reset
 
 Reset backs up an existing database under its adjacent `backups/` directory,
 clears users, sessions, predictions, and settlements, and restores seeded
-catalogs. It requires `--confirm-reset` and refuses to reset a database held by
+catalogs. It prints the exact database path and verifies that user/session/prediction/settlement
+counts are zero. The selected database must already exist. It requires `--confirm-reset` and refuses to reset a database held by
 a running server. It uses `PREDICT60_DB` or the default checkout database, does
 not read `.env` files, and does not reset a Docker volume's database. Run
 `python3 scripts/restart-server.py` afterward when ready to resume.
@@ -153,3 +161,36 @@ python3 scripts/run_tests.py
   health status does not establish provider availability.
 - Docker unavailable: check `docker info`; use `sudo` if required by your setup.
   The plain-Docker helper works when the Compose plugin is missing.
+
+### Reset a deployed database
+
+Select the runtime explicitly so the reset targets its database:
+
+```bash
+sudo scripts/reset-database.sh --service --confirm-reset
+# Or Docker (use sudo if required for Docker access):
+scripts/reset-database.sh --docker --confirm-reset
+# If multiple Predict60 app containers exist:
+scripts/reset-database.sh --docker --container p60-local --confirm-reset
+```
+
+`--service` reads `predict60.service`'s working directory, configured database
+variables, and environment files. It stops the service and runs its maintenance
+script as the service user. Run it with sudo to read private configuration and
+switch users. The service remains stopped; resume with
+`sudo systemctl start predict60`.
+
+`--docker` finds an existing Predict60 app container, including stopped ones,
+stops it, and runs a temporary maintenance container using its image, user,
+database environment, and mounted data volumes. It does not need Compose or an
+`.env` file. If more than one app container exists, select one with `--container`.
+The app remains stopped, including after a reset failure; resume with
+`docker start CONTAINER_NAME`. The backup stays in the data volume beside the
+database under `backups/`. Other containers, including Caddy, keep running.
+
+Both modes require `--confirm-reset`; they cannot be combined. `--db PATH`
+overrides the database path, inside the container for Docker. With neither flag,
+the command resets the checkout database selected by the current environment.
+It does not automatically load systemd configuration or select Docker volumes.
+Reset prints the exact selected path and verifies zero users, sessions,
+predictions, and settlements after backing up existing data.

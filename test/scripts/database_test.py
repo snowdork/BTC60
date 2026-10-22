@@ -10,6 +10,28 @@ SCRIPT = (Path(__file__).resolve().parents[2] / 'scripts/database.py')
 
 
 class MaintenanceTest(unittest.TestCase):
+    def test_reset_wrapper_clears_selected_database_and_reports_path(self):
+        with tempfile.TemporaryDirectory() as folder:
+            db = Path(folder) / 'deployed.sqlite3'
+            wrapper = SCRIPT.with_name('reset-database.sh')
+            command = ['bash', str(wrapper), '--db', str(db), '--confirm-reset']
+            missing = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(missing.returncode, 0)
+            self.assertFalse(db.exists())
+            subprocess.run([sys.executable, str(SCRIPT), 'init', '--db', str(db)],
+                           check=True, capture_output=True)
+            with sqlite3.connect(db) as conn:
+                conn.execute("INSERT INTO users(name,email,password_hash,salt,created_at) VALUES('Test','test@example.com','hash','salt',0)")
+            result = subprocess.run(command, cwd='/tmp', capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(f'Resetting database: {db}', result.stdout)
+            self.assertIn('users: 0', result.stdout)
+            with sqlite3.connect(db) as conn:
+                self.assertEqual(conn.execute('SELECT count(*) FROM users').fetchone()[0], 0)
+            saved, = (db.parent / 'backups').glob('*.sqlite3')
+            with sqlite3.connect(saved) as conn:
+                self.assertEqual(conn.execute('SELECT count(*) FROM users').fetchone()[0], 1)
+
     def test_init_backup_reset_and_lock(self):
         with tempfile.TemporaryDirectory() as folder:
             db = Path(folder) / 'test.sqlite3'

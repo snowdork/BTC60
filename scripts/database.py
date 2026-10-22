@@ -71,6 +71,9 @@ def status(path):
 def reset(path):
     """Back up the database before clearing account state and restoring seeded catalogs."""
     with maintenance_lock(path):
+        if not path.is_file():
+            raise ValueError(f'Database does not exist: {path}. Use --db to select the deployed database, or init to create one.')
+        print(f'Resetting database: {path}', flush=True)
         # Build and validate the replacement before touching the existing database.
         with tempfile.TemporaryDirectory(prefix='p60-reset-', dir=path.parent) as folder:
             original = server.DB
@@ -85,6 +88,11 @@ def reset(path):
                 print(f'Backup saved: {saved}')
             with closing(sqlite3.connect(fresh)) as source, closing(sqlite3.connect(path)) as destination:
                 source.backup(destination)
+                for table in ('users', 'sessions', 'predictions', 'settlements'):
+                    count = destination.execute(f'SELECT count(*) FROM {table}').fetchone()[0]
+                    if count:
+                        raise ValueError(f'Reset verification failed: {table} still contains {count} rows.')
+                    print(f'{table}: {count}')
             os.chmod(path, 0o600)
     print('Database reset. Users, sessions, predictions, and settlements cleared; category and instrument seeds restored.')
 

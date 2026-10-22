@@ -156,6 +156,10 @@ the watchdog with `scripts/stop-server.sh`. Switching does not transfer
 accounts between the host database and Docker volumes. See
 [switching modes](deploy/LOCAL.md#switching-between-python-and-docker) for details.
 
+To stop every Predict60 runtime (Docker, systemd service, and checkout watchdog),
+run `scripts/stop.sh`; use `sudo bash scripts/stop.sh` if your installation needs
+Docker or service permissions. Containers and volumes are preserved.
+
 To stop intentionally:
 
 ```bash
@@ -164,7 +168,8 @@ scripts/stop-server.sh
 
 Use `scripts/stop-docker.sh` to stop Predict60 Docker containers while preserving
 volumes. For a backed-up database reset, stop its server and run
-`scripts/reset-database.sh --confirm-reset`; see [stop and reset commands](deploy/LOCAL.md#stop-and-reset-commands).
+`scripts/reset-database.sh --confirm-reset`. For deployed databases, select
+`--service` or `--docker`; see [stop and reset commands](deploy/LOCAL.md#stop-and-reset-commands).
 
 This stops the watchdog and server and writes `data/server.stopped`, preventing
 automatic restarts. Run `restart-server.py` again to clear the marker and resume.

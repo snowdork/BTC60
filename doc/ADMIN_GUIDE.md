@@ -127,7 +127,17 @@ process is running. Do not remove lock files to bypass a running process.
 `server_control.py` supplies shared process discovery and shutdown functions;
 it is an internal module rather than an administrator command.
 
+To stop all Predict60 runtimes, use `scripts/stop.sh` (or
+`sudo bash scripts/stop.sh` when required). This stops Docker containers, the
+installed systemd service, and the checkout watchdog, preserving data volumes.
+
 ## Database maintenance
+
+For deployed databases, use `sudo scripts/reset-database.sh --service --confirm-reset`
+or `scripts/reset-database.sh --docker --confirm-reset`. Each stops the selected
+app, backs up and resets its database, and leaves the app stopped. Docker supports
+`--container NAME` when multiple app containers exist. See
+[deployment reset options](../deploy/LOCAL.md#reset-a-deployed-database).
 
 ```bash
 python3 scripts/database.py status
