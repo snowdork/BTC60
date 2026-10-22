@@ -82,7 +82,7 @@ class ContestTest(unittest.TestCase):
             conn.execute('INSERT INTO settlements VALUES(?,?,?,?,?,?)', ('reinvested', 99, 'down', 0, self.day + 3599, 'test'))
             ending = contests.wallet(conn, 1, self.day + 3599)
             self.assertEqual(ending['net_cents'], ending['remaining_cents'] - 100000)
-            self.assertTrue(contests.wallet(conn, 1, self.day + 3600)['reset_pending'])
+            self.assertEqual(contests.wallet(conn, 1, self.day + 3600)['remaining_cents'], 100000)
             contests.finalize(conn, self.day + 3601)
             result = conn.execute('SELECT score_cents FROM contest_results WHERE user_id=1').fetchone()
             self.assertEqual(result['score_cents'], -80000)
@@ -102,22 +102,25 @@ class ContestTest(unittest.TestCase):
             contests.finalize(conn, self.day + 86400)
             self.assertEqual(contests.wallet(conn, 1, self.day + 86400)['remaining_cents'], 100000)
 
-    def test_missing_benchmark_blocks_reset_and_new_entries_for_every_player(self):
+    def test_hourly_reset_is_independent_of_delayed_results_for_all_players(self):
         with server.connect() as conn:
             self.entry(conn, 'pending', user=1)
             contests.finalize(conn, self.day + 3601)
-            self.assertEqual(contests.wallet(conn, 2, self.day + 3601)['remaining_cents'], 0)
-        with self.assertRaisesRegex(ValueError, 'awaiting settlement'):
-            with server.connect() as conn:
-                self.entry(conn, 'too-early', user=2, start=self.day + 3600)
-        with server.connect() as conn:
-            conn.execute('INSERT INTO settlements VALUES(?,?,?,?,?,?)', ('pending', 99, 'down', 0, self.day + 3602, 'test'))
+            for user in (1, 2, 3):
+                wallet = contests.wallet(conn, user, self.day + 3600)
+                self.assertEqual(wallet['remaining_cents'], 100000)
+                self.assertEqual(wallet['net_cents'], 0)
+                self.assertFalse(wallet['reset_pending'])
+            self.assertEqual(contests.last_hour_score(conn, 1, self.day + 3601)['state'], 'awaiting_settlement')
+            self.entry(conn, 'new-hour', user=1, start=self.day + 3600, cost=25000)
+            # A late payout belongs to the previous hour; it cannot refill this hour.
+            conn.execute('INSERT INTO settlements VALUES(?,?,?,?,?,?)', ('pending', 101, 'up', 150000, self.day + 3602, 'test'))
             contests.finalize(conn, self.day + 3602)
-            result = conn.execute('SELECT * FROM contest_results').fetchone()
-            self.assertEqual(result['score_cents'], -50000)
-            self.assertEqual(result['rank'], 1)
-            self.entry(conn, 'unlocked', user=2, start=self.day + 3600)
-            self.assertEqual(contests.wallet(conn, 2, self.day + 3602)['remaining_cents'], 50000)
+            result = contests.last_hour_score(conn, 1, self.day + 3602)
+            self.assertEqual((result['state'], result['rank'], result['score_cents']), ('final', 1, 100000))
+            self.assertEqual(contests.wallet(conn, 1, self.day + 3602)['remaining_cents'], 75000)
+            for user in (1, 2, 3):
+                self.assertEqual(contests.wallet(conn, user, self.day + 7200)['remaining_cents'], 100000)
 
     def test_last_hour_hud_distinguishes_empty_provisional_and_final_scores(self):
         now = self.day + 3601

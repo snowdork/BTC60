@@ -45,12 +45,12 @@ def result_path(now: datetime | None = None) -> Path:
 
 def parse_counts(output: str, returncode: int) -> tuple[int, int, int, int]:
     """Extract test, pass, failure, and skip counts from Node or unittest output."""
-    node_tests = re.search(r'^ℹ tests (\d+)$', output, re.MULTILINE)
+    node_tests = re.search(r'^(?:ℹ|#) tests (\d+)$', output, re.MULTILINE)
     if node_tests:
         tests = int(node_tests.group(1))
-        passed_match = re.search(r'^ℹ pass (\d+)$', output, re.MULTILINE)
-        failed_match = re.search(r'^ℹ fail (\d+)$', output, re.MULTILINE)
-        skipped_match = re.search(r'^ℹ skipped (\d+)$', output, re.MULTILINE)
+        passed_match = re.search(r'^(?:ℹ|#) pass (\d+)$', output, re.MULTILINE)
+        failed_match = re.search(r'^(?:ℹ|#) fail (\d+)$', output, re.MULTILINE)
+        skipped_match = re.search(r'^(?:ℹ|#) skipped (\d+)$', output, re.MULTILINE)
         return (
             tests,
             int(passed_match.group(1)) if passed_match else 0,

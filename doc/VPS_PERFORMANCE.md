@@ -144,3 +144,13 @@ Docker/Compose, and VPS Docker/systemd workflows.
 
 Validation: `python3 scripts/run_tests.py` passes all 170 tests. This is local
 regression coverage with mocked market providers, not a live Docker/VPS load test.
+
+### Hourly interface and deployment follow-up
+
+See the [October 21 deployment review](DEPLOYMENT_REVIEW.md) for the latest
+findings, fixes, validation, and remaining VPS checks. The browser now uses the
+hourly wallet and a per-prediction cap without scanning account history for each
+quote. Prediction creation avoids two redundant ID lookups. The complete local
+suite passes 180 tests, with TAP totals now included correctly in the reporter.
+Full account-history payloads and complete dashboard standings remain the main
+identified growth limits; no VPS capacity or Docker runtime claim is made.

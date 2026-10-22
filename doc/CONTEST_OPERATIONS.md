@@ -3,14 +3,14 @@
 ## Deploy and rules
 
 Hourly contests close at HH:00 GMT (UTC+00:00). Rule version:
-`hourly-reinvested-credits-v3`. Each user starts with 1,000 credits per hour across all
+`hourly-independent-reset-v4`. Each user starts with 1,000 credits per hour across all
 instruments, intervals, and directions. Settled payouts return to spendable
 credits and can be reused that hour. Final score is ending credits minus 1,000.
 
 The settlement worker finalizes closed hourly contests and saves winners and
-prize allocations in one transaction. All prior hourly contests must be final
-before the next allowance unlocks. Missing benchmarks delay the reset; retries
-are automatic. Hours remain aligned to GMT even when finalization is delayed.
+prize allocations in one transaction. Every player starts each GMT hour with 1,000 credits independently of prior
+settlements. Missing benchmarks delay winners, with automatic retries. Late
+payouts count only toward their original hour; they never refill a later hour. Hours remain aligned to GMT even when finalization is delayed.
 Ties share first place, negative highest scores still win, and empty contests
 have no winner. Historical results are immutable after finalization.
 

@@ -26,10 +26,10 @@ test('older history uses the server cursor and GMT lookup selects an exact hour'
  s.get('contest-lookup').handlers.click();await s.flush();
  assert.equal(s.get('contest-period').value,'2');
 });
-test('pending settlement explains the locked reset and never labels provisional leaders winners',async()=>{
- const s=setup();s.data.wallet.reset_pending=true;s.data.wallet.awaiting_hour=hour-3600;s.data.wallet.remaining_cents=0;await s.flush();
- assert.equal(s.get('contest-wallet').textContent,'0.00 credits');
- assert.match(s.get('contest-reset-note').textContent,/awaiting settlement/);
+test('new hour credits remain available while the previous winner awaits settlement',async()=>{
+ const s=setup();s.data.contests[1].state='awaiting_settlement';await s.flush();
+ assert.equal(s.get('contest-wallet').textContent,'1,000.00 credits');
+ assert.match(s.get('contest-reset-note').textContent,/Every player starts each new GMT hour with 1,000 credits/);
  assert.equal(s.get('contest-winner').textContent,'Winner declared after all hourly predictions settle.');
 });
 test('lookup with no recorded hour clears stale results',async()=>{

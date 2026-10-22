@@ -4,8 +4,7 @@ import time
 from urllib.parse import urlsplit
 
 HOURLY_CREDITS = 1000
-WINDOW_CAP_CREDITS = 1000
-RULE_VERSION = 'hourly-reinvested-credits-v3'
+RULE_VERSION = 'hourly-independent-reset-v4'
 
 
 def initialize(conn):
@@ -99,19 +98,12 @@ def enter(conn, prediction_id, user_id, coin, starts_at, ends_at, cost_cents):
     hour = (ends_at - 1) // 3600 * 3600
     if not hour <= starts_at < ends_at <= hour + 3600:
         raise ValueError('Contest predictions must fit within one GMT hour.')
-    if reset_blocker(conn, hour) is not None:
-        raise ValueError('Previous hourly contest is awaiting settlement. Credits reset after winners are final.')
     hourly = ensure_period(conn, 'hourly', hour)
     if hourly['finalized_at'] is not None:
         raise ValueError('This contest is finalized.')
     if cost_cents > wallet(conn, user_id, hour)['remaining_cents']:
         raise ValueError('Hourly contest balance exhausted. Wait for segment winnings or the next hourly reset.')
     conn.execute('INSERT INTO contest_entries VALUES(?,?,?)', (prediction_id, None, hourly['id']))
-
-
-def reset_blocker(conn, hour):
-    """Find a closed hourly contest whose winners must be saved before resetting."""
-    return conn.execute("SELECT id,starts_at FROM contests WHERE kind='hourly' AND ends_at<=? AND finalized_at IS NULL ORDER BY ends_at LIMIT 1", (hour,)).fetchone()
 
 
 def standings(conn, contest):
@@ -161,7 +153,7 @@ def finalize(conn, now=None):
 
 
 def wallet(conn, user_id, now=None):
-    """Return spendable credits including settled payouts; reset after finalization."""
+    """Return this hour's spendable credits, independent of prior settlements."""
     now = int(time.time()) if now is None else now
     hour = now // 3600 * 3600
     totals = conn.execute("""SELECT COALESCE(SUM(p.cost_cents),0) AS spent,
@@ -171,13 +163,12 @@ def wallet(conn, user_id, now=None):
       FROM contest_entries e JOIN contests c ON c.id=e.hourly_id
       JOIN predictions p ON p.id=e.prediction_id LEFT JOIN settlements s ON s.prediction_id=p.id
       WHERE c.starts_at=? AND p.user_id=?""", (hour, user_id)).fetchone()
-    blocker = reset_blocker(conn, hour)
     return {'hourlyCredits': HOURLY_CREDITS,
-            'remaining_cents': 0 if blocker else max(0, HOURLY_CREDITS * 100 - totals['spent'] + totals['returned']),
+            'remaining_cents': max(0, HOURLY_CREDITS * 100 - totals['spent'] + totals['returned']),
             'spent_cents': totals['spent'], 'net_cents': totals['net'], 'pending': totals['pending'],
             'starts_at': hour, 'resets_at': hour + 3600,
-            'reset_pending': blocker is not None,
-            'awaiting_hour': blocker['starts_at'] if blocker else None}
+            'reset_pending': False,
+            'awaiting_hour': None}
 
 
 def last_hour_score(conn, user_id, now=None):

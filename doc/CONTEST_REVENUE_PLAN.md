@@ -13,7 +13,7 @@ instrument/interval in aggregate across both directions. Daily contests are disa
 
 Settled payouts return to the hourly balance and can be reused that hour.
 Final score is ending credits minus 1,000. Final rankings wait for all entries
-to settle; the next hourly allowance unlocks after prior results are finalized.
+to settle; the next GMT hour starts with 1,000 fresh credits independently of prior results.
 Unspent credits do not carry forward. Current and recent periods plus upcoming
 reserved pools appear on the contest page.
 

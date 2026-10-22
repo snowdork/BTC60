@@ -48,7 +48,7 @@ manual procedure explicitly says to use a live feed.
 | `market-model.test.js`, `portfolio-model.test.js` | Interval layout, Up/Down outcomes, probability and volatility calculations, cutoff rules, credit limits, payout rounding, settled P/L and numeric history sorting. |
 | `community.test.js`, `contests.test.js`, `sponsor.test.js` | Community polling recovery, hourly score states, contest history and lookup, pending resets, safe sponsor links and absent/failed sponsor configuration. |
 | `server_test.py` | HTTP accounts, signup code, password changes, CSRF/origin/proxy/cookie rules, credit cap, idempotent predictions, settlement, health, catalog, community, protected pages and static allowlist/compression/HEAD. |
-| `contests_test.py` | Shared hourly wallet, concurrent spending, reusable winnings, hour boundaries, blocked resets, finalization, ties, history, migration, gift-card pools and private-reference isolation. |
+| `contests_test.py` | Shared hourly wallet, concurrent spending, reusable winnings, hour boundaries, independent resets, finalization, ties, history, migration, gift-card pools and private-reference isolation. |
 | `categories_test.py` | Idempotent catalog migrations and preservation of legacy simulated settlement sources. |
 | `odds_test.py` | Browser/server parity, volatility response, calibration, settlement horizon and resumable/deduplicated history downloads. |
 | `live_oil_test.py`, `oilprice_api_test.py`, `weather_test.py` | Provider timestamps, exact observation boundaries, unavailable/stale/mismatched data, credential/error handling and dormant category behavior. These tests do not enable Oil or Weather trading. |
@@ -197,12 +197,13 @@ use two disposable accounts and confirm:
    the API rejects new practice predictions.
 2. A 600-credit contest entry leaves 400 across all instruments and intervals.
    Settled payouts refill the balance and can be reused that hour. MAX reflects
-   the balance and interval cap; overspending through the API is rejected.
+   the balance and 1,000-credit per-prediction cap; overspending through the API is rejected.
 3. The portfolio displays contest history and the current hourly balance.
 4. Closed hourly periods show final winners only after all entries
    settle; ties retain equal rank. Old practice predictions never appear.
-5. At the hour boundary, missing settlement blocks new contest entries and the
-   reset. After finalization, the allowance is 1,000 and the new tally is zero.
+5. At the hour boundary, each player receives 1,000 fresh credits and a zero tally,
+   even if prior settlements are pending. Late payouts update only their original
+   hour. Final first-place results display the Winner trophy in Last hour.
    Verify Last hour, older history pages, and a GMT date/hour lookup.
 6. Sponsor configuration renders a labeled HTTPS link. With no configuration or
    a failed sponsor request, the game remains usable and no banner is inserted.

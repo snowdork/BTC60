@@ -135,3 +135,196 @@ button,a,input{touch-action:manipulation}
  .terminal-page .terminal-overview .hour-window{grid-column:1;grid-row:3}
  .terminal-page .terminal-overview .score-hud{grid-column:1;grid-row:4;max-width:none;border-left:0;border-top:1px solid var(--border);padding:8px 0 0}
 }
+
+
+/* Segment actions open the ticket without reserving a sidebar. */
+.terminal-page .workspace{grid-template-columns:minmax(0,1fr)}
+.segment-action{display:block;align-self:stretch;min-height:44px;margin-top:5px;padding:8px 14px;border:1px solid var(--green);border-radius:7px;background:var(--raised);color:var(--green);font-size:12px;font-weight:600;cursor:pointer;text-align:center}
+.segment-action:hover{background:var(--surface)}
+.segment-action:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+.market-card.settled .segment-action,.market-card.queued .segment-action{border-color:var(--border);color:var(--text)}
+#prediction-dialog{width:min(440px,calc(100vw - 24px));max-width:none;max-height:calc(100dvh - 24px);padding:0;overflow-y:auto;overscroll-behavior:contain}
+#prediction-dialog .ticket{position:static;top:auto;width:100%;min-width:0;box-sizing:border-box;border:0;margin:0;padding:16px}
+.prediction-popup-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.prediction-popup-header h2{font-size:19px;margin:0}
+.prediction-popup-header button{min-width:44px;min-height:44px}
+#prediction-dialog #stake{font-size:16px}
+@media(max-width:480px){
+ #prediction-dialog{width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}
+ #prediction-dialog .ticket{padding:14px}
+
+}
+
+
+/* Segment actions sit beside the time range in a compact header. */
+.terminal-page .market-card{--action-bg:#44484d;--action-fg:#fff;--action-border:#686d73;--action-edge:#2b2e32;--action-hover:#555b61}
+.terminal-page .market-card.settled{--action-bg:#3c5362;--action-fg:#f4f8fb;--action-border:#69818f;--action-edge:#273c49;--action-hover:#4b6575}
+.terminal-page .market-card.queued{--action-bg:#765a2b;--action-fg:#fff8e8;--action-border:#a88c51;--action-edge:#503b19;--action-hover:#8a6b34}
+[data-theme="light"] .terminal-page .market-card{--action-bg:#e1e3e6;--action-fg:#202326;--action-border:#b6bbc1;--action-edge:#969da5;--action-hover:#d1d5d9}
+[data-theme="light"] .terminal-page .market-card.settled{--action-bg:#d5e1e7;--action-fg:#203f50;--action-border:#91a8b5;--action-edge:#708b9b;--action-hover:#c2d3dd}
+[data-theme="light"] .terminal-page .market-card.queued{--action-bg:#f0d590;--action-fg:#51380f;--action-border:#b9954e;--action-edge:#927133;--action-hover:#e7c575}
+.terminal-page .market-card .segment-price{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 12px}
+.terminal-page .market-card .segment-price-values{display:inline-flex;align-items:center;flex:1 1 100px;flex-wrap:wrap;gap:4px 6px;min-width:0;max-width:none}
+.terminal-page .market-card .segment-price-values>:is(.initial-price,.settlement-price){white-space:nowrap}
+.terminal-page .market-card.settled .segment-price{padding:0;background:none}
+.terminal-page .market-card.settled .segment-price-values{padding:5px 7px;border-radius:5px;background:var(--surface)}
+.terminal-page .market-card .card-top .segment-action{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 112px;align-self:flex-start;gap:8px;width:112px;min-height:36px;margin:0;padding:6px 10px;background:var(--action-bg);color:var(--action-fg);border:1px solid var(--action-border);border-bottom:2px solid var(--action-edge);border-radius:6px;font-size:14px;font-weight:600;line-height:1.2;white-space:nowrap;box-shadow:0 1px 2px #0002}
+.terminal-page .market-card .card-top .segment-action:hover{background:var(--action-hover)}
+.terminal-page .market-card .card-top .segment-action:active{transform:translateY(1px);box-shadow:none}
+.terminal-page .market-card .card-top .segment-action:focus-visible{outline:2px solid var(--text);outline-offset:3px}
+.terminal-page .market-card .card-top{display:flex;align-items:center;justify-content:flex-start;gap:8px 12px}
+.terminal-page .market-card .card-top .card-time{font-size:16px;font-weight:600;line-height:1.3;white-space:nowrap;letter-spacing:0}
+.terminal-page .market-card .segment-meta{display:inline-flex;align-items:center;gap:6px;margin-left:auto}
+.terminal-page .market-card .segment-meta .segment-countdown{margin:0;white-space:nowrap;font-size:11px}
+.segment-action-icon{width:20px;height:20px;flex:0 0 20px}
+@media(max-width:600px),(pointer:coarse){.terminal-page .market-card .card-top .segment-action{min-height:44px}}
+
+.hour-winner{display:inline-flex;align-items:center;gap:4px;align-self:flex-end;font-size:11px;font-weight:700;color:var(--text)}
+.hour-winner[hidden]{display:none}
+
+/* Laptop workspace: readable cards with less header and chart height. */
+.terminal-page .market-workspace{min-width:0}
+.terminal-page .market-card{min-width:0}
+.terminal-page .card-top{gap:6px;flex-wrap:wrap}
+.terminal-page .card-distance,.terminal-page .segment-price{white-space:normal;overflow-wrap:anywhere}
+.terminal-page .segment-action{margin-top:auto}
+.terminal-page .terminal-overview .score-hud-result .hour-winner{color:var(--text);font-weight:700}
+@media(min-width:901px) and (max-height:900px){
+ .terminal-page main{padding-top:8px}
+ .terminal-page .topbar{padding-block:5px;gap:5px 12px!important}
+ .terminal-page .topbar .coin-button{min-height:36px;padding:4px 8px}
+ .terminal-page .terminal-overview.overview{padding:7px 10px!important}
+ .terminal-page .timeline-stack{--chart-height:64px}
+ .terminal-page .tier{padding-top:5px;margin-bottom:6px}
+ .terminal-page .market-card{min-height:0!important;padding:7px 10px!important;gap:4px!important}
+ .terminal-page .market-card .card-benchmark{font-size:16px;line-height:1.25}
+ .terminal-page .market-card .segment-price{font-size:16px}
+ .terminal-page .market-card .chance-row{font-size:12px}
+ .terminal-page .market-card .segment-result{font-size:24px}
+ .terminal-page .segment-action{min-height:36px;padding:6px 12px}
+ .terminal-page .rules-strip{margin-block:4px;padding-block:4px}
+}
+@media(min-width:901px) and (max-width:1200px){
+ .terminal-page .terminal-overview .overview-top{grid-template-columns:minmax(150px,1fr) auto auto minmax(210px,auto)}
+ .terminal-page .terminal-overview .price-clock,.terminal-page .terminal-overview .hour-window,.terminal-page .terminal-overview .score-hud{grid-row:auto;grid-column:auto}
+ .terminal-page .terminal-overview .price-clock{padding-inline:8px;border-inline:1px solid var(--border)}
+ .terminal-page .terminal-overview .spot{font-size:21px;flex-wrap:wrap}
+ .terminal-page .terminal-overview .spot>#btc-change{font-size:10px}
+}
+
+/* Keep laptop navigation to two deliberate rows. */
+@media(min-width:601px) and (max-width:1499px){
+ .terminal-page .topbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto}
+ .terminal-page .topbar>.brand{grid-column:1;grid-row:1}
+ .terminal-page .topbar .workspace-label:has(.coin-picker){grid-column:2/-1;grid-row:1;width:100%}
+ .terminal-page .topbar-right{grid-column:1/3;grid-row:2;flex-basis:auto;margin:0;flex-wrap:nowrap}
+ .terminal-page .topbar>.account-link{grid-column:3;grid-row:2;justify-self:end}
+ .terminal-page .topbar-right .account-balance>strong{font-size:19px}
+ .terminal-page .topbar .account-identity .signed-in-name{max-width:120px;font-size:12px}
+ .terminal-page .terminal-overview .score-hud-result{display:grid;grid-template-columns:auto auto;align-items:center;gap:3px 6px}
+ .terminal-page .terminal-overview .score-hud-result>span:last-child{grid-column:1/-1}
+ .terminal-page .terminal-overview .score-hud-result>strong{grid-column:2}
+}
+@media(min-width:601px) and (max-width:1000px){
+ .terminal-page .topbar-right .community-counts{display:none}
+ .terminal-page .topbar .portfolio-icon{font-size:11px;padding:8px}
+ .terminal-page .topbar .account-identity .signed-in-name{max-width:80px}
+}
+
+/* Phones use readable segment cards below a full-width hourly chart. */
+@media(max-width:600px){
+ .terminal-page main{padding:8px 10px 0}
+ .terminal-page .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;padding:8px 10px;gap:6px 10px!important}
+ .terminal-page .topbar>.brand{grid-column:1;grid-row:1;font-size:17px}
+ .terminal-page .topbar>.account-link{grid-column:2;grid-row:1;min-height:44px;display:flex;align-items:center;font-size:11px}
+ .terminal-page .topbar-right{grid-column:1/-1;grid-row:2;flex-basis:auto;width:100%;margin:0;gap:6px}
+ .terminal-page .topbar-right .community-counts{display:none}
+ .terminal-page .account-balance{order:-1;margin-right:auto}
+ .terminal-page .topbar-right .account-balance>strong{font-size:clamp(14px,4.4vw,18px)}
+ .terminal-page .topbar .theme-toggle,.terminal-page .topbar #rules-open{width:44px;height:44px;flex-shrink:0}
+ .terminal-page .topbar .portfolio-icon{width:44px;height:44px;padding:10px;justify-content:center}
+ .terminal-page .topbar .portfolio-icon>span{display:none}
+ .terminal-page .account-identity{flex-basis:100%;justify-content:flex-end;gap:8px}
+ .terminal-page .account-identity .signed-in-name{max-width:160px;font-size:12px}
+ .terminal-page .account-identity:has([data-logout][hidden]){display:none}
+ .terminal-page .account-identity .account-link{min-height:44px;display:inline-flex;align-items:center}
+ .terminal-page .topbar .workspace-label:has(.coin-picker){grid-column:1/-1;grid-row:3;width:100%;gap:8px;overflow-x:auto;overscroll-behavior-x:contain}
+ .terminal-page .category-switch{min-height:44px;display:flex;align-items:center;font-size:11px;white-space:nowrap}
+ .terminal-page .topbar .coin-button{min-height:44px;padding:6px 9px;font-size:12px}
+ .terminal-page .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto;gap:8px}
+ .terminal-page .terminal-overview .price-summary{grid-column:1;grid-row:1}
+ .terminal-page .terminal-overview .price-heading{flex-wrap:wrap;gap:4px}
+ .terminal-page .terminal-overview .price-context{margin-left:0}
+ .terminal-page .terminal-overview .spot{font-size:22px;flex-wrap:wrap;gap:3px;margin-top:0}
+ .terminal-page .terminal-overview .spot>#btc-change{flex-basis:100%;margin-left:0;font-size:11px}
+ .terminal-page .terminal-overview .price-clock{grid-column:2;grid-row:1;flex-direction:column;align-items:flex-end;gap:4px;border:0;padding:0}
+ .terminal-page .terminal-overview .price-clock strong{font-size:12px}
+ .terminal-page .terminal-overview .hour-window{grid-column:1/-1;grid-row:2;width:100%;align-items:stretch;border-top:1px solid var(--border);padding-top:8px}
+ .terminal-page .terminal-overview .window-heading{justify-content:space-between}
+ .terminal-page .terminal-overview .hour-time-navigation{justify-content:space-between;gap:8px}
+ .terminal-page .terminal-overview .hour-time-navigation button{width:44px;height:44px}
+ .terminal-page .terminal-overview .hour-time-navigation>#hour-window-label{font-size:17px}
+ .terminal-page .terminal-overview .score-hud{grid-column:1/-1;grid-row:3;max-width:none;padding:8px 0 0;border:0;border-top:1px solid var(--border)}
+ .terminal-page .terminal-overview .score-history-button{min-height:36px;display:flex;align-items:center;justify-self:start;font-size:11px}
+ .terminal-page .market-status-strip{margin-top:6px}
+ .terminal-page .selected-status{font-size:11px;gap:6px;line-height:1.5}
+ .terminal-page .data-health{gap:4px 8px;font-size:10px;line-height:1.4}
+ .terminal-page .data-health strong{flex-basis:100%;margin-left:0}
+ .terminal-page .timeline-scroll{overflow:visible;padding-bottom:0}
+ .terminal-page .timeline-stack{min-width:0;--chart-height:96px}
+ .terminal-page .hour-chart{margin-left:0}
+ .terminal-page .chart-coin-icon{display:none}
+ .terminal-page .interval-guides{left:1px}
+ .terminal-page .time-cursor{display:none}
+ .terminal-page .tier{display:block;padding-top:8px;margin-bottom:12px}
+ .terminal-page .tier-label{display:flex;align-items:baseline;gap:5px;margin-bottom:6px;font-size:18px;line-height:1.3}
+ .terminal-page .tier-label small{font-size:11px}
+ .terminal-page .tier-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:8px}
+ .terminal-page .market-card{min-height:0!important;padding:12px!important;gap:8px!important}
+ .terminal-page .tier[data-duration] .market-card::before,.terminal-page .tier[data-duration] .market-card::after{display:none}
+ .terminal-page .card-top{justify-content:space-between;font-size:12px}
+ .terminal-page .card-time{font-size:13px}
+ .terminal-page .market-card .badge{font-size:10px}
+ .terminal-page .market-card .segment-price{font-size:20px;flex-wrap:wrap;line-height:1.4}
+ .terminal-page .market-card .segment-countdown{font-size:13px}
+ .terminal-page .market-card .card-distance{font-size:12px}
+ .terminal-page .market-card .chance-row{font-size:15px;gap:10px}
+ .terminal-page .segment-action{min-height:44px;font-size:14px}
+ .terminal-page .positions-heading{gap:8px}
+ .terminal-page .positions-heading h2{font-size:13px}
+ .terminal-page .pending-history-link{min-height:44px;font-size:11px;padding:8px}
+ .terminal-page .position-row{flex-wrap:wrap;gap:8px;font-size:12px}
+ .terminal-page .rules-strip p{min-width:0;flex-basis:calc(100% - 30px);font-size:11px;line-height:1.5}
+ .terminal-page .rules-strip button{min-height:44px;font-size:12px}
+}
+
+/* Dialogs remain usable with the phone keyboard and browser bars visible. */
+.terminal-page:has(dialog[open]){overflow:hidden}
+#prediction-dialog,#review-dialog,#rules-dialog{max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain;scroll-padding-block:64px}
+#prediction-dialog .prediction-popup-header{position:sticky;top:-16px;z-index:2;background:var(--surface);padding-block:4px}
+@media(pointer:coarse){.segment-action,.ticket .stake-presets button,.review-actions button{min-height:44px}}
+@media(max-width:600px){
+ #prediction-dialog,#review-dialog,#rules-dialog{width:calc(100vw - 16px);max-width:480px;max-height:calc(100dvh - 16px)}
+ #review-dialog,#rules-dialog{padding:16px}
+ #prediction-dialog .ticket{padding:14px;padding-bottom:max(14px,env(safe-area-inset-bottom))}
+ #prediction-dialog .prediction-popup-header{top:-14px}
+ .ticket .stake-presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+ .ticket .stake-presets button{min-height:44px;font-size:13px}
+ #review-dialog .dialog-top{gap:8px;align-items:center}
+ #review-dialog .review-close,#rules-dialog .icon-button{width:44px;height:44px;flex-shrink:0}
+ #review-dialog .review-actions{flex-wrap:wrap}
+ #review-dialog .review-actions button{min-height:48px}
+ .ticket .ticket-status-line{flex-wrap:wrap;gap:8px}
+ .ticket .order-math>div{gap:8px}
+ .ticket .order-math strong{white-space:nowrap}
+ #notification{max-width:calc(100vw - 24px);width:max-content;bottom:max(12px,env(safe-area-inset-bottom));font-size:12px}
+}
+
+@media(min-width:601px) and (max-width:900px){
+ .terminal-page .topbar-right{min-width:0;flex-wrap:wrap}
+ .terminal-page .terminal-overview .hour-window{margin-left:0}
+}
+
+.terminal-page .market-card.open .chance-block{align-self:stretch}
+[data-theme="light"] .terminal-page .market-card.open{background:#fff;color:var(--text)}
+[data-theme="light"] .terminal-page .market-card.open:hover{background:#eef1f3}

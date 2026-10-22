@@ -3,11 +3,12 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 const {createCatalog}=require('./coins.js');
+const pageIds=new Set([...fs.readFileSync('index.html','utf8').matchAll(/\bid="([^"]+)"/g)].map(match=>match[1]));
 async function run(protocol,fetch,category='crypto',accountOptions={}){
  const elements=new Map(),loaded=[],buttons=[],listeners=new Map(),timers=[];
  let now=1800000300000;
  const element=id=>{if(!elements.has(id))elements.set(id,{textContent:'Connecting…',hidden:true,addEventListener(){},append(){},replaceChildren(...children){buttons.push(...children);},querySelectorAll(){return buttons;},setAttribute(){},dataset:{}});return elements.get(id);};
- const document={body:{dataset:{},style:{setProperty(){}}},getElementById:element,querySelector:()=>element('picker'),createElement:()=>({dataset:{},attributes:{},setAttribute(name,value){this.attributes[name]=value;},addEventListener(){},append(){}}),head:{append(script){loaded.push(script.src);script.onload();}}};
+ const document={body:{dataset:{},style:{setProperty(){}}},getElementById:id=>pageIds.has(id)?element(id):null,querySelector:()=>element('picker'),createElement:()=>({dataset:{},attributes:{},setAttribute(name,value){this.attributes[name]=value;},addEventListener(){},append(){}}),head:{append(script){loaded.push(script.src);script.onload();}}};
  const context={document,location:{protocol,search:'?category='+category,reload(){}},window:{addEventListener(name,handler){listeners.set(name,handler);},Predict60Account:{loaded:Promise.resolve(),user:{},predictions:[],...accountOptions},PredictCoinCatalog:{createCatalog},PredictModel:{configure(){}}},fetch:async(url,...args)=>url==='/api/categories'?{ok:true,json:async()=>({categories:[{id:'crypto',name:'Crypto'},{id:'oil',name:'Oil'}]})}:fetch(url,...args),URLSearchParams,AbortSignal,AbortController,setTimeout,clearTimeout,setInterval(handler){timers.push(handler);return timers.length;},clearInterval(){},Date:{now:()=>now},Error,TypeError,SyntaxError};
  await vm.runInNewContext(fs.readFileSync('bootstrap.js','utf8'),context);
  return {elements,loaded,window:context.window,document,buttons,listeners,tick(value){now=value;timers.forEach(handler=>handler());}};

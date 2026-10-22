@@ -36,8 +36,8 @@ Prediction budgets are limited to **1–1,000 credits** per submission, enforced
 the server and browser. Credits are game points; market prices remain USD.
 Hourly contests start with 1,000 credits per user. Settled winnings can be reused during
 the hour; the final score is ending credits minus 1,000, with a live net gain/loss tally
-and final winners. Daily contests are disabled. New hourly credits unlock after prior
-winners are finalized; missing benchmarks delay the reset.
+and final winners. Daily contests are disabled. Every player starts each GMT hour with a fresh 1,000 credits. Prior winners are
+finalized after all segments settle; missing benchmarks delay results, not the reset.
 Open **Contests & winners** to play or inspect results. Sponsor and prize setup is
 documented in [contest operations](doc/CONTEST_OPERATIONS.md);
 [revenue research](doc/CONTEST_REVENUE_PLAN.md) covers provider options.
@@ -239,7 +239,7 @@ Tests cover market calculations, catalog/bootstrap behavior, portfolio summaries
 
 ## Data and catalog
 
-New installations use `data/p60.sqlite3`; `PREDICT60_DB` or `P60_DB` selects another path. Existing `data/btc60.sqlite3` databases remain in use when the new default does not exist. Legacy `BTC60_*` environment variables remain fallbacks after `PREDICT60_*` and `P60_*`. Session cookies and browser theme storage now use the `p60_` prefix; users must sign in again and reselect their theme after upgrading. Startup creates missing tables and applies catalog migrations. Players receive 1,000 contest credits per hour, with the next allowance unlocking after prior results are finalized. Browser-only positions are not imported. Database files and backups are excluded from Git.
+New installations use `data/p60.sqlite3`; `PREDICT60_DB` or `P60_DB` selects another path. Existing `data/btc60.sqlite3` databases remain in use when the new default does not exist. Legacy `BTC60_*` environment variables remain fallbacks after `PREDICT60_*` and `P60_*`. Session cookies and browser theme storage now use the `p60_` prefix; users must sign in again and reselect their theme after upgrading. Startup creates missing tables and applies catalog migrations. Players receive 1,000 contest credits per hour, resetting independently at each GMT hour boundary. Browser-only positions are not imported. Database files and backups are excluded from Git.
 
 The database `coins` table is authoritative. The crypto seed has ten records: BTC, ETH, SOL, XRP, DOGE, ADA, and LTC enabled; LINK, TRUMP, and AVAX disabled. Existing databases can have administrator edits. Triggers allow at most eight enabled instruments per category. Disabling a coin blocks new orders while preserving history and settlement. Keep referenced symbols and product mappings stable.
 

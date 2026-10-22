@@ -1016,11 +1016,10 @@ class Handler(SimpleHTTPRequestHandler):
             else:
                 if time.time() >= end - 30:
                     raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
-                conn.execute('INSERT INTO predictions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', (secrets.token_hex(16), session['user_id'], request_id, coin, market_id, side, start, end, strike, cents, contracts, cost, now))
-                conn.execute('INSERT INTO prediction_sources VALUES(?,?,?)',(conn.execute('SELECT id FROM predictions WHERE user_id=? AND request_id=?',(session['user_id'],request_id)).fetchone()['id'],source['feed'],source['product']))
-                if mode == 'contest':
-                    prediction_id = conn.execute('SELECT id FROM predictions WHERE user_id=? AND request_id=?', (session['user_id'], request_id)).fetchone()['id']
-                    contests.enter(conn, prediction_id, session['user_id'], coin, start, end, cost)
+                prediction_id = secrets.token_hex(16)
+                conn.execute('INSERT INTO predictions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', (prediction_id, session['user_id'], request_id, coin, market_id, side, start, end, strike, cents, contracts, cost, now))
+                conn.execute('INSERT INTO prediction_sources VALUES(?,?,?)', (prediction_id, source['feed'], source['product']))
+                contests.enter(conn, prediction_id, session['user_id'], coin, start, end, cost)
                 created = True
         if created:
             LOG.info('Prediction created user=%s coin=%s market=%s side=%s cost_cents=%s',

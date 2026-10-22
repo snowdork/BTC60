@@ -9,8 +9,8 @@ You do not need to install Python or Docker on your own computer. New signups
 require the secret signup code provided by the organizer, an 8–16-character
 password, and a matching verification password. Show/Hide controls reveal or
 conceal the signup code and password fields. Existing accounts can
-log in without the code. Sign up or log in, then choose **Crypto** from the category screen. Players receive 1,000 contest credits each hour, with the next allowance
-unlocking after prior results are finalized. Accounts and saved predictions belong to that installation;
+log in without the code. Sign up or log in, then choose **Crypto** from the category screen. Players receive 1,000 contest credits each hour, resetting independently
+at each GMT hour boundary. Accounts and saved predictions belong to that installation;
 a separate local installation does not automatically share them.
 
 For local use, run `python3 server.py` from the project folder and open
@@ -121,6 +121,19 @@ then choose the category you want to play. No real money is used.
 
 OilPriceAPI mode shows dated physical spot assessments for all five crudes. These series do not provide minute settlement benchmarks, so hourly oil predictions are unavailable; Crypto continues normally.
 
+## Laptop and phone displays
+
+On a laptop, the chart and the 60-, 30-, and 15-minute segment rows share one
+hourly timeline. Compact navigation and cards leave more room for predictions.
+On phone screens up to 600 pixels wide, the chart fits the screen and segments
+stack by duration. Swipe the instrument picker to choose another coin.
+
+Tap **Predict** on an open segment to open the prediction popup, select Up or
+Down, enter a budget, and review before confirming. Tap **Result** on a closed
+segment to see its outcome and your returns. **Details** describes an upcoming
+segment. Popups scroll on short screens; use the close button or Escape to close
+them. The hourly balance and last-hour results remain in the header.
+
 ## Hourly contests
 
 The game uses **Hourly contest** only. Each user starts with 1,000 credits
@@ -130,8 +143,10 @@ score is ending credits minus 1,000. Unspent
 credits do not carry forward.
 
 At HH:00 GMT the contest closes. Final winners and results are saved after all
-predictions settle, then the next hourly allowance unlocks. If a price benchmark
-is unavailable, results and the credit reset wait; no winner is guessed. GMT is
+predictions settle. Every player starts the next GMT hour with a fresh 1,000 credits.
+If a price benchmark is unavailable, results wait while the new hour continues;
+no winner is guessed. A trophy marked Winner appears in Last hour for finalized
+first-place results, including ties. GMT is
 UTC+00:00 year-round. The highest net tally wins, including when all tallies are
 negative. Ties share first place; an empty hour has no winner.
 

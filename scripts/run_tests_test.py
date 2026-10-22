@@ -28,6 +28,10 @@ class TestResultReporterTest(unittest.TestCase):
         output = 'ℹ tests 59\nℹ pass 57\nℹ fail 1\nℹ skipped 1\n'
         self.assertEqual(run_tests.parse_counts(output, 1), (59, 57, 1, 1))
 
+    def test_parses_node_tap_summary(self):
+        output = '# tests 87\n# pass 85\n# fail 1\n# skipped 1\n'
+        self.assertEqual(run_tests.parse_counts(output, 1), (87, 85, 1, 1))
+
     def test_parses_python_test_summary(self):
         output = 'Ran 40 tests in 1.250s\n\nFAILED (failures=2, errors=1, skipped=3)'
         self.assertEqual(run_tests.parse_counts(output, 1), (40, 34, 3, 3))
