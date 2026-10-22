@@ -132,16 +132,16 @@ To reset a host database, stop its server first, then run:
 
 ```bash
 scripts/stop-server.sh
-scripts/reset-database.sh --confirm-reset
+scripts/reset-database.sh --local --confirm-reset
 # Or select an explicit database:
-# scripts/reset-database.sh --db /path/to/p60.sqlite3 --confirm-reset
+# scripts/reset-database.sh --local --db /path/to/p60.sqlite3 --confirm-reset
 ```
 
 Reset backs up an existing database under its adjacent `backups/` directory,
 clears users, sessions, predictions, and settlements, and restores seeded
 catalogs. It prints the exact database path and verifies that user/session/prediction/settlement
 counts are zero. The selected database must already exist. It requires `--confirm-reset` and refuses to reset a database held by
-a running server. It uses `PREDICT60_DB` or the default checkout database, does
+a running server. With `--local`, it uses `PREDICT60_DB` or the default checkout database, does
 not read `.env` files, and does not reset a Docker volume's database. Run
 `python3 scripts/restart-server.py` afterward when ready to resume.
 
@@ -164,12 +164,13 @@ python3 scripts/run_tests.py
 
 ### Reset a deployed database
 
-Select the runtime explicitly so the reset targets its database:
+Docker is the default runtime. Use `--service` for systemd or `--local` for the
+checkout database; there is no fallback to a different runtime if Docker fails:
 
 ```bash
 sudo scripts/reset-database.sh --service --confirm-reset
 # Or Docker (use sudo if required for Docker access):
-scripts/reset-database.sh --docker --confirm-reset
+scripts/reset-database.sh --confirm-reset  # Docker by default
 # If multiple Predict60 app containers exist:
 scripts/reset-database.sh --docker --container p60-local --confirm-reset
 ```
@@ -188,9 +189,40 @@ The app remains stopped, including after a reset failure; resume with
 `docker start CONTAINER_NAME`. The backup stays in the data volume beside the
 database under `backups/`. Other containers, including Caddy, keep running.
 
-Both modes require `--confirm-reset`; they cannot be combined. `--db PATH`
-overrides the database path, inside the container for Docker. With neither flag,
-the command resets the checkout database selected by the current environment.
-It does not automatically load systemd configuration or select Docker volumes.
+Reset always requires `--confirm-reset`. `--docker`, `--service`, and `--local`
+are mutually exclusive; omitting them selects Docker. `--db PATH` overrides the
+database path inside the selected runtime, so a host path requires `--local`
+or `--service`. `--local` uses the checkout database and current environment.
 Reset prints the exact selected path and verifies zero users, sessions,
 predictions, and settlements after backing up existing data.
+
+## List usernames and password storage
+
+```bash
+scripts/list-usernames.py  # Docker by default
+scripts/list-usernames.py --local --db /path/to/p60.sqlite3
+sudo scripts/list-usernames.py --service
+scripts/list-usernames.py --docker
+scripts/list-usernames.py --docker --container p60-local
+# For a running Docker app (replace the container name if needed):
+docker exec p60-local python3 scripts/database.py usernames
+```
+
+The command prints account display names, one per line, using a read-only
+connection. Login uses email addresses; display names are not unique login IDs.
+It does not print emails, hashes, salts, or session tokens. An empty database
+prints no names. A missing database produces an error without creating a file.
+`--service` reads the service configuration and runs as its user. `--docker`
+uses the app container image and volumes; select `--container NAME` if multiple
+app containers exist. Both flags leave the app running (or stopped) as it was.
+Use sudo when needed for Docker or service configuration access. Docker images must be rebuilt to include the new
+`database.py usernames` command. Docker is the default when no deployment flag
+is supplied. Use `--local` for the checkout database and current environment;
+`--db` alone still selects a path inside Docker. `--service`, `--docker`, and
+`--local` are mutually exclusive. Docker supports stopped containers as well as running ones.
+
+Passwords are stored as scrypt hashes (`n=16384`, `r=8`, `p=1`) with a unique
+random 16-byte salt per password. Signup and password changes store the hash
+and salt; login verifies the derived hash with a constant-time comparison.
+Original passwords cannot be retrieved by these tools. This protects password
+values; it does not encrypt the whole SQLite database.

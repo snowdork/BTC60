@@ -68,6 +68,14 @@ def status(path):
             raise ValueError('Database integrity or foreign-key check failed.')
 
 
+def list_usernames(path):
+    """Print display names only, using a read-only connection."""
+    with closing(readonly(path)) as conn:
+        for (name,) in conn.execute('SELECT name FROM users ORDER BY name COLLATE NOCASE, id'):
+            # Keep each stored name on one output line, including unusual input.
+            print(str(name).replace('\r', r'\r').replace('\n', r'\n'))
+
+
 def reset(path):
     """Back up the database before clearing account state and restoring seeded catalogs."""
     with maintenance_lock(path):
@@ -100,7 +108,7 @@ def reset(path):
 def main():
     """Parse maintenance commands and enforce locks and explicit reset confirmation."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['init', 'backup', 'status', 'reset'])
+    parser.add_argument('command', choices=['init', 'backup', 'status', 'reset', 'usernames'])
     parser.add_argument('--db', type=Path, default=server.DB, help='SQLite path (default: PREDICT60_DB or project data/p60.sqlite3)')
     parser.add_argument('--confirm-reset', action='store_true', help='Required for reset; clears all account/order data after backup')
     parser.add_argument('--backup-dir', type=Path, help='Optional destination for the backup command')
@@ -117,6 +125,8 @@ def main():
             print(f'Backup saved: {backup(path, args.backup_dir.expanduser().resolve() if args.backup_dir else None)}')
         elif args.command == 'status':
             status(path)
+        elif args.command == 'usernames':
+            list_usernames(path)
         elif args.command == 'reset':
             if not args.confirm_reset:
                 raise ValueError('Reset clears users, sessions, predictions, and settlements. Re-run with --confirm-reset to back up and reset.')

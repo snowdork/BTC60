@@ -168,8 +168,8 @@ scripts/stop-server.sh
 
 Use `scripts/stop-docker.sh` to stop Predict60 Docker containers while preserving
 volumes. For a backed-up database reset, stop its server and run
-`scripts/reset-database.sh --confirm-reset`. For deployed databases, select
-`--service` or `--docker`; see [stop and reset commands](deploy/LOCAL.md#stop-and-reset-commands).
+`scripts/reset-database.sh --confirm-reset`. Docker is the default; select
+`--service` for systemd or `--local` for the checkout database; see [stop and reset commands](deploy/LOCAL.md#stop-and-reset-commands).
 
 This stops the watchdog and server and writes `data/server.stopped`, preventing
 automatic restarts. Run `restart-server.py` again to clear the marker and resume.

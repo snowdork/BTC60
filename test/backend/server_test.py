@@ -51,6 +51,25 @@ class AccountsTest(unittest.TestCase):
         conn.close()
         return result
 
+    def test_password_storage_uses_unique_salted_scrypt_hashes(self):
+        password = 'same-password'
+        for index in range(2):
+            response = self.request('POST', '/api/signup', {
+                'name': f'Hash {index}', 'email': f'hash-{index}@example.com',
+                'password': password, 'confirmPassword': password, 'signupCode': '777'})
+            self.assertEqual(response[0], 200)
+        with server.connect() as conn:
+            rows = conn.execute('SELECT password_hash,salt FROM users ORDER BY id').fetchall()
+        self.assertEqual(len(rows), 2)
+        self.assertNotEqual(rows[0]['salt'], rows[1]['salt'])
+        self.assertNotEqual(rows[0]['password_hash'], rows[1]['password_hash'])
+        for row in rows:
+            self.assertNotEqual(row['password_hash'], password)
+            self.assertEqual(len(bytes.fromhex(row['salt'])), 16)
+            expected = server.hashlib.scrypt(password.encode(), salt=bytes.fromhex(row['salt']),
+                                             n=16384, r=8, p=1).hex()
+            self.assertEqual(row['password_hash'], expected)
+
     def test_prediction_credit_cap_is_enforced_without_debiting_rejections(self):
         _, _, cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-cap', 'signupCode': '777',
             'name': 'Cap', 'email': 'cap@example.com', 'password': 'pass-cap',

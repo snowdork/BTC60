@@ -14,7 +14,7 @@ class MaintenanceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             db = Path(folder) / 'deployed.sqlite3'
             wrapper = SCRIPT.with_name('reset-database.sh')
-            command = ['bash', str(wrapper), '--db', str(db), '--confirm-reset']
+            command = ['bash', str(wrapper), '--local', '--db', str(db), '--confirm-reset']
             missing = subprocess.run(command, capture_output=True, text=True)
             self.assertNotEqual(missing.returncode, 0)
             self.assertFalse(db.exists())
@@ -31,6 +31,24 @@ class MaintenanceTest(unittest.TestCase):
             saved, = (db.parent / 'backups').glob('*.sqlite3')
             with sqlite3.connect(saved) as conn:
                 self.assertEqual(conn.execute('SELECT count(*) FROM users').fetchone()[0], 1)
+
+    def test_list_usernames_outputs_names_only_and_requires_existing_database(self):
+        with tempfile.TemporaryDirectory() as folder:
+            db = Path(folder) / 'users.sqlite3'
+            script = SCRIPT.with_name('list-usernames.py')
+            command = [sys.executable, str(script), '--local', '--db', str(db)]
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(db.exists())
+            subprocess.run([sys.executable, str(SCRIPT), 'init', '--db', str(db)],
+                           check=True, capture_output=True)
+            with sqlite3.connect(db) as conn:
+                for name in ('Zoe', 'Alice'):
+                    conn.execute("INSERT INTO users(name,email,password_hash,salt,created_at) VALUES(?,?,?,?,0)",
+                                 (name, name + '@example.com', 'private-hash', 'private-salt'))
+            result = subprocess.run(command, cwd='/tmp', capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, 'Alice\nZoe\n')
 
     def test_init_backup_reset_and_lock(self):
         with tempfile.TemporaryDirectory() as folder:

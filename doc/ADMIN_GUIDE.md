@@ -155,8 +155,10 @@ the database without deleting existing account data and requires a stopped serve
 Options include `--db PATH` and, for backup, `--backup-dir PATH`. Use the same
 database path in maintenance commands and `PREDICT60_DB` for server startup.
 
-`scripts/reset-database.sh --confirm-reset` (also available as
-`python3 scripts/database.py reset --confirm-reset`) is destructive: it backs up an existing
+`scripts/reset-database.sh --confirm-reset` resets Docker by default. Use
+`--service` for systemd or `--local` for the checkout database. The local form
+is also available as `python3 scripts/database.py reset --confirm-reset`. Reset
+is destructive: it backs up an existing
 database, clears accounts, sessions, predictions, and settlements, and restores
 seed catalogs. Stop the server first. See
 [Database maintenance](DATABASE_MAINTENANCE.md) for the detailed procedure.
@@ -200,3 +202,34 @@ The scripts suite covers database operations and isolated watchdog lifecycle,
 including log-level retention across crashes and manual restarts. Integration
 tests require permission to bind local loopback sockets. Any command's `--help`
 prints its supported parameters.
+
+## List usernames and password storage
+
+```bash
+scripts/list-usernames.py  # Docker by default
+scripts/list-usernames.py --local --db /path/to/p60.sqlite3
+sudo scripts/list-usernames.py --service
+scripts/list-usernames.py --docker
+scripts/list-usernames.py --docker --container p60-local
+# For a running Docker app (replace the container name if needed):
+docker exec p60-local python3 scripts/database.py usernames
+```
+
+The command prints account display names, one per line, using a read-only
+connection. Login uses email addresses; display names are not unique login IDs.
+It does not print emails, hashes, salts, or session tokens. An empty database
+prints no names. A missing database produces an error without creating a file.
+`--service` reads the service configuration and runs as its user. `--docker`
+uses the app container image and volumes; select `--container NAME` if multiple
+app containers exist. Both flags leave the app running (or stopped) as it was.
+Use sudo when needed for Docker or service configuration access. Docker images must be rebuilt to include the new
+`database.py usernames` command. Docker is the default when no deployment flag
+is supplied. Use `--local` for the checkout database and current environment;
+`--db` alone still selects a path inside Docker. `--service`, `--docker`, and
+`--local` are mutually exclusive. Docker supports stopped containers as well as running ones.
+
+Passwords are stored as scrypt hashes (`n=16384`, `r=8`, `p=1`) with a unique
+random 16-byte salt per password. Signup and password changes store the hash
+and salt; login verifies the derived hash with a constant-time comparison.
+Original passwords cannot be retrieved by these tools. This protects password
+values; it does not encrypt the whole SQLite database.

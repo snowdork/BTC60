@@ -15,7 +15,7 @@ def output(command):
     return subprocess.check_output(command, text=True).strip()
 
 
-def reset_service(args):
+def reset_service(args, command_name='reset'):
     properties = {}
     for key in ('LoadState', 'User', 'WorkingDirectory', 'Environment', 'EnvironmentFiles'):
         properties[key] = output(['systemctl', 'show', 'predict60.service',
@@ -44,7 +44,9 @@ def reset_service(args):
     working = Path(properties['WorkingDirectory'])
     if not working.is_absolute():
         raise ValueError('Service WorkingDirectory must be an absolute path.')
-    command = [sys.executable, str(working / 'scripts/database.py'), 'reset', '--confirm-reset']
+    command = [sys.executable, str(working / 'scripts/database.py'), command_name]
+    if command_name == 'reset':
+        command.append('--confirm-reset')
     if args.db:
         command.extend(['--db', str(args.db.resolve())])
     # Match the service database environment without inheriting the caller's DB overrides.
@@ -57,12 +59,14 @@ def reset_service(args):
         import pwd
         if pwd.getpwuid(os.geteuid()).pw_name != user:
             raise ValueError('Run --service with sudo to reset as the service user.')
-    subprocess.run(['systemctl', 'stop', 'predict60.service'], check=True)
+    if command_name == 'reset':
+        subprocess.run(['systemctl', 'stop', 'predict60.service'], check=True)
     subprocess.run(command, cwd=working, env=env, check=True)
-    print('Service database reset. Service remains stopped; start with sudo systemctl start predict60.')
+    if command_name == 'reset':
+        print('Service database reset. Service remains stopped; start with sudo systemctl start predict60.')
 
 
-def reset_docker(args):
+def reset_docker(args, command_name='reset'):
     if args.container:
         ids = [args.container]
     else:
@@ -89,29 +93,44 @@ def reset_docker(args):
     if info['Config'].get('User'):
         command.extend(['--user', info['Config']['User']])
     command.extend(['-e', 'PREDICT60_DB=' + db, info['Image'],
-                    '/app/scripts/database.py', 'reset', '--confirm-reset'])
-    subprocess.run(['docker', 'stop', '--time', '30', info['Id']], check=True)
+                    '/app/scripts/database.py', command_name])
+    if command_name == 'reset':
+        command.append('--confirm-reset')
+    if command_name == 'reset':
+        subprocess.run(['docker', 'stop', '--time', '30', info['Id']], check=True)
     subprocess.run(command, check=True)
-    print('Docker database reset. App remains stopped; start it with docker start ' + info['Name'].lstrip('/'))
+    if command_name == 'reset':
+        print('Docker database reset. App remains stopped; start it with docker start ' + info['Name'].lstrip('/'))
+
+
+def deployment_options(parser):
+    """Share runtime selection between database commands; Docker is the default."""
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--service', dest='runtime', action='store_const', const='service',
+                      help='Use predict60.service database configuration')
+    mode.add_argument('--docker', dest='runtime', action='store_const', const='docker',
+                      help='Use the existing Predict60 app container and data volumes (default)')
+    mode.add_argument('--local', dest='runtime', action='store_const', const='local',
+                      help='Use the checkout database and current environment')
+    parser.set_defaults(runtime='docker')
+    parser.add_argument('--container', help='Select a Docker app container (also works with the default runtime)')
+    parser.add_argument('--db', type=Path,
+                        help='Override database path (inside the container for Docker)')
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument('--service', action='store_true', help='Use predict60.service configuration; stop the service first')
-    mode.add_argument('--docker', action='store_true', help='Use the existing Predict60 app container and its data volumes; stop the app first')
-    parser.add_argument('--container', help='Select a Predict60 app container with --docker')
-    parser.add_argument('--db', type=Path, help='Override database path (inside the container for --docker)')
+    deployment_options(parser)
     parser.add_argument('--confirm-reset', action='store_true', help='Required: back up and clear account/prediction data')
     args = parser.parse_args()
-    if args.container and not args.docker:
-        parser.error('--container requires --docker')
+    if args.container and args.runtime != 'docker':
+        parser.error('--container requires the Docker runtime')
     if not args.confirm_reset:
         parser.error('Reset clears account and prediction data; pass --confirm-reset.')
     try:
-        if args.service:
+        if args.runtime == 'service':
             reset_service(args)
-        elif args.docker:
+        elif args.runtime == 'docker':
             reset_docker(args)
         else:
             command = [sys.executable, str(ROOT / 'scripts/database.py'), 'reset', '--confirm-reset']
