@@ -47,7 +47,9 @@ also completes when another tab has already ended that session.
 
 ## Read the terminal
 
-Choose a coin using the header buttons. The default choices are BTC, ETH, SOL, XRP, DOGE, ADA, and LTC; administrators can change availability. Coin selection updates prices, chart, and market context. All coins share your account balance.
+Choose a coin using the icon grid beside the price. The default choices are BTC, ETH, SOL, XRP, DOGE, ADA, and LTC; administrators can change availability. Coin selection updates prices, chart, and market context. All coins share your account balance.
+
+Selecting a coin immediately requests a current price and shows **Loading…** while it arrives. If no valid, recent quote is available, the price reads **Data Not Available**. The terminal retries automatically; you do not need to refresh or switch coins again. Historical candles never substitute for a current quote, and predictions remain blocked until the required price and benchmark data are ready.
 
 Each UTC hour shows one 60-minute interval, two 30-minute intervals, and four 15-minute intervals. Select any card to inspect its benchmark and details in the ticket. Open cards accept predictions when data is ready. Upcoming and completed cards are read-only. A red dashed cursor shows the current UTC time across the chart and markets.
 
@@ -88,6 +90,7 @@ The sun/moon button switches themes and saves your preference across tabs. On sm
 | --- | --- |
 | Coins unavailable / terminal offline | On a hosted site, refresh and contact the administrator if it persists. For local use, start `python3 src/backend/server.py` and open the localhost URL. |
 | Price feed disconnected or stale | Check internet access and use Reconnect; wait for a fresh live update. |
+| Data Not Available | No valid current quote was received. Automatic retries continue; check internet access if it persists. Available chart history can still be viewed. |
 | History or opening benchmark unavailable | Wait for Coinbase candle history, then reconnect if needed. Orders stay blocked until required data is available. |
 | Chart paused / synthetic preview / historical market | Resume, reconnect to live data, or select Current hour. |
 | Too late to place | Select an open interval and review a new prediction. |
@@ -126,13 +129,22 @@ OilPriceAPI mode shows dated physical spot assessments for all five crudes. Thes
 On a laptop, the chart and the 60-, 30-, and 15-minute segment rows share one
 hourly timeline. Compact navigation and cards leave more room for predictions.
 On phone screens up to 600 pixels wide, the chart fits the screen and segments
-stack by duration. Swipe the instrument picker to choose another coin.
+stack by duration. Choose coins from the five-column icon grid in the live price
+panel. Each icon shows its ticker; the inner highlight marks the selected coin,
+and the outer ring shows your hourly prediction direction.
 
 Tap **Predict** on an open segment to open the prediction popup, select Up or
 Down, enter a budget, and review before confirming. Tap **Result** on a closed
 segment to see its outcome and your returns. **Details** describes an upcoming
 segment. Popups scroll on short screens; use the close button or Escape to close
 them. The hourly balance and last-hour results remain in the header.
+
+On a phone, tap **Sideways** above the market summary to request landscape view.
+If the browser permits it, the page enters full screen and rotates. Tap
+**Auto rotate** to release the orientation lock and leave full screen. On
+browsers without automatic rotation support, follow the on-screen prompt to
+turn the phone sideways and disable the phone’s rotation lock if necessary.
+The button shows **Landscape** when the phone is already sideways.
 
 ## Hourly contests
 

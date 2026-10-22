@@ -3,8 +3,8 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 
-function chartHarness({oil=false,live=false,spotError=false,transformCandles=c=>c}={}){
- let now=Date.UTC(2026,9,12,17,25,30);
+function chartHarness({oil=false,live=false,spotError=false,transformCandles=c=>c,quote=({now})=>({price:'108.00',time:new Date(now).toISOString()}),startTime=Date.UTC(2026,9,12,17,25,30)}={}){
+ let now=startTime;
  const elements=new Map(),hour=Math.floor(now/3600000)*3600000;
  function element(id){
   if(!elements.has(id))elements.set(id,{textContent:'',hidden:false,dataset:{},style:{setProperty(){}},classList:{},listeners:{},
@@ -13,11 +13,14 @@ function chartHarness({oil=false,live=false,spotError=false,transformCandles=c=>
   return elements.get(id);
  }
  const coin={symbol:oil?'WTI':'BTC',name:oil?'West Texas Intermediate':'Bitcoin',product:oil?'SIM-WTI':'BTC-USD',icon:'btc.svg',demoBase:100,category:oil?'oil':'crypto',feed:oil?(live?'twelvedata':'simulated'):'coinbase',maxPriceAgeMs:live?90000:15000};
+ const coins=oil?[coin]:[coin,{...coin,symbol:'ETH',name:'Ethereum',product:'ETH-USD'}];
+ const buttons=coins.map(c=>{const button=element(`coin-${c.symbol}`);button.dataset.coin=c.symbol;return button;});
  const model={...require('../../src/frontend/market-model.js'),markets:require('../../src/frontend/market-model.js').markets.map(m=>({...m})),coin};
  const pending=[],timers=[],requests=[];let socket;
  let frameStamp=0;
- const fetch=async url=>{
+ const fetch=async (url,options)=>{
   requests.push(url);
+  if(url.endsWith('/ticker'))return {ok:true,json:async()=>quote({url,now,signal:options.signal})};
   if(url.startsWith('/api/spot'))return spotError?{ok:false,json:async()=>({error:'Oil feed needs a Twelve Data API key on the server.'})}:{ok:true,json:async()=>({price:110.25,time:live?now-30000:now,source:live?'Twelve Data':'oil-simulation-v1'})};
   if(oil&&url.startsWith('/api/pricing-history'))return {ok:true,json:async()=>({candles:Array.from({length:90},(_,i)=>[(hour/1000)-5400+i*60,99,102,100,100+i*.01,0])})};
   if(url.startsWith('/api/pricing-history'))return new Promise(resolve=>pending.push(resolve));
@@ -30,12 +33,114 @@ function chartHarness({oil=false,live=false,spotError=false,transformCandles=c=>
  };
  class FakeDate extends Date{static now(){return now;}}
  class Socket{constructor(){this.readyState=1;socket=this;}close(){}send(){}}
- const window={PredictModel:model,PredictCoins:{available:[coin],getCoin:()=>coin,formatPrice:v=>'$'+v.toFixed(2)},dispatchEvent(){},addEventListener(){}};
- const context={window,document:{getElementById:element,querySelector:s=>s.startsWith('[data-remaining')?null:element(s),querySelectorAll:()=>[],addEventListener(){},createElement:()=>({dataset:{},style:{setProperty(){}},setAttribute(k,v){this[k]=v;}})},Date:FakeDate,Intl,URLSearchParams,fetch,AbortController,WebSocket:Socket,Event:class{},localStorage:{getItem(){return null;},setItem(){}},setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout(){},performance:{now:()=>frameStamp},console};
+ const window={PredictModel:model,PredictCoins:{available:coins,getCoin:symbol=>coins.find(c=>c.symbol===symbol)||coin,formatPrice:v=>'$'+v.toFixed(2)},dispatchEvent(){},addEventListener(){}};
+ const context={window,document:{getElementById:element,querySelector:s=>s.startsWith('[data-remaining')?null:element(s),querySelectorAll:s=>s==='[data-coin]'?buttons:[],addEventListener(){},createElement:()=>({dataset:{},style:{setProperty(){}},setAttribute(k,v){this[k]=v;}})},Date:FakeDate,Intl,URLSearchParams,fetch,AbortController,WebSocket:Socket,Event:class{},localStorage:{getItem(){return null;},setItem(){}},setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout(){},performance:{now:()=>frameStamp},console};
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../../src/frontend/btc-chart.js'),'utf8'),context);
- return {element,pending,model,hour,requests,step(){now+=1000;frameStamp+=1000;timers.at(-1)();},tick(price){frameStamp+=1000;socket.onmessage({data:JSON.stringify({type:'ticker',product_id:'BTC-USD',price:String(price),time:new Date(now).toISOString()})});timers.at(-1)();}};
+ return {element,pending,model,hour,requests,select(symbol){element(`coin-${symbol}`).listeners.click();},step(){now+=1000;frameStamp+=1000;timers.at(-1)();},tick(price){frameStamp+=1000;socket.onmessage({data:JSON.stringify({type:'ticker',product_id:model.coin.product,price:String(price),time:new Date(now).toISOString()})});timers.at(-1)();}};
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
+
+test('initial selection loads a validated price without waiting for a WebSocket trade',async()=>{
+ const h=chartHarness();
+ assert.equal(h.element('btc-spot').textContent,'Loading…');
+ await flush();
+ assert.equal(h.model.spot,108);
+ assert.equal(h.model.spotStatus,'ready');
+ assert.equal(h.model.feedConnection,'connected');
+ assert.equal(h.element('btc-spot').children[0],'$108.');
+ assert.equal(h.element('feed-message').hidden,true);
+ assert(h.requests.some(url=>url.endsWith('/BTC-USD/ticker')));
+ assert.equal(h.model.pricingHistoryStatus,'loading','a current quote does not substitute for missing odds history');
+});
+
+test('one click on a different coin loads its own price without refreshing',async()=>{
+ const h=chartHarness({quote:({url,now})=>({price:url.includes('ETH-USD')?'2500.50':'108.00',time:new Date(now).toISOString()})});await flush();
+ h.select('ETH');
+ assert.equal(h.element('btc-spot').textContent,'Loading…');
+ assert(!Number.isFinite(h.model.spot),'the previous coin price is cleared immediately');
+ await flush();
+ assert.equal(h.model.coin.symbol,'ETH');
+ assert.equal(h.model.spot,2500.5);
+ assert.equal(h.element('btc-spot').children[0],'$2500.');
+ assert.equal(h.element('btc-spot').children[1].dataset.trend,'');
+});
+
+test('late quote responses cannot overwrite a newly selected coin',async()=>{
+ let finishOld,oldSignal;
+ const h=chartHarness({quote:({url,now,signal})=>url.includes('BTC-USD')?new Promise(resolve=>{finishOld=resolve;oldSignal=signal;}):({price:'2500',time:new Date(now).toISOString()})});await flush();
+ h.select('ETH');await flush();
+ assert.equal(oldSignal.aborted,true);
+ finishOld({price:'99999',time:new Date(h.hour+1530000).toISOString()});await flush();
+ assert.equal(h.model.coin.symbol,'ETH');
+ assert.equal(h.model.spot,2500);
+});
+
+test('an unavailable quote is labelled and retried automatically without a refresh',async()=>{
+ let calls=0;
+ const h=chartHarness({quote:({now})=>{if(++calls===1)throw Error('Network unavailable');return {price:'115',time:new Date(now).toISOString()};}});await flush();
+ assert.equal(h.element('btc-spot').textContent,'Data Not Available');
+ assert.equal(h.element('btc-spot').dataset.state,'unavailable');
+ assert.match(h.element('feed-message').textContent,/Retrying automatically/);
+ assert.equal(h.model.feedConnection,'disconnected');
+ assert(!Number.isFinite(h.model.spot));
+ assert.match(h.element('btc-line').d,/^M/,'available history remains visible');
+ for(let i=0;i<5;i++)h.step();await flush();
+ assert.equal(calls,2);
+ assert.equal(h.model.spot,115);
+ assert.equal(h.model.feedConnection,'connected');
+ assert.equal(h.element('feed-message').hidden,true);
+ assert.equal(h.element('btc-spot').dataset.state,'ready');
+});
+
+test('invalid and stale provider quotes never become current prices',async()=>{
+ for(const invalid of [null,{}, {price:'NaN'}, {price:'0'}, {price:'-1'}, {price:'100',age:16000}, {price:'100',age:-6000}]){
+  const h=chartHarness({quote:({now})=>invalid&&({...invalid,time:new Date(now-(invalid.age||0)).toISOString()})});await flush();
+  assert.equal(h.model.spotStatus,'unavailable');
+  assert(!Number.isFinite(h.model.spot));
+  assert.equal(h.element('btc-spot').textContent,'Data Not Available');
+ }
+});
+
+test('a REST error cannot hide a newer valid live trade',async()=>{
+ let failQuote;
+ const h=chartHarness({quote:()=>new Promise((resolve,reject)=>{failQuote=reject;})});await flush();
+ h.tick(120);
+ failQuote(Error('Lookup failed'));await flush();
+ assert.equal(h.model.spot,120);
+ assert.equal(h.model.spotStatus,'ready');
+ assert.equal(h.model.feedConnection,'connected');
+ assert.equal(h.element('feed-message').hidden,true);
+});
+
+test('an older REST quote cannot replace a newer live trade',async()=>{
+ let finishQuote;
+ const h=chartHarness({quote:()=>new Promise(resolve=>{finishQuote=resolve;})});await flush();
+ h.tick(120);
+ finishQuote({price:'119',time:new Date(h.hour+1529000).toISOString()});await flush();
+ assert.equal(h.model.spot,120);
+});
+
+test('an expired price is replaced by unavailable until a fresh quote arrives',async()=>{
+ let available=true;
+ const h=chartHarness({quote:({now})=>{if(!available)throw Error('Feed offline');return {price:'108',time:new Date(now).toISOString()};}});await flush();
+ available=false;
+ for(let i=0;i<16;i++){h.step();await flush();}
+ assert.equal(h.element('btc-spot').textContent,'Data Not Available');
+ assert.equal(h.model.feedConnection,'disconnected');
+ assert.equal(h.model.dataStatus(h.model,h.model.markets[0]).ready,false);
+ h.tick(125);
+ assert.equal(h.model.spot,125);
+ assert.equal(h.element('btc-spot').dataset.state,'ready');
+ assert.equal(h.element('feed-message').hidden,true);
+});
+
+test('a fresh quote just before the hour is displayed without inventing a chart point',async()=>{
+ const h=chartHarness({startTime:Date.UTC(2026,9,12,18,0,1),quote:({now})=>({price:'120',time:new Date(now-2000).toISOString()})});await flush();
+ assert.equal(h.model.spot,120);
+ assert.equal(h.model.spotStatus,'ready');
+ assert.equal(h.element('btc-spot').children[0],'$120.');
+ assert.equal(h.element('btc-line').d,'M0.000,65.000');
+});
 
 test('initial current hour backfills to its start before pricing history completes',async()=>{
  const h=chartHarness();await flush();

@@ -86,6 +86,7 @@ PUBLIC_FILES = {
     'styles.css',
     'theme.css',
     'theme.js',
+    'orientation.js',
     'welcome.css',
     'welcome.html',
 }

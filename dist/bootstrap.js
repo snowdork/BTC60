@@ -24,7 +24,8 @@
     document.body.style.setProperty('--category-accent',category.accent);
     document.body.style.setProperty('--category-background',category.background);
     const categoryLink=document.getElementById('category-switch');
-    categoryLink.textContent=`← ${category.name} / Categories`;
+    categoryLink.textContent='← Categories';
+    categoryLink.title=`Browse categories · ${category.name} selected`;
     picker.setAttribute('aria-label',`Choose ${category.name} instrument`);
     document.querySelector('.market-workspace').setAttribute('aria-label',`${category.name} markets`);
     window.Predict60MarketConfig=data.marketConfig;

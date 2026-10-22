@@ -328,3 +328,57 @@ button,a,input{touch-action:manipulation}
 .terminal-page .market-card.open .chance-block{align-self:stretch}
 [data-theme="light"] .terminal-page .market-card.open{background:#fff;color:var(--text)}
 [data-theme="light"] .terminal-page .market-card.open:hover{background:#eef1f3}
+
+
+/* Offer phone rotation without crowding the account and instrument controls. */
+.phone-view-controls{display:none}
+@media(max-width:600px),(max-width:1000px) and (pointer:coarse),(max-height:600px) and (pointer:coarse){
+ .phone-view-controls{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-bottom:8px}
+ .landscape-button{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:8px;min-height:44px;padding:8px 12px;border:1px solid var(--muted);border-radius:7px;background:var(--raised);color:var(--text);font-size:12px;font-weight:600}
+ .landscape-button svg{width:24px;height:24px;flex-shrink:0}
+ .landscape-button:hover:not(:disabled){border-color:var(--text)}
+ .landscape-button[aria-pressed="true"]{border-color:var(--text)}
+ .landscape-button:disabled{opacity:.75}
+ .landscape-hint{margin:0;max-width:38ch;color:var(--muted);font-size:12px;line-height:1.5}
+}
+@media(max-width:400px){.phone-view-controls{flex-wrap:wrap}.landscape-hint{flex-basis:100%;max-width:none}}
+
+
+/* A five-column coin grid shares the live price panel. */
+.terminal-page .terminal-overview.overview{display:grid;grid-template-columns:240px minmax(0,1fr);align-items:center;gap:16px}
+.terminal-page .coin-selection{min-width:0}
+.coin-selection-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px}
+.coin-selection-heading .category-switch{display:inline-flex;align-items:center;min-height:28px;font-size:10px;white-space:nowrap}
+.terminal-page .coin-selection .coin-picker{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:stretch;gap:8px;width:100%;padding:4px;border:0;border-radius:0;background:transparent}
+.terminal-page .coin-selection .coin-button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;min-height:44px;width:100%;padding:3px;border:1px solid var(--border);border-radius:7px;background:var(--raised);color:var(--text);font:600 10px/1.1 'JetBrains Mono',monospace;white-space:nowrap}
+.terminal-page .coin-selection .coin-button img{width:22px;height:22px;object-fit:contain}
+.terminal-page .coin-selection .coin-button:hover{background:var(--surface)}
+.terminal-page .coin-selection .coin-button:focus-visible{outline:2px solid var(--text);outline-offset:3px}
+.terminal-page .terminal-overview .overview-top{min-width:0}
+@media(min-width:601px){
+ .terminal-page .topbar{display:flex;flex-wrap:wrap}
+ .terminal-page .topbar .topbar-right{flex:1 1 auto;min-width:0;margin-left:auto;justify-content:flex-end}
+ .terminal-page .topbar>.account-link{flex-shrink:0}
+}
+@media(min-width:1101px){
+ .terminal-page .topbar{flex-wrap:nowrap}
+ .terminal-page .topbar .topbar-right{flex-wrap:nowrap}
+}
+@media(min-width:601px) and (max-width:1100px){
+ .terminal-page .topbar .community-counts{display:none}
+ .terminal-page .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto}
+ .terminal-page .terminal-overview .price-summary{grid-column:1;grid-row:1}
+ .terminal-page .terminal-overview .price-clock{grid-column:2;grid-row:1;border:0;padding:0}
+ .terminal-page .terminal-overview .hour-window{grid-column:1;grid-row:2}
+ .terminal-page .terminal-overview .score-hud{grid-column:2;grid-row:2;max-width:none}
+}
+@media(max-width:700px){
+ .terminal-page .terminal-overview.overview{grid-template-columns:minmax(0,1fr) auto;gap:8px}
+ .terminal-page .terminal-overview .overview-top{display:contents}
+ .terminal-page .terminal-overview .coin-selection{grid-column:1/-1;grid-row:2;padding-block:4px 8px;border-block:1px solid var(--border)}
+ .terminal-page .terminal-overview .price-summary{grid-column:1;grid-row:1}
+ .terminal-page .terminal-overview .price-clock{grid-column:2;grid-row:1;border:0;padding:0}
+ .terminal-page .terminal-overview .hour-window{grid-column:1/-1;grid-row:3;margin:0;padding:0;border:0}
+ .terminal-page .terminal-overview .score-hud{grid-column:1/-1;grid-row:4;max-width:none;border-left:0;padding:8px 0 0}
+ .coin-selection-heading .category-switch{min-height:44px;font-size:11px}
+}
