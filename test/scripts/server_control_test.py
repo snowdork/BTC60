@@ -23,7 +23,7 @@ class WatchdogTest(unittest.TestCase):
             docker.write_text('#!/bin/sh\nexit 0\n')
             docker.chmod(0o755)
             (root / 'src/backend').mkdir(parents=True)
-            for name in ('server_control.py', 'restart-server.py', 'stop-server.py',
+            for name in ('server_control.py', 'docker_control.py', 'restart-server.py', 'stop-server',
                          'watchdog-server.py'):
                 shutil.copy(Path(__file__).resolve().parents[2] / 'scripts' / name, scripts / name)
             (root / 'src/backend/server.py').write_text('''import argparse, os
@@ -76,12 +76,12 @@ server.serve_forever()
                     time.sleep(0.1)
                 self.assertEqual(len(starts()), 3)
                 self.assertEqual((root / 'level').read_text(), 'normal')
-                result = run('stop-server.py')
+                result = run('stop-server')
                 self.assertEqual(result.returncode, 0, result.stderr)
                 time.sleep(3.5)
                 self.assertEqual(len(starts()), 3)
                 self.assertTrue((root / 'data/server.stopped').exists())
-                self.assertEqual(run('stop-server.py').returncode, 0)
+                self.assertEqual(run('stop-server').returncode, 0)
                 self.assertEqual(run('restart-server.py', '--port', str(port),
                                      '--log-level', 'debug').returncode, 0)
                 self.assertEqual((root / 'level').read_text(), 'debug')
@@ -99,11 +99,11 @@ server.serve_forever()
                 self.assertEqual(len(starts()), 6)
                 # Stop while the watchdog is waiting to restart a crashed child.
                 os.kill(int(starts()[-1]), signal.SIGKILL)
-                self.assertEqual(run('stop-server.py').returncode, 0)
+                self.assertEqual(run('stop-server').returncode, 0)
                 time.sleep(3.5)
                 self.assertEqual(len(starts()), 6)
             finally:
-                run('stop-server.py')
+                run('stop-server')
 
 
 if __name__ == '__main__':

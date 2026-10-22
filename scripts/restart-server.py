@@ -4,13 +4,13 @@ import argparse
 import os
 from pathlib import Path
 import fcntl
-import shutil
 import subprocess
 import sys
 import time
 import urllib.request
 
 from server_control import ROOT, DATA, STOP, stop_server
+from docker_control import stop_docker
 
 sys.path.insert(0, str(ROOT / 'src/backend'))
 from p60_logging import LOG_PATH, write_or_rotate
@@ -41,29 +41,6 @@ def main():
         with os.fdopen(fd, 'w') as stream:
             stream.write(args.log_level + '\n')
 
-
-def stop_docker():
-    """Stop Predict60 containers without touching other Docker applications or volumes."""
-    if shutil.which('docker') is None:
-        return
-    try:
-        containers = set()
-        for selector in ('name=^/p60-local$',
-                         'label=com.docker.compose.project=p60',
-                         'label=com.docker.compose.project=p60-local'):
-            result = subprocess.run(
-                ['docker', 'ps', '-q', '--filter', selector],
-                check=True, capture_output=True, text=True,
-            )
-            containers.update(result.stdout.split())
-        if containers:
-            print('Stopping Predict60 Docker containers before starting the server...', flush=True)
-            subprocess.run(['docker', 'stop', '--time', '30', *sorted(containers)], check=True)
-    except (OSError, subprocess.CalledProcessError) as error:
-        raise SystemExit(
-            'Cannot check or stop Predict60 Docker containers. Check Docker access and '
-            'permissions, then retry; the host server was not started.'
-        ) from error
 
 
 def start_server(args):

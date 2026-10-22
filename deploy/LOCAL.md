@@ -32,7 +32,7 @@ For a Linux background watchdog:
 
 ```bash
 python3 scripts/restart-server.py
-python3 scripts/stop-server.py
+scripts/stop-server
 ```
 
 Use these instead of running a second direct process. Logs rotate under
@@ -53,7 +53,7 @@ before changing the existing Python processes. Check `docker info` and restore
 daemon access or Docker permissions, then retry as your usual server user.
 The stopped containers remain stopped after reboot unless explicitly started.
 
-Before switching back to Docker, run `python3 scripts/stop-server.py` to stop
+Before switching back to Docker, run `scripts/stop-server` to stop
 the watchdog. The Docker restart helper stops an installed `predict60.service`,
 but does not stop the development watchdog. Direct Python, `docker start`,
 Compose commands, and systemd commands do not perform this automatic Docker
@@ -108,6 +108,34 @@ Choose one local Docker mode. Before switching, stop/remove the old container
 without deleting its volume (`docker stop p60-local`, then `docker rm p60-local`
 when switching from plain Docker; use Compose `down` for the reverse direction).
 Never append `--volumes` to routine shutdown commands.
+
+## Stop and reset commands
+
+```bash
+scripts/stop-server  # Stop this checkout's Python server and watchdog.
+scripts/stop-docker  # Stop Predict60 Docker containers, including Compose Caddy.
+```
+
+`stop-docker` preserves containers and volumes and leaves unrelated containers
+and the Docker daemon running. It needs the same Docker access as the restart
+helper. `stop-server` does not stop an installed systemd service; use
+`sudo systemctl stop predict60` for that deployment.
+
+To reset a host database, stop its server first, then run:
+
+```bash
+scripts/stop-server
+scripts/reset-database --confirm-reset
+# Or select an explicit database:
+# scripts/reset-database --db /path/to/p60.sqlite3 --confirm-reset
+```
+
+Reset backs up an existing database under its adjacent `backups/` directory,
+clears users, sessions, predictions, and settlements, and restores seeded
+catalogs. It requires `--confirm-reset` and refuses to reset a database held by
+a running server. It uses `PREDICT60_DB` or the default checkout database, does
+not read `.env` files, and does not reset a Docker volume's database. Run
+`python3 scripts/restart-server.py` afterward when ready to resume.
 
 ## Checks and common problems
 
