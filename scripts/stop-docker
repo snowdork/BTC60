@@ -1,8 +1,0 @@
-#!/usr/bin/env python3
-"""Stop Predict60 Docker containers, preserving containers and data volumes."""
-from docker_control import stop_docker
-
-
-if __name__ == '__main__':
-    stop_docker()
-    print('Predict60 Docker containers stopped (or Docker is not installed).')

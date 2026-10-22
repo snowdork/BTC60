@@ -1,5 +1,6 @@
 """Shared Linux process discovery and shutdown for this checkout."""
 import os
+import fcntl
 from pathlib import Path
 import signal
 import time
@@ -55,3 +56,16 @@ def stop_server():
         if time.monotonic() >= deadline:
             raise SystemExit('Predict60 did not stop within 15 seconds; stop marker retained.')
         time.sleep(0.1)
+
+
+def main():
+    """Stop the checkout server and watchdog intentionally, preserving the stop marker."""
+    DATA.mkdir(parents=True, exist_ok=True)
+    with (DATA / 'server-control.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        stop_server()
+    print('Predict60 server and watchdog stopped. Run scripts/restart-server.py to start again.')
+
+
+if __name__ == '__main__':
+    main()

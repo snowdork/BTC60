@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Supervise Predict60; use restart-server.py to start and stop-server to stop."""
+"""Supervise Predict60; use restart-server.py to start and stop-server.sh to stop."""
 import argparse
 import fcntl
 import logging

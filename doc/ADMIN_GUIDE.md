@@ -19,7 +19,7 @@ scripts.
 ```bash
 python3 scripts/restart-server.py
 python3 scripts/restart-server.py --port 8080 --log-level debug
-scripts/stop-server
+scripts/stop-server.sh
 ```
 
 `restart-server.py` stops the existing watchdog and server, clears the intentional
@@ -43,7 +43,7 @@ saved level file alone does not change a running watchdog; use the restart scrip
 An explicit level overrides the saved selection. Failed starts do not save a new
 selection.
 
-`stop-server` creates `data/server.stopped` before stopping both processes.
+`stop-server.sh` creates `data/server.stopped` before stopping both processes.
 The marker prevents automatic restarts, including during the three-second retry
 pause. Running stop repeatedly is supported. If shutdown times out, the command
 fails and retains the marker. Use `restart-server.py` to resume operation.
@@ -132,7 +132,7 @@ it is an internal module rather than an administrator command.
 ```bash
 python3 scripts/database.py status
 python3 scripts/database.py backup
-scripts/stop-server
+scripts/stop-server.sh
 python3 scripts/database.py init
 python3 scripts/restart-server.py
 ```
@@ -145,7 +145,7 @@ the database without deleting existing account data and requires a stopped serve
 Options include `--db PATH` and, for backup, `--backup-dir PATH`. Use the same
 database path in maintenance commands and `PREDICT60_DB` for server startup.
 
-`scripts/reset-database --confirm-reset` (also available as
+`scripts/reset-database.sh --confirm-reset` (also available as
 `python3 scripts/database.py reset --confirm-reset`) is destructive: it backs up an existing
 database, clears accounts, sessions, predictions, and settlements, and restores
 seed catalogs. Stop the server first. See

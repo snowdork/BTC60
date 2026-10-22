@@ -26,3 +26,8 @@ def stop_docker():
             'permissions, then retry; Docker shutdown could not be completed.'
         ) from error
 
+
+
+if __name__ == "__main__":
+    stop_docker()
+    print("Predict60 Docker containers stopped (or Docker is not installed).")

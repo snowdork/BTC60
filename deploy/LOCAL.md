@@ -32,7 +32,7 @@ For a Linux background watchdog:
 
 ```bash
 python3 scripts/restart-server.py
-scripts/stop-server
+scripts/stop-server.sh
 ```
 
 Use these instead of running a second direct process. Logs rotate under
@@ -53,7 +53,7 @@ before changing the existing Python processes. Check `docker info` and restore
 daemon access or Docker permissions, then retry as your usual server user.
 The stopped containers remain stopped after reboot unless explicitly started.
 
-Before switching back to Docker, run `scripts/stop-server` to stop
+Before switching back to Docker, run `scripts/stop-server.sh` to stop
 the watchdog. The Docker restart helper stops an installed `predict60.service`,
 but does not stop the development watchdog. Direct Python, `docker start`,
 Compose commands, and systemd commands do not perform this automatic Docker
@@ -112,22 +112,22 @@ Never append `--volumes` to routine shutdown commands.
 ## Stop and reset commands
 
 ```bash
-scripts/stop-server  # Stop this checkout's Python server and watchdog.
-scripts/stop-docker  # Stop Predict60 Docker containers, including Compose Caddy.
+scripts/stop-server.sh  # Stop this checkout's Python server and watchdog.
+scripts/stop-docker.sh  # Stop Predict60 Docker containers, including Compose Caddy.
 ```
 
-`stop-docker` preserves containers and volumes and leaves unrelated containers
+`stop-docker.sh` preserves containers and volumes and leaves unrelated containers
 and the Docker daemon running. It needs the same Docker access as the restart
-helper. `stop-server` does not stop an installed systemd service; use
+helper. `stop-server.sh` does not stop an installed systemd service; use
 `sudo systemctl stop predict60` for that deployment.
 
 To reset a host database, stop its server first, then run:
 
 ```bash
-scripts/stop-server
-scripts/reset-database --confirm-reset
+scripts/stop-server.sh
+scripts/reset-database.sh --confirm-reset
 # Or select an explicit database:
-# scripts/reset-database --db /path/to/p60.sqlite3 --confirm-reset
+# scripts/reset-database.sh --db /path/to/p60.sqlite3 --confirm-reset
 ```
 
 Reset backs up an existing database under its adjacent `backups/` directory,

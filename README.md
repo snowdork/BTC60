@@ -152,19 +152,19 @@ If Docker is installed but cannot be checked or stopped, the script aborts
 before starting the host server; restore Docker access and retry.
 This also stops the VPS stack's Caddy proxy. Direct Python and systemd starts
 require manually stopping Docker first. Before switching back to Docker, stop
-the watchdog with `scripts/stop-server`. Switching does not transfer
+the watchdog with `scripts/stop-server.sh`. Switching does not transfer
 accounts between the host database and Docker volumes. See
 [switching modes](deploy/LOCAL.md#switching-between-python-and-docker) for details.
 
 To stop intentionally:
 
 ```bash
-scripts/stop-server
+scripts/stop-server.sh
 ```
 
-Use `scripts/stop-docker` to stop Predict60 Docker containers while preserving
+Use `scripts/stop-docker.sh` to stop Predict60 Docker containers while preserving
 volumes. For a backed-up database reset, stop its server and run
-`scripts/reset-database --confirm-reset`; see [stop and reset commands](deploy/LOCAL.md#stop-and-reset-commands).
+`scripts/reset-database.sh --confirm-reset`; see [stop and reset commands](deploy/LOCAL.md#stop-and-reset-commands).
 
 This stops the watchdog and server and writes `data/server.stopped`, preventing
 automatic restarts. Run `restart-server.py` again to clear the marker and resume.

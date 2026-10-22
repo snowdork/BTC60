@@ -52,7 +52,7 @@ systemctl daemon-reload
 systemctl enable predict60.service
 if [[ ${1:-} == --start ]]; then
   # Hand over supervision; never run the watchdog and service together.
-  runuser -u "$owner" -- python3 "$root/scripts/stop-server"
+  runuser -u "$owner" -- bash "$root/scripts/stop-server.sh"
   systemctl restart predict60.service
   curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 2 --max-time 5 http://127.0.0.1:8000/healthz
   echo
