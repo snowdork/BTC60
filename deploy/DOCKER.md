@@ -51,8 +51,33 @@ aborted. A failed build leaves the host service running. Stopping the service
 does not disable its boot startup; use `sudo systemctl disable predict60` if
 Docker will permanently replace the host service.
 
+### Switching to the host server
 
-Run this after updating the checkout and making a database backup. The script
+For the development watchdog, run `python3 scripts/restart-server.py` from the
+checkout. It stops the `p60-local` container and all containers in the `p60` and
+`p60-local` Compose projects, including Caddy, before starting Python. Containers
+and volumes are retained; unrelated containers and the Docker daemon keep
+running. If Docker cannot be checked or stopped, host startup aborts. See
+[local switching instructions](LOCAL.md#switching-between-python-and-docker)
+for permissions, data locations, and switching back.
+
+For systemd, stop the stack explicitly before starting the host service:
+
+```bash
+docker compose stop
+sudo systemctl start predict60
+```
+
+Use `sudo` for Docker commands if your installation requires it. Stop any local
+Docker deployment as well (`docker stop p60-local`). Systemd startup and direct
+Python startup do not call the restart script's Docker shutdown. Docker data is
+not automatically imported into the host database. Stopping the stack also stops
+its HTTPS proxy; configure the host's HTTPS proxy before serving public traffic.
+
+### Rebuild behavior and persistent data
+
+Run `sudo bash scripts/restart-docker.sh` after updating the checkout and making
+a database backup. The script
 uses the VPS `compose.yaml` and `.env`, checks configuration and Docker access
 before building, and retains all database and certificate volumes. Existing
 containers continue serving during the build. If the build fails, they remain

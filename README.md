@@ -146,6 +146,16 @@ The watchdog restarts the server three seconds after it exits. Both processes
 inherit your environment (including API keys and `PREDICT60_DB`), and append output to
 `/tmp/p60/server.log`. Only one watchdog can run for this checkout.
 
+Before starting, the restart script stops the `p60-local` Docker container and
+containers in the `p60` and `p60-local` Compose projects. Volumes are preserved.
+If Docker is installed but cannot be checked or stopped, the script aborts
+before starting the host server; restore Docker access and retry.
+This also stops the VPS stack's Caddy proxy. Direct Python and systemd starts
+require manually stopping Docker first. Before switching back to Docker, stop
+the watchdog with `python3 scripts/stop-server.py`. Switching does not transfer
+accounts between the host database and Docker volumes. See
+[switching modes](deploy/LOCAL.md#switching-between-python-and-docker) for details.
+
 To stop intentionally:
 
 ```bash

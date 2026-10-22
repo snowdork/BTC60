@@ -103,7 +103,8 @@ For HTTPS, apply the origin, secure-cookie, and proxy settings from
 
 The `--start` command stops this checkout's development watchdog and restarts the
 service, then checks `/healthz`. Stop any Docker deployment before switching to
-this service. The installer does not install packages or change Caddy or firewall
+this service; see [switching to the host server](DOCKER.md#switching-to-the-host-server)
+for shutdown commands and data considerations. The installer does not install packages or change Caddy or firewall
 rules. It binds to `127.0.0.1:8000`; use your reverse proxy for public access.
 Keep the checkout at its installed path. The unit runs `src/backend/server.py` directly as
 the checkout owner, retries crashes every five seconds, and logs to the journal.

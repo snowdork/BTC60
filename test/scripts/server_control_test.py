@@ -18,6 +18,10 @@ class WatchdogTest(unittest.TestCase):
             root.mkdir()
             scripts = root / 'scripts'
             scripts.mkdir()
+            # Keep lifecycle tests isolated from real Docker containers and permissions.
+            docker = scripts / 'docker'
+            docker.write_text('#!/bin/sh\nexit 0\n')
+            docker.chmod(0o755)
             (root / 'src/backend').mkdir(parents=True)
             for name in ('server_control.py', 'restart-server.py', 'stop-server.py',
                          'watchdog-server.py'):
@@ -46,7 +50,8 @@ server.serve_forever()
             def run(name, *args):
                 return subprocess.run([sys.executable, str(scripts / name), *args],
                                       capture_output=True, text=True, timeout=25,
-                                      env={**os.environ, 'PREDICT60_LOG_DIR': str(root / 'logs')})
+                                      env={**os.environ, 'PREDICT60_LOG_DIR': str(root / 'logs'),
+                                           'PATH': str(scripts) + os.pathsep + os.environ['PATH']})
 
             def starts():
                 return (root / 'starts').read_text().splitlines()

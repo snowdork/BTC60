@@ -39,6 +39,30 @@ Use these instead of running a second direct process. Logs rotate under
 `/tmp/p60`; the watchdog is not a boot-time service. See the main README for log
 levels. For startup at boot on a VPS use systemd or Docker.
 
+### Switching between Python and Docker
+
+`python3 scripts/restart-server.py` stops the `p60-local` container and all
+containers in the `p60` and `p60-local` Compose projects before starting Python.
+This includes the VPS stack's Caddy container. It preserves containers and data
+volumes, leaves unrelated Docker applications running, and does not stop the
+Docker daemon. No Compose plugin or `.env` file is needed for this shutdown.
+
+If Docker is not installed, Python starts normally. If Docker is installed but
+the daemon cannot be reached or a container cannot be stopped, the restart aborts
+before changing the existing Python processes. Check `docker info` and restore
+daemon access or Docker permissions, then retry as your usual server user.
+The stopped containers remain stopped after reboot unless explicitly started.
+
+Before switching back to Docker, run `python3 scripts/stop-server.py` to stop
+the watchdog. The Docker restart helper stops an installed `predict60.service`,
+but does not stop the development watchdog. Direct Python, `docker start`,
+Compose commands, and systemd commands do not perform this automatic Docker
+shutdown; stop the previous deployment before using them.
+
+Switching modes does not copy data: Python uses the checkout database, while
+local Docker uses `p60-local-data`. Back up and explicitly import data if you
+need the same accounts in another deployment.
+
 ## Docker
 
 ```bash
