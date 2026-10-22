@@ -13,7 +13,7 @@ log in without the code. Sign up or log in, then choose **Crypto** from the cate
 at each GMT hour boundary. Accounts and saved predictions belong to that installation;
 a separate local installation does not automatically share them.
 
-For local use, run `python3 server.py` from the project folder and open
+For local use, run `python3 src/backend/server.py` from the project folder and open
 http://127.0.0.1:8000. The default bind address remains local-only. Administrators
 setting up a VPS should follow the [Docker deployment guide](../deploy/DOCKER.md).
 
@@ -86,7 +86,7 @@ The sun/moon button switches themes and saves your preference across tabs. On sm
 
 | Message or symptom | Action |
 | --- | --- |
-| Coins unavailable / terminal offline | On a hosted site, refresh and contact the administrator if it persists. For local use, start `python3 server.py` and open the localhost URL. |
+| Coins unavailable / terminal offline | On a hosted site, refresh and contact the administrator if it persists. For local use, start `python3 src/backend/server.py` and open the localhost URL. |
 | Price feed disconnected or stale | Check internet access and use Reconnect; wait for a fresh live update. |
 | History or opening benchmark unavailable | Wait for Coinbase candle history, then reconnect if needed. Orders stay blocked until required data is available. |
 | Chart paused / synthetic preview / historical market | Resume, reconnect to live data, or select Current hour. |

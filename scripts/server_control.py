@@ -42,7 +42,7 @@ def stop_server():
     DATA.mkdir(parents=True, exist_ok=True)
     STOP.touch(mode=0o600)
     # Disable supervision before stopping its child, including during retry delays.
-    for script in ('scripts/watchdog-server.py', 'server.py'):
+    for script in ('scripts/watchdog-server.py', 'src/backend/server.py'):
         for pid in project_processes(script):
             try:
                 os.kill(pid, signal.SIGTERM)
@@ -51,7 +51,7 @@ def stop_server():
     deadline = time.monotonic() + 15
     # Wait for both supervisor and child to exit, but keep a bounded shutdown deadline.
     while any(list(project_processes(script)) for script in
-              ('scripts/watchdog-server.py', 'server.py')):
+              ('scripts/watchdog-server.py', 'src/backend/server.py')):
         if time.monotonic() >= deadline:
             raise SystemExit('Predict60 did not stop within 15 seconds; stop marker retained.')
         time.sleep(0.1)

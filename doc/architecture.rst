@@ -4,7 +4,7 @@ Architecture and control flow
 Entry and account lifecycle
 ---------------------------
 
-``server.py`` serves an explicit public file allowlist. Guest requests for the
+``src/backend/server.py`` serves an explicit public file allowlist. Guest requests for the
 terminal or categories redirect to welcome. A valid saved session redirects
 welcome to categories. ``auth.js`` submits login/signup and navigates successful
 requests to categories; ``account.js`` owns account snapshots, text-only username

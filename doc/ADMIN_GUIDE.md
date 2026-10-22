@@ -176,13 +176,13 @@ while correcting the problem. If stop reports a timeout, check the remaining
 processes before running maintenance. A running watchdog responds to process
 exit; an unresponsive but live server requires a manual restart.
 
-For foreground development, `python3 server.py --port 8000 --log-level debug`
+For foreground development, `python3 src/backend/server.py --port 8000 --log-level debug`
 logs to the console without supervision or file rotation. Stop the supervised
 server before using the same port/database.
 
 ```bash
-python3 -m unittest server_test.py logging_test.py
-python3 -m unittest discover -s scripts -p '*_test.py'
+PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest server_test.py logging_test.py
+PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest discover -s test/scripts -p '*_test.py'
 ```
 
 The scripts suite covers database operations and isolated watchdog lifecycle,

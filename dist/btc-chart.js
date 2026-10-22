@@ -258,6 +258,26 @@
     }
     $('segment-results').replaceChildren(...markers);
   }
+  /** Interpolate samples with bounded cubic tangents, preserving prices and local extrema. */
+  function smoothPath(samples){
+    if(!samples.length)return '';
+    const slopes=samples.slice(1).map((point,index)=>{
+      const previous=samples[index],width=point.x-previous.x;
+      return width>0?(point.y-previous.y)/width:0;
+    });
+    const tangents=samples.map((point,index)=>{
+      if(index===0)return slopes[0]||0;
+      if(index===samples.length-1)return slopes[index-1]||0;
+      const before=slopes[index-1],after=slopes[index];
+      return before*after>0?Math.sign(before)*Math.min(Math.abs(before),Math.abs(after)):0;
+    });
+    let path=`M${samples[0].x.toFixed(3)},${samples[0].y.toFixed(3)}`;
+    for(let index=1;index<samples.length;index++){
+      const previous=samples[index-1],point=samples[index],third=(point.x-previous.x)/3;
+      path+=` C${(previous.x+third).toFixed(3)},${(previous.y+third*tangents[index-1]).toFixed(3)} ${(point.x-third).toFixed(3)},${(point.y-third*tangents[index]).toFixed(3)} ${point.x.toFixed(3)},${point.y.toFixed(3)}`;
+    }
+    return path;
+  }
   /** Project valid price points into SVG coordinates and update chart and benchmark labels. */ function draw(now,force=false) {
     const displayTime=historical?hour+3600000:now;
     $('time-cursor').hidden=historical;
@@ -278,7 +298,7 @@
     if($('chart-times').dataset.hour!==String(hour)){$('chart-times').dataset.hour=String(hour);$('chart-times').replaceChildren(...[0,15,30,45,60].map(minute=>{const span=document.createElement('span');span.textContent=time(hour+minute*60000);return span;}));}
     renderBannerPrice();
     const plotTime=Date.now();
-    if(!force&&plotTime-lastPlotAt<2000)return;
+    if(!force&&plotTime-lastPlotAt<5000)return;
     lastPlotAt=plotTime;
     const valid=points.filter(p=>p.t>=hour&&p.t<=displayTime);
     const hasPoints=valid.length>0;
@@ -294,7 +314,7 @@
     let low=Math.min(...valid.map(p=>p.price)),high=Math.max(...valid.map(p=>p.price));
     const pad=Math.max(coin.demoBase*.00012,(high-low)*.18);low-=pad;high+=pad;
     const /** Project a timestamp into the chart horizontal coordinate. */ x=t=>(t-hour)/3600000*1000,/** Project a price into the chart vertical coordinate. */ y=p=>116-(p-low)/(high-low)*102;
-    const path=valid.map((p,i)=>`${i?'L':'M'}${x(p.t).toFixed(3)},${y(p.price).toFixed(3)}`).join(' '),first=valid[0],last=valid.at(-1);
+    const path=smoothPath(valid.map(p=>({x:x(p.t),y:y(p.price)}))),first=valid[0],last=valid.at(-1);
     $('btc-line').setAttribute('d',path);
     $('btc-area').setAttribute('d',`${path} L${x(last.t)},130 L${x(first.t)},130 Z`);
     $('btc-tip').setAttribute('cx',x(last.t));$('btc-tip').setAttribute('cy',y(last.price));$('btc-tip').setAttribute('visibility','visible');

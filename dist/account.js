@@ -7,7 +7,7 @@
   /** Recover a stale CSRF token once for the same account, without replaying other failures. */ async function request(path,body,retry=true){
     const started=generation,userId=account.user?.id;
     const response=await fetch('/api/'+path,{method:body?'POST':'GET',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':account.csrf||''},...(body?{body:JSON.stringify(body)}:{})});
-    let data;try{data=await response.json();}catch{throw Error('Start the local app with python3 server.py to use accounts.');}
+    let data;try{data=await response.json();}catch{throw Error('Start the local app with python3 src/backend/server.py to use accounts.');}
     if(body&&retry&&response.status===403&&(data.code==='csrf_mismatch'||data.error==='Refresh the page and try again.')){
       const fresh=await request('account');
       if(started!==generation)throw Error('Your session changed. Please sign in again.');

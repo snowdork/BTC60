@@ -10,7 +10,7 @@ is needed for JavaScript tests. The full test runner and watchdog target Linux.
 # Read a signup code without storing it in shell history (Bash).
 read -rs -p 'Local signup code: ' P60_SIGNUP_CODE
 export P60_SIGNUP_CODE
-python3 server.py --bind 127.0.0.1 --port 8000
+python3 src/backend/server.py --bind 127.0.0.1 --port 8000
 ```
 
 Open http://127.0.0.1:8000. Stop with Ctrl-C; restart after Python changes.

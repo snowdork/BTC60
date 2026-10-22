@@ -19,7 +19,7 @@ fi
 command -v systemctl >/dev/null
 command -v systemd-analyze >/dev/null
 [[ -d /run/systemd/system ]] || { echo 'This installer requires a host running systemd.' >&2; exit 1; }
-runuser -u "$owner" -- test -r "$root/server.py"
+runuser -u "$owner" -- test -r "$root/src/backend/server.py"
 install -d -m 700 /etc/predict60
 if [[ ! -e /etc/predict60/predict60.env ]]; then
   # Preserve the checkout's database selection, including the legacy filename.

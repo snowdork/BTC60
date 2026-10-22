@@ -2,7 +2,7 @@
 
 Predict60 is a buildless web app for exploring hourly direction predictions with game credits. See a complete UTC hour at once: one 60-minute market, two 30-minute markets, and four 15-minute markets, with a live chart and a persistent order ticket.
 
-![Predict60 terminal with an hourly chart, aligned prediction intervals, and an order ticket](assets/previews/prediction-playfield.png)
+![Predict60 terminal with an hourly chart, aligned prediction intervals, and an order ticket](src/frontend/assets/previews/prediction-playfield.png)
 
 *Illustrative demo preview. Prices, percentages, and account figures shown are sample values.*
 
@@ -19,13 +19,13 @@ Predict60 is a buildless web app for exploring hourly direction predictions with
 ### Default prediction coins
 
 <p>
-  <img src="assets/coins/btc.svg" width="32" height="32" alt="Bitcoin (BTC)">
-  <img src="assets/coins/eth.svg" width="32" height="32" alt="Ethereum (ETH)">
-  <img src="assets/coins/sol.svg" width="32" height="32" alt="Solana (SOL)">
-  <img src="assets/coins/xrp.svg" width="32" height="32" alt="XRP">
-  <img src="assets/coins/doge.svg" width="32" height="32" alt="Dogecoin (DOGE)">
-  <img src="assets/coins/ada.svg" width="32" height="32" alt="Cardano (ADA)">
-  <img src="assets/coins/ltc.svg" width="32" height="32" alt="Litecoin (LTC)">
+  <img src="src/frontend/assets/coins/btc.svg" width="32" height="32" alt="Bitcoin (BTC)">
+  <img src="src/frontend/assets/coins/eth.svg" width="32" height="32" alt="Ethereum (ETH)">
+  <img src="src/frontend/assets/coins/sol.svg" width="32" height="32" alt="Solana (SOL)">
+  <img src="src/frontend/assets/coins/xrp.svg" width="32" height="32" alt="XRP">
+  <img src="src/frontend/assets/coins/doge.svg" width="32" height="32" alt="Dogecoin (DOGE)">
+  <img src="src/frontend/assets/coins/ada.svg" width="32" height="32" alt="Cardano (ADA)">
+  <img src="src/frontend/assets/coins/ltc.svg" width="32" height="32" alt="Litecoin (LTC)">
 </p>
 
 BTC · ETH · SOL · XRP · DOGE · ADA · LTC. The database catalog controls availability; all coins share the same account balance.
@@ -59,7 +59,7 @@ See [local operation](deploy/LOCAL.md) for Python/Docker lifecycle commands and
 Requires Python 3.10+ on Linux/macOS; no Python packages or frontend build are needed.
 
 ```bash
-python3 server.py
+python3 src/backend/server.py
 ```
 
 Open http://127.0.0.1:8000 for the welcome page or http://127.0.0.1:8000/index.html for the terminal. Use `--port` to change the port. Internet access is required for live prices, benchmarks, and settlement. The terminal requires `/api/coins`; file previews and static hosting alone cannot initialize a working terminal or provide accounts.
@@ -155,7 +155,7 @@ python3 scripts/stop-server.py
 This stops the watchdog and server and writes `data/server.stopped`, preventing
 automatic restarts. Run `restart-server.py` again to clear the marker and resume.
 These scripts manage this checkout's processes; they do not install boot-time
-startup or monitor HTTP health. Running `python3 server.py` directly bypasses the
+startup or monitor HTTP health. Running `python3 src/backend/server.py` directly bypasses the
 watchdog.
 
 ### Logging and rotation
@@ -188,7 +188,7 @@ python3 scripts/rotate-logs.py --force
 No scheduled job is needed: rotation runs as logs are written. On the next
 restart, the old `data/server.log` is imported under the same retention policy
 and removed. `/tmp` logs may be cleared on reboot; `PREDICT60_LOG_DIR` can override
-the directory when persistent storage is desired. Direct `server.py` runs log to
+the directory when persistent storage is desired. Direct `src/backend/server.py` runs log to
 the console and support the same `--log-level` option.
 
 ## Documentation
@@ -222,7 +222,7 @@ and rendered docs are ignored by Git and excluded from the static app build.
 
 ## Development and validation
 
-The root files are the application source. `bootstrap.js` loads the database coin catalog before loading the model, trading controller, and chart. `server.py` serves the interface and account API with SQLite persistence. Keep development on the `Phase1` branch.
+Application sources live under `src/backend`, `src/frontend`, and `src/seeds`. `bootstrap.js` loads the database coin catalog before loading the model, trading controller, and chart. `src/backend/server.py` serves the interface and account API with SQLite persistence. Keep development on the `Phase1` branch.
 
 ```bash
 python3 scripts/run_tests.py
@@ -243,7 +243,7 @@ New installations use `data/p60.sqlite3`; `PREDICT60_DB` or `P60_DB` selects ano
 
 The database `coins` table is authoritative. The crypto seed has ten records: BTC, ETH, SOL, XRP, DOGE, ADA, and LTC enabled; LINK, TRUMP, and AVAX disabled. Existing databases can have administrator edits. Triggers allow at most eight enabled instruments per category. Disabling a coin blocks new orders while preserving history and settlement. Keep referenced symbols and product mappings stable.
 
-`coins.seed.json` seeds new databases; editing it does not overwrite existing catalog rows. One-time migrations add catalog entries and replace LINK selection with LTC while retaining LINK history. Refresh the terminal after database catalog edits.
+`src/seeds/coins.seed.json` seeds new databases; editing it does not overwrite existing catalog rows. One-time migrations add catalog entries and replace LINK selection with LTC while retaining LINK history. Refresh the terminal after database catalog edits.
 
 ```sql
 BEGIN;
@@ -252,11 +252,11 @@ UPDATE coins SET enabled=1 WHERE symbol='AVAX';
 COMMIT;
 ```
 
-Custom coins need a supported Coinbase USD product, display precision, positive demo base, and sort order. Optional local SVG icons belong under `assets/coins/`; a blank icon uses a text button. See the maintenance guide before changing or resetting a database.
+Custom coins need a supported Coinbase USD product, display precision, positive demo base, and sort order. Optional local SVG icons belong under `src/frontend/assets/coins/`; a blank icon uses a text button. See the maintenance guide before changing or resetting a database.
 
 ## Static distribution and hosting
 
-`dist/` contains generated static copies, not a standalone account backend. After frontend changes, run `python3 scripts/build-static.py` to refresh the public HTML, CSS, browser JavaScript, and artwork in `dist/`. The build uses the server’s public file list and excludes backend scripts, tests, credentials, and account data. It stages sources before updating output and removes obsolete files; keep hand-edited files outside `dist/`. The welcome preview is `assets/previews/prediction-playfield.png`. `.openai/hosting.json` identifies the existing private Site.
+`dist/` contains generated static copies, not a standalone account backend. After frontend changes, run `python3 scripts/build-static.py` to refresh the public HTML, CSS, browser JavaScript, and artwork in `dist/`. The build uses the server’s public file list and excludes backend scripts, tests, credentials, and account data. It stages sources before updating output and removes obsolete files; keep hand-edited files outside `dist/`. The welcome preview is `src/frontend/assets/previews/prediction-playfield.png`. `.openai/hosting.json` identifies the existing private Site.
 
 The Python server binds to loopback for local development. Public account hosting requires a production server, HTTPS, Secure session cookies, and account recovery/email verification. Static hosting cannot replace the Python/SQLite API.
 
@@ -296,7 +296,7 @@ shell history:
 ```bash
 read -r -s -p "Twelve Data API key: " TWELVE_DATA_API_KEY
 export TWELVE_DATA_API_KEY
-python3 server.py
+python3 src/backend/server.py
 ```
 
 The key stays server-side and is sent in an Authorization header. The provider
@@ -328,7 +328,7 @@ feed type requires an explicit backend adapter and frontend transport; unsupport
 feeds must not masquerade as live prices. `coins` and `/api/coins` keep their legacy
 names for compatibility, but now contain all instrument types.
 
-After pulling this change, restart `python3 server.py` to apply migrations and open
+After pulling this change, restart `python3 src/backend/server.py` to apply migrations and open
 `http://127.0.0.1:8000/`. To migrate explicitly while the server is stopped, use
 `python3 scripts/database.py init`. Back up first with
 `python3 scripts/database.py backup`.
@@ -343,7 +343,7 @@ for new oil prices. All five requested crude grades remain in the catalog; unmap
 products return an explicit unavailable response. Adding a mapping requires
 verifying that the provider symbol represents the same crude, currency, and unit.
 
-Validation includes `python3 -m unittest live_oil_test.py categories_test.py` for
+Validation includes `PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest live_oil_test.py categories_test.py` for
 provider parsing, credentials, cache behavior, quote freshness, migration, and
 legacy-source preservation. Provider network calls are mocked in automated tests;
 a successful live quote with the user's subscription is still required before
@@ -370,3 +370,16 @@ blocked under the existing hourly settlement rules; Crypto continues normally.
 The faster WTI_USD and BRENT_CRUDE_USD series are front-month futures and are not
 mapped as spot. Migration 5 expands instrument source providers while retaining
 existing prediction source snapshots and account data.
+
+## Project layout
+
+- `src/backend/`: Python server and application modules.
+- `src/frontend/`: browser JavaScript, styles, pages, and assets.
+- `src/seeds/`: initial market catalogs and weather configuration.
+- `test/backend/`, `test/frontend/`, `test/scripts/`: application and tooling tests.
+- `scripts/`: development, build, and maintenance commands.
+- `deploy/` and `doc/`: deployment configuration and documentation.
+- `data/` and `dist/`: local runtime data and generated static output.
+
+Run all tests with `python3 scripts/run_tests.py`. Start the application with
+`python3 src/backend/server.py`.

@@ -4,7 +4,7 @@
 
 | Environment | Start/update | Persistent data | Logs |
 | --- | --- | --- | --- |
-| Local Python | `python3 server.py` | `data/p60.sqlite3` by default | Terminal |
+| Local Python | `python3 src/backend/server.py` | `data/p60.sqlite3` by default | Terminal |
 | Local Docker, no Compose | `bash scripts/restart-docker.sh --local` | `p60-local-data` volume | `docker logs p60-local` |
 | Local Compose | `docker compose -f compose.local.yaml --env-file .env.local up -d --build` | `p60-local-data` volume | Compose logs |
 | VPS Docker + HTTPS | `bash deploy/start-docker.sh` initially; `bash scripts/restart-docker.sh` for updates | Compose `p60-data` volume | Compose logs |
@@ -104,7 +104,7 @@ The `--start` command stops this checkout's development watchdog and restarts th
 service, then checks `/healthz`. Stop any Docker deployment before switching to
 this service. The installer does not install packages or change Caddy or firewall
 rules. It binds to `127.0.0.1:8000`; use your reverse proxy for public access.
-Keep the checkout at its installed path. The unit runs `server.py` directly as
+Keep the checkout at its installed path. The unit runs `src/backend/server.py` directly as
 the checkout owner, retries crashes every five seconds, and logs to the journal.
 
 ```bash
@@ -143,8 +143,8 @@ this checkout’s development watchdog before starting systemd.
 If `/etc/predict60/predict60.env` does not exist, the helper creates it with mode
 0600, setting the HTTPS origin, Secure cookies, and loopback trusted proxies. It
 attempts to preserve database-path and provider-key variables from a process
-whose command line contains this checkout’s absolute `server.py` path. A process
-started as `python3 server.py` may not match. Verify the database path and keys
+whose command line contains this checkout’s absolute `src/backend/server.py` path. A process
+started as `python3 src/backend/server.py` may not match. Verify the database path and keys
 manually; an existing environment file is left unchanged. **`P60_SIGNUP_CODE` is
 not copied**: set it explicitly in that private file to enable new signups.
 Restart the service after editing the file.
@@ -234,5 +234,5 @@ assets or API responses.
 
 For Docker, edit the root `.env` and run `docker compose up -d` to recreate the
 app with the new environment. For systemd, edit `/etc/predict60/predict60.env`
-and restart `predict60.service`. A local `python3 server.py` process needs the
+and restart `predict60.service`. A local `python3 src/backend/server.py` process needs the
 variable exported in its shell; it does not automatically load `.env`.

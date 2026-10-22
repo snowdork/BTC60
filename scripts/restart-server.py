@@ -11,7 +11,7 @@ import urllib.request
 
 from server_control import ROOT, DATA, STOP, stop_server
 
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / 'src/backend'))
 from p60_logging import LOG_PATH, write_or_rotate
 
 

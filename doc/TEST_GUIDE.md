@@ -22,11 +22,11 @@ Tests mock provider calls and do not prove live Coinbase or paid-feed access.
 For focused checks:
 
 ```bash
-python3 -m unittest server_test logging_test
-python3 -m unittest discover -s scripts -p '*_test.py'
-python3 -m unittest docs_test
-node --test *.test.js
-python3 server.py --help
+PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest server_test logging_test
+PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest discover -s test/scripts -p '*_test.py'
+PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest docs_test
+node --test test/frontend/*.test.js
+python3 src/backend/server.py --help
 git diff --check
 ```
 
@@ -42,11 +42,11 @@ manual procedure explicitly says to use a live feed.
 
 | Suite files | Coverage |
 | --- | --- |
-| `account.test.js`, `auth.test.js`, `password.test.js` | Restored/expired sessions, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery and bounded retries. |
-| `bootstrap.test.js`, `coins.test.js`, `categories.test.js` | Catalog-first startup, offline/static-server failures, instrument selection, category configuration, coming-soon availability and displayed-hour coin prediction rings (direction, settled retention, hour navigation and logout). |
-| `btc-chart.test.js` | Minute history and heat maps, current/historical-hour navigation, stale response rejection, benchmark/quote freshness and oil-feed error states. |
-| `market-model.test.js`, `portfolio-model.test.js` | Interval layout, Up/Down outcomes, probability and volatility calculations, cutoff rules, credit limits, payout rounding, settled P/L and numeric history sorting. |
-| `community.test.js`, `contests.test.js`, `sponsor.test.js` | Community polling recovery, hourly score states, contest history and lookup, pending resets, safe sponsor links and absent/failed sponsor configuration. |
+| `test/frontend/account.test.js`, `test/frontend/auth.test.js`, `test/frontend/password.test.js` | Restored/expired sessions, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery and bounded retries. |
+| `test/frontend/bootstrap.test.js`, `test/frontend/coins.test.js`, `test/frontend/categories.test.js` | Catalog-first startup, offline/static-server failures, instrument selection, category configuration, coming-soon availability and displayed-hour coin prediction rings (direction, settled retention, hour navigation and logout). |
+| `test/frontend/btc-chart.test.js` | Minute history and heat maps, current/historical-hour navigation, stale response rejection, benchmark/quote freshness and oil-feed error states. |
+| `test/frontend/market-model.test.js`, `test/frontend/portfolio-model.test.js` | Interval layout, Up/Down outcomes, probability and volatility calculations, cutoff rules, credit limits, payout rounding, settled P/L and numeric history sorting. |
+| `test/frontend/community.test.js`, `test/frontend/contests.test.js`, `test/frontend/sponsor.test.js` | Community polling recovery, hourly score states, contest history and lookup, pending resets, safe sponsor links and absent/failed sponsor configuration. |
 | `server_test.py` | HTTP accounts, signup code, password changes, CSRF/origin/proxy/cookie rules, credit cap, idempotent predictions, settlement, health, catalog, community, protected pages and static allowlist/compression/HEAD. |
 | `contests_test.py` | Shared hourly wallet, concurrent spending, reusable winnings, hour boundaries, independent resets, finalization, ties, history, migration, gift-card pools and private-reference isolation. |
 | `categories_test.py` | Idempotent catalog migrations and preservation of legacy simulated settlement sources. |
@@ -54,9 +54,9 @@ manual procedure explicitly says to use a live feed.
 | `live_oil_test.py`, `oilprice_api_test.py`, `weather_test.py` | Provider timestamps, exact observation boundaries, unavailable/stale/mismatched data, credential/error handling and dormant category behavior. These tests do not enable Oil or Weather trading. |
 | `performance_test.py` | Bounded HTTP concurrency, database lifecycle, constant catalog query counts, history coalescing and settlement retry deduplication. |
 | `logging_test.py`, `docs_test.py` | Log levels/rotation and source documentation coverage/control-flow ownership. |
-| `scripts/build_static_test.py`, `scripts/database_test.py` | Public-only static builds, preservation after a missing source, database initialization/backup/reset and process locking. |
-| `scripts/server_control_test.py`, `scripts/docker_restart_test.py` | Watchdog crash/stop lifecycle and Docker restart command ordering/container options. Docker calls are mocked. |
-| `scripts/run_tests_test.py` | Timestamped result filenames and Node/Python summary parsing. |
+| `test/scripts/build_static_test.py`, `test/scripts/database_test.py` | Public-only static builds, preservation after a missing source, database initialization/backup/reset and process locking. |
+| `test/scripts/server_control_test.py`, `test/scripts/docker_restart_test.py` | Watchdog crash/stop lifecycle and Docker restart command ordering/container options. Docker calls are mocked. |
+| `test/scripts/run_tests_test.py` | Timestamped result filenames and Node/Python summary parsing. |
 
 ## Account test isolation and deterministic time
 
@@ -98,7 +98,7 @@ prize type; tests reject other types on both new and existing database schemas.
 Run without a Docker daemon:
 
 ```bash
-python3 -m unittest discover -s scripts -p 'docker_restart_test.py'
+PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest discover -s test/scripts -p 'docker_restart_test.py'
 ```
 
 The tests substitute a fake Docker executable and exercise
@@ -190,7 +190,7 @@ availability, rendered layout, Docker recovery or production capacity.
 
 ## Contest and sponsor acceptance checks
 
-Run `python3 -m unittest contests_test` for backend and HTTP checks. In a browser,
+Run `PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest contests_test` for backend and HTTP checks. In a browser,
 use two disposable accounts and confirm:
 
 1. The terminal uses Hourly contest only. There is no play mode selector, and
@@ -231,7 +231,7 @@ passwords can still log in; login requires neither confirmation nor signup code.
 
 ## VPS resource regressions
 
-`python3 -m unittest performance_test` checks database closure/rollback, read-only
+`PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest performance_test` checks database closure/rollback, read-only
 contest polling under a writer lock, concurrent history request sharing, failed
 settlement deduplication, and HTTP overload recovery. These use temporary data
 and mocked providers; see [local performance measurements](VPS_PERFORMANCE.md).
@@ -244,10 +244,10 @@ verify that missing/empty configuration disables signup without blocking login.
 Run the focused browser regressions with:
 
 ```bash
-node --test account.test.js password.test.js
-python3 -m unittest server_test.AccountsTest.test_change_password_validation_and_session_revocation
-python3 -m unittest server_test.AccountsTest.test_password_hashing_allows_other_database_writers
-python3 -m unittest server_test.AccountsTest.test_password_change_rejects_concurrent_credentials_or_session_change
+node --test test/frontend/account.test.js test/frontend/password.test.js
+PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest server_test.AccountsTest.test_change_password_validation_and_session_revocation
+PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest server_test.AccountsTest.test_password_hashing_allows_other_database_writers
+PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest server_test.AccountsTest.test_password_change_rejects_concurrent_credentials_or_session_change
 ```
 
 Browser tests cover CSRF submission, confirmation mismatch, retry after an
@@ -289,7 +289,7 @@ require the Python API. Automated DOM tests do not replace these visual checks.
 
 ## Coin prediction outlines
 
-Run `node --test bootstrap.test.js` for marker-state regressions. Contest
+Run `node --test test/frontend/bootstrap.test.js` for marker-state regressions. Contest
 predictions are grouped by the hour of their interval start, including settled
 orders. The outer ring describes the hour displayed in the playfield, across all
 coins; it does not disappear when a shorter interval ends or settles. Tests cover
@@ -305,3 +305,5 @@ is displayed. Check horizontal scrolling on mobile so the outside ring is not
 clipped, and verify hover/focus do not hide the direction ring. Tooltips and
 accessible labels should describe predictions in the displayed hour. Synthetic
 preview must not show real prediction rings.
+
+Test files are grouped in `test/backend`, `test/frontend`, and `test/scripts`; application sources live in `src/backend`, `src/frontend`, and `src/seeds`. Run the commands above from the repository root.

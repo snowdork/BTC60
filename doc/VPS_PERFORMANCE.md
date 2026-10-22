@@ -64,7 +64,7 @@ cache state; the request/query reductions are the more useful evidence.
 ## Verification and deployment
 
 ```bash
-python3 -m unittest performance_test
+PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest performance_test
 python3 scripts/run_tests.py
 docker compose config --quiet
 docker compose up -d --build

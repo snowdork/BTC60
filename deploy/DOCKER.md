@@ -139,7 +139,7 @@ assets or API responses.
 
 For Docker, edit the root `.env` and run `docker compose up -d` to recreate the
 app with the new environment. For systemd, edit `/etc/predict60/predict60.env`
-and restart `predict60.service`. A local `python3 server.py` process needs the
+and restart `predict60.service`. A local `python3 src/backend/server.py` process needs the
 variable exported in its shell; it does not automatically load `.env`.
 
 ## Routine operation

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -81,6 +82,7 @@ def run_suite(name: str, command: tuple[str, ...], log: TextIO) -> SuiteResult:
     process = subprocess.Popen(
         command,
         cwd=ROOT,
+        env={**os.environ, 'PYTHONPATH': os.pathsep.join([str(ROOT / 'src/backend'), str(ROOT / 'scripts'), os.environ.get('PYTHONPATH', '')])},
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -129,11 +131,11 @@ def main() -> int:
     RESULTS_DIRECTORY.mkdir(parents=True, exist_ok=True)
     started_at = datetime.now().astimezone()
     destination = result_path(started_at)
-    javascript_tests = tuple(str(path.name) for path in sorted(ROOT.glob('*.test.js')))
+    javascript_tests = tuple(str(path.relative_to(ROOT)) for path in sorted(ROOT.glob('test/frontend/*.test.js')))
     suites = [
         ('JavaScript', ('node', '--test', *javascript_tests)),
-        ('Python application', (sys.executable, '-m', 'unittest', 'discover', '-p', '*_test.py')),
-        ('Python scripts', (sys.executable, '-m', 'unittest', 'discover', '-s', 'scripts', '-p', '*_test.py')),
+        ('Python application', (sys.executable, '-m', 'unittest', 'discover', '-s', 'test/backend', '-p', '*_test.py')),
+        ('Python scripts', (sys.executable, '-m', 'unittest', 'discover', '-s', 'test/scripts', '-p', '*_test.py')),
     ]
     with destination.open('w', encoding='utf-8') as log:
         write_line(log, f'{BOLD}Predict60 unit-test run{RESET}')

@@ -37,7 +37,7 @@ def generate(root, destination):
     """Create module pages, procedure docs, control-flow references, and source views."""
     destination.mkdir(parents=True, exist_ok=True)
     pages = []
-    paths = sorted([*root.glob('*.py'), *root.glob('*.js'), *root.joinpath('scripts').glob('*.py'), root / 'doc/conf.py', *root.joinpath('doc/_ext').glob('*.py'), *root.joinpath('doc/_ext').glob('*.cjs')])
+    paths = sorted([*root.glob('src/**/*.py'), *root.glob('src/**/*.js'), *root.glob('test/**/*.py'), *root.glob('test/**/*.js'), *root.joinpath('scripts').glob('*.py'), root / 'doc/conf.py', *root.joinpath('doc/_ext').glob('*.py'), *root.joinpath('doc/_ext').glob('*.cjs')])
     for path in paths:
         relative = path.relative_to(root).as_posix()
         slug = relative.replace('/', '_').replace('.', '_')

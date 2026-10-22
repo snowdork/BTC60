@@ -7,14 +7,14 @@
     await window.Predict60Account.loaded;
     // Do not request market configuration until the restored account is authenticated.
     if(!window.Predict60Account.user){location.replace('welcome.html');return;}
-    if(location.protocol==='file:')throw Error('Open the terminal through python3 server.py, not a file preview.');
+    if(location.protocol==='file:')throw Error('Open the terminal through python3 src/backend/server.py, not a file preview.');
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);
     let response;try{response=await fetch('/api/coins',{signal:controller.signal,cache:'no-store'});}finally{clearTimeout(timeout);}
-    if(!response.ok||!response.headers.get('Content-Type')?.includes('application/json'))throw Error('Coin API unavailable. Run or restart python3 server.py and open http://127.0.0.1:8000/index.html.');
+    if(!response.ok||!response.headers.get('Content-Type')?.includes('application/json'))throw Error('Coin API unavailable. Run or restart python3 src/backend/server.py and open http://127.0.0.1:8000/index.html.');
     const data=await response.json();
     const categoryId=new URLSearchParams(location.search||'').get('category')||'crypto';
     const categoryResponse=await fetch('/api/categories',{cache:'no-store',signal:AbortSignal.timeout(8000)});
-    if(!categoryResponse.ok)throw Error('Market categories unavailable. Restart python3 server.py.');
+    if(!categoryResponse.ok)throw Error('Market categories unavailable. Restart python3 src/backend/server.py.');
     const category=(await categoryResponse.json()).categories.find(item=>item.id===categoryId);
     if(!category)throw Error('This category is unavailable. Choose another market from the category screen.');
     // Coming-soon categories never initialize a prediction terminal.
@@ -77,7 +77,7 @@
   }catch(error){
     picker.textContent='Markets unavailable';
     const connectionError=error instanceof TypeError||error.name==='AbortError'||error instanceof SyntaxError;
-    document.getElementById('chart-empty').textContent=connectionError?'Cannot reach the coin database. Run python3 server.py, then open http://127.0.0.1:8000/index.html.':error.message;
+    document.getElementById('chart-empty').textContent=connectionError?'Cannot reach the coin database. Run python3 src/backend/server.py, then open http://127.0.0.1:8000/index.html.':error.message;
     document.getElementById('btc-change').textContent='Database connection unavailable';
     document.getElementById('workspace-clock').textContent='Terminal offline';
     document.getElementById('selected-state').textContent='OFFLINE';

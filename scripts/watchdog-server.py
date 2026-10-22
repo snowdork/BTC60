@@ -10,7 +10,7 @@ import sys
 import threading
 from server_control import DATA, ROOT, STOP
 
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / 'src/backend'))
 from p60_logging import configure, write_or_rotate
 
 
@@ -35,7 +35,7 @@ def main():
         logging.info('Watchdog started; log level=%s', args.log_level)
         while not stopped.is_set() and not STOP.exists():
             child = subprocess.Popen(
-                [sys.executable, '-u', str(ROOT / 'server.py'), '--port', str(args.port)],
+                [sys.executable, '-u', str(ROOT / 'src/backend/server.py'), '--port', str(args.port)],
                 cwd=ROOT, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT, text=True, errors='replace',
                 # Apply the original selection to every replacement child.

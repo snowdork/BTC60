@@ -76,7 +76,7 @@ the recorded executable test results.
 
 After the full run recorded above, `restart-docker.sh` was updated to stop an
 installed `predict60.service` after a successful build and before starting Docker.
-`python3 -m unittest discover -s scripts -p docker_restart_test.py` passed all
+`PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest discover -s test/scripts -p docker_restart_test.py` passed all
 six tests (0 failures). Both local and VPS modes cover handoff ordering, absent
 service behavior and aborting replacement after a failed service stop.
 `bash -n scripts/restart-docker.sh` and `git diff --check` also passed. Docker and
@@ -84,7 +84,7 @@ systemctl were mocked; the complete suite was not rerun for this script change.
 
 ## Subsequent focused verification: hourly direction rings
 
-`node --test bootstrap.test.js` passed all six tests after changing coin markers
+`node --test test/frontend/bootstrap.test.js` passed all six tests after changing coin markers
 to retain settled predictions for the displayed hour. Coverage includes mixed
 Up/Down orders, hour rollover, historical-hour navigation, synthetic preview,
 settlement retention and logout. The static export was rebuilt and
