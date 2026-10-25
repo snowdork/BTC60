@@ -217,11 +217,11 @@ def initialize():
           enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)), sort_order INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS catalog_migrations (version INTEGER PRIMARY KEY);
         CREATE TRIGGER IF NOT EXISTS max_enabled_coins_insert BEFORE INSERT ON coins
-        WHEN NEW.enabled=1 AND (SELECT count(*) FROM coins WHERE enabled=1)>=8
-        BEGIN SELECT RAISE(ABORT,'Maximum 8 enabled prediction coins'); END;
+        WHEN NEW.enabled=1 AND (SELECT count(*) FROM coins WHERE enabled=1)>=10
+        BEGIN SELECT RAISE(ABORT,'Maximum 10 enabled prediction coins'); END;
         CREATE TRIGGER IF NOT EXISTS max_enabled_coins_update BEFORE UPDATE OF enabled ON coins
-        WHEN NEW.enabled=1 AND OLD.enabled=0 AND (SELECT count(*) FROM coins WHERE enabled=1)>=8
-        BEGIN SELECT RAISE(ABORT,'Maximum 8 enabled prediction coins'); END;
+        WHEN NEW.enabled=1 AND OLD.enabled=0 AND (SELECT count(*) FROM coins WHERE enabled=1)>=10
+        BEGIN SELECT RAISE(ABORT,'Maximum 10 enabled prediction coins'); END;
         CREATE TABLE IF NOT EXISTS users (
           id INTEGER PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL,
           password_hash TEXT NOT NULL, salt TEXT NOT NULL,
@@ -290,12 +290,12 @@ def initialize():
         DROP TRIGGER IF EXISTS max_enabled_coins_insert;
         DROP TRIGGER IF EXISTS max_enabled_coins_update;
         CREATE TRIGGER max_enabled_coins_insert BEFORE INSERT ON coins
-        WHEN NEW.enabled=1 AND (SELECT count(*) FROM coins WHERE enabled=1 AND category=NEW.category)>=8
-        BEGIN SELECT RAISE(ABORT,'Maximum 8 enabled instruments per category'); END;
+        WHEN NEW.enabled=1 AND (SELECT count(*) FROM coins WHERE enabled=1 AND category=NEW.category)>=10
+        BEGIN SELECT RAISE(ABORT,'Maximum 10 enabled instruments per category'); END;
         CREATE TRIGGER max_enabled_coins_update BEFORE UPDATE OF enabled,category ON coins
         WHEN NEW.enabled=1 AND (OLD.enabled=0 OR OLD.category<>NEW.category)
-          AND (SELECT count(*) FROM coins WHERE enabled=1 AND category=NEW.category)>=8
-        BEGIN SELECT RAISE(ABORT,'Maximum 8 enabled instruments per category'); END;
+          AND (SELECT count(*) FROM coins WHERE enabled=1 AND category=NEW.category)>=10
+        BEGIN SELECT RAISE(ABORT,'Maximum 10 enabled instruments per category'); END;
         CREATE TRIGGER IF NOT EXISTS preserve_prediction_feed BEFORE UPDATE OF product,feed,category,demo_base ON coins
         WHEN (NEW.product<>OLD.product OR NEW.feed<>OLD.feed OR NEW.category<>OLD.category OR NEW.demo_base<>OLD.demo_base)
           AND EXISTS(SELECT 1 FROM predictions WHERE coin=OLD.symbol)
@@ -346,6 +346,19 @@ def initialize():
             DROP TABLE instrument_sources_v4;
             INSERT INTO catalog_migrations VALUES(5);
             """)
+        # Expand the curated crypto set once, preserving saved sources and later admin edits.
+        if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=6').fetchone():
+            additions = [coin for coin in json.loads((SEEDS / 'coins.seed.json').read_text())
+                         if coin['symbol'] in ('LINK', 'AVAX', 'SUI')]
+            for coin in additions:
+                conn.execute('INSERT OR IGNORE INTO coins(symbol,name,product,precision,demo_base,icon,enabled,sort_order) VALUES(?,?,?,?,?,?,0,?)',
+                             (coin['symbol'], coin['name'], coin['product'], coin['precision'], coin['demoBase'], coin['icon'], coin['sortOrder']))
+                room = conn.execute("SELECT count(*) FROM coins WHERE enabled=1 AND category='crypto'").fetchone()[0] < 10
+                if room:
+                    conn.execute("UPDATE coins SET enabled=1,sort_order=? WHERE symbol=? AND category='crypto' AND feed='coinbase' AND product=?",
+                                 (coin['sortOrder'], coin['symbol'], coin['product']))
+            conn.execute('INSERT INTO catalog_migrations VALUES(6)')
+
         if oilprice_api.configured():
             for symbol,product in oilprice_api.SYMBOLS.items():
                 conn.execute("UPDATE instrument_sources SET provider='oilpriceapi',product=? WHERE coin=?",(product,symbol))

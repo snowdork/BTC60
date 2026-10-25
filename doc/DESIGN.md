@@ -38,7 +38,7 @@ Crypto is the only active category. Oil and Weather render as non-navigable
 server-side validation rejects their orders. Oil feed adapters remain available
 for diagnostics until a verified feed can support prediction settlement.
 
-The database catalog supplies selectable coins, Coinbase products, precision, icons, and synthetic base prices. The default seed enables BTC, ETH, SOL, XRP, DOGE, ADA, and LTC. Up to eight coins may be enabled. Predictions retain their original coin independently of current selection; account balance is shared across coins.
+The database catalog supplies selectable coins, Coinbase products, precision, icons, and synthetic base prices. The default seed enables BTC, ETH, SOL, XRP, DOGE, ADA, LTC, LINK, AVAX and SUI. Up to ten instruments per category may be enabled. Migration 6 adds/enables the three additions once, preserves saved source mappings and respects existing custom selections. Predictions retain their original coin independently of current selection; account balance is shared across coins.
 
 ## Data and readiness
 

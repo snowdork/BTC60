@@ -6,16 +6,19 @@ const source=fs.readFileSync(require('node:path').join(__dirname,'../../src/fron
 
 test('segments expose prediction, result, and upcoming details actions without nested buttons',()=>{
   const markets=[{id:'60-0',minutes:60,status:'open'},{id:'30-0',minutes:30,status:'settled'},{id:'15-0',minutes:15,status:'queued'}].map(m=>({...m,start:'12:00',end:'13:00',strike:100,close:101}));
-  const grid={innerHTML:'',querySelectorAll:()=>[]};
+  const icons=[{},{},{}];
+  const grid={innerHTML:'',querySelectorAll:selector=>selector==='.tier-coin-icon'?icons:[]};
   const start=source.indexOf('function renderMarkets()');
   const end=source.indexOf('  /** Estimate the selected interval',start);
   vm.runInNewContext(source.slice(start,end)+';renderMarkets();',{
-    markets,market:markets[0],$:()=>grid,marketElements:new Map(),window:{PredictModel:{coin:{feed:'coinbase'}}},
+    markets,market:markets[0],$:()=>grid,marketElements:new Map(),window:{PredictModel:{coin:{feed:'coinbase',icon:'assets/coins/eth.svg',symbol:'ETH'}}},
     outcome:()=> 'up',price:String,renderSegmentPredictions(){},renderChances(){}
   });
   assert.match(grid.innerHTML,/data-segment-action="60-0"[^>]*>[\s\S]*?<span class="segment-action-label">Predict<\/span><\/button>/);
   assert.match(grid.innerHTML,/data-segment-action="30-0"[^>]*>[\s\S]*?<span class="segment-action-label">Result<\/span><\/button>/);
   assert.match(grid.innerHTML,/data-segment-action="15-0"[^>]*>[\s\S]*?<span class="segment-action-label">Details<\/span><\/button>/);
+  for(const minutes of [60,30,15])assert.ok(grid.innerHTML.includes(`<span>${minutes}m</span>`));
+  assert.ok(icons.every(icon=>icon.src==='assets/coins/eth.svg'&&icon.alt==='ETH'));
   assert.equal((grid.innerHTML.match(/<button/g)||[]).length,3);
   assert.equal((grid.innerHTML.match(/aria-controls="prediction-dialog"/g)||[]).length,3);
 });

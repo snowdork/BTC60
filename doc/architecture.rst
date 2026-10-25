@@ -61,7 +61,10 @@ The API pages list each named procedure's own branches and loops with source
 lines. Nested helpers have separate entries. Validation guards reject unsupported
 providers, stale data, invalid money and unknown instruments. Polling guards skip
 hidden documents and overlapping requests; transport errors preserve retry paths.
-Catalog migrations seed only missing data to preserve administrator edits.
+Catalog migrations seed missing data and record one-time selection changes.
+Migration 6 adds/enables LINK, AVAX and SUI within the ten-instrument category
+limit, preserving saved sources and custom coins. Later administrator edits are
+not reapplied on subsequent startups.
 
 Operations
 ----------

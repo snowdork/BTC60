@@ -459,8 +459,7 @@ class AccountsTest(unittest.TestCase):
 
     def test_database_coin_catalog(self):
         with server.connect() as conn:
-            conn.execute("UPDATE coins SET enabled=1 WHERE symbol='AVAX'")
-            self.assertEqual(conn.execute('SELECT count(*) FROM coins WHERE enabled=1 AND category="crypto"').fetchone()[0], 8)
+            self.assertEqual(conn.execute('SELECT count(*) FROM coins WHERE enabled=1 AND category="crypto"').fetchone()[0], 10)
             with self.assertRaises(sqlite3.IntegrityError):
                 conn.execute("UPDATE coins SET enabled=1 WHERE symbol='TRUMP'")
             conn.execute("UPDATE coins SET enabled=0 WHERE symbol='AVAX'")

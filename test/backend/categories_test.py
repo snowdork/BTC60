@@ -13,6 +13,40 @@ class CategoryMigrationTest(unittest.TestCase):
         config=patch('oilprice_api.configured',return_value=False)
         config.start();self.addCleanup(config.stop)
 
+    def test_ten_coin_upgrade_runs_once_and_preserves_later_edits(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(server, 'DB', Path(folder) / 'upgrade.sqlite3'):
+            server.initialize()
+            with server.connect() as conn:
+                conn.execute('DELETE FROM catalog_migrations WHERE version=6')
+                conn.execute("UPDATE coins SET enabled=0 WHERE symbol IN ('LINK','AVAX','SUI')")
+                conn.execute("DELETE FROM coins WHERE symbol='SUI'")
+                conn.execute("UPDATE coins SET name='My Bitcoin' WHERE symbol='BTC'")
+            server.initialize()
+            with server.connect() as conn:
+                symbols = [row[0] for row in conn.execute("SELECT symbol FROM coins WHERE category='crypto' AND enabled=1 ORDER BY sort_order,symbol")]
+                self.assertEqual(symbols, ['BTC','ETH','SOL','XRP','DOGE','ADA','LTC','LINK','AVAX','SUI'])
+                self.assertEqual(conn.execute("SELECT name FROM coins WHERE symbol='BTC'").fetchone()[0], 'My Bitcoin')
+                conn.execute("UPDATE coins SET enabled=0 WHERE symbol='LINK'")
+                conn.execute("UPDATE coins SET name='My Sui' WHERE symbol='SUI'")
+            server.initialize()
+            with server.connect() as conn:
+                self.assertEqual(conn.execute("SELECT enabled FROM coins WHERE symbol='LINK'").fetchone()[0], 0)
+                self.assertEqual(conn.execute("SELECT name FROM coins WHERE symbol='SUI'").fetchone()[0], 'My Sui')
+                self.assertEqual(conn.execute('SELECT count(*) FROM catalog_migrations WHERE version=6').fetchone()[0], 1)
+
+    def test_ten_coin_upgrade_keeps_custom_coins_within_capacity(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(server, 'DB', Path(folder) / 'custom.sqlite3'):
+            server.initialize()
+            with server.connect() as conn:
+                conn.execute('DELETE FROM catalog_migrations WHERE version=6')
+                conn.execute("UPDATE coins SET enabled=0 WHERE symbol IN ('LINK','AVAX','SUI')")
+                conn.execute("INSERT INTO coins(symbol,name,product,precision,demo_base,enabled) VALUES('CUSTOM','Custom','CUSTOM-USD',2,1,1)")
+            server.initialize()
+            with server.connect() as conn:
+                self.assertEqual(conn.execute("SELECT count(*) FROM coins WHERE category='crypto' AND enabled=1").fetchone()[0], 10)
+                self.assertEqual(conn.execute("SELECT enabled FROM coins WHERE symbol='CUSTOM'").fetchone()[0], 1)
+                self.assertEqual(conn.execute("SELECT enabled FROM coins WHERE symbol='SUI'").fetchone()[0], 0)
+
     def test_legacy_data_survives_idempotent_category_migration(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(server, 'DB', Path(folder) / 'legacy.sqlite3'):
             # The eight-column legacy catalog, with an existing account and order.

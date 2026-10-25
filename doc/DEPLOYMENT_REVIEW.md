@@ -12,13 +12,14 @@ cached minutes, retry wider windows and validate malformed/truncated provider
 responses. Missing exact data still blocks execution; no order replay or session
 replacement is added. Maintenance-script source documentation now passes.
 
-The latest local run passes all **235 tests**, with mocked providers and temporary
+The latest local run passes all **240 tests**, with mocked providers and temporary
 databases. Phone/laptop segment fixtures were inspected; these checks do not
 establish live order recovery or production capacity. See
 [test results](TEST_RESULTS.md) and [performance review](VPS_PERFORMANCE.md).
 Apply backend changes by restarting the selected runtime or rebuilding its Docker
 image. Source is served from `src/frontend/`; the regenerated `dist/` is a static
-export. No database migration or data reset is required by this maintenance.
+export. The ten-coin expansion uses one-time catalog migration 6; no data reset is
+required. Saved accounts/bets and custom coin selections are preserved.
 
 ## Corrections completed
 

@@ -24,7 +24,9 @@ need a synchronized export. Static hosting alone cannot run accounts or trading.
 ### Segment and benchmark maintenance
 
 The October 25 cleanup updates browser sources and backend benchmark recovery;
-no database reset or new migration is required. Use the normal update/restart
+no database reset is required. Catalog migration 6 adds LINK, AVAX and SUI on
+startup within the new ten-coin limit, preserving accounts, saved bets and custom
+coin selections. Use the normal update/restart
 command for your selected mode above; Docker must rebuild to include the source
 changes. Rebuilding only `dist/` does not change the backend. A missing exact
 benchmark remains a provider-data failure even after recovery retries; logging

@@ -432,3 +432,8 @@ button,a,input{touch-action:manipulation}
 .no-credits-banner{margin:0 0 14px;padding:14px 16px;border:2px solid #ff5275;border-radius:8px;background:#ff174414;color:#ff5275;text-align:center;font:900 22px/1.3 'Sora',Arial,sans-serif;letter-spacing:1px}
 .no-credits-banner[hidden]{display:none}
 [data-theme="light"] .no-credits-banner{color:#b51d3c;border-color:#b51d3c;background:#ff17440c}
+
+/* Duration labels and selected-coin icons share one centered column. */
+.terminal-page .tier .tier-label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding-top:0;text-align:center;font-size:16px;line-height:1.3}
+.terminal-page .tier-coin-icon{display:block;width:24px;height:24px;object-fit:contain;flex-shrink:0}
+@media(max-width:600px){.terminal-page .tier .tier-label{margin-bottom:10px}}

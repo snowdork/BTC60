@@ -63,7 +63,7 @@ def status(path):
         for table in ['users', 'sessions', 'categories', 'coins', 'instrument_sources', 'predictions', 'prediction_sources', 'settlements']:
             print(f'{table}: {conn.execute("SELECT count(*) FROM " + table).fetchone()[0]}')
         for category, count in conn.execute('SELECT category,count(*) FROM coins WHERE enabled=1 GROUP BY category ORDER BY category'):
-            print(f'Enabled {category} instruments: {count} / 8')
+            print(f'Enabled {category} instruments: {count} / 10')
         if integrity != 'ok' or conn.execute('PRAGMA foreign_key_check').fetchone():
             raise ValueError('Database integrity or foreign-key check failed.')
 

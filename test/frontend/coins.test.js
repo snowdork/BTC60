@@ -8,10 +8,18 @@ test('empty and invalid catalogs are handled',()=>{assert.equal(createCatalog([]
 
 test('category selection isolates instruments without truncating another category',()=>{
  const oil=Array.from({length:5},(_,i)=>({...records[0],symbol:'OIL'+i,category:'oil',feed:'simulated',unit:'USD/barrel'}));
- const crypto=Array.from({length:8},(_,i)=>({...records[0],symbol:'CRYPTO'+i,category:'crypto'}));
- assert.equal(createCatalog([...oil,...crypto],'crypto').available.length,8);
+ const crypto=Array.from({length:10},(_,i)=>({...records[0],symbol:'CRYPTO'+i,category:'crypto'}));
+ assert.equal(createCatalog([...oil,...crypto],'crypto').available.length,10);
  const catalog=createCatalog([...crypto,...oil],'oil');
  assert.equal(catalog.available.length,5);
  assert(catalog.available.every(c=>c.feed==='simulated'&&c.category==='oil'));
  assert.equal(createCatalog([...crypto,...oil],'missing').available.length,0);
+});
+
+test('default catalog contains ten tradable coins with local icons',()=>{
+ const seed=require('../../src/seeds/coins.seed.json');
+ const catalog=createCatalog(seed);
+ assert.deepEqual(catalog.available.map(c=>c.symbol).sort(),['ADA','AVAX','BTC','DOGE','ETH','LINK','LTC','SOL','SUI','XRP']);
+ const fs=require('node:fs'),path=require('node:path');
+ assert(catalog.available.every(coin=>fs.existsSync(path.join(__dirname,'../../src/frontend',coin.icon))));
 });

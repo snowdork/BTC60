@@ -22,7 +22,7 @@ Stop `src/backend/server.py` and any other SQLite clients before `init` or `rese
 
 By default the database is `data/p60.sqlite3`, and backups go under `data/backups/`. Both are excluded from Git. Backup files have owner-only read/write permissions and UTC timestamps. The reset command always creates a backup when the target already exists, builds a fresh database first, and uses SQLite's backup API to replace it without manual WAL-file deletion.
 
-Use `--db /path/to/test.sqlite3` for a separate database; `PREDICT60_DB` is also supported. `P60_DB` is also supported, with legacy `BTC60_DB` as the final environment fallback. If no database path is configured and `data/p60.sqlite3` does not exist, an existing `data/btc60.sqlite3` remains in use. For the backup command only, `--backup-dir /path/to/backups` changes the destination. These commands never push, deploy, or send data externally. TRUMP and AVAX remain disabled in the current default seed.
+Use `--db /path/to/test.sqlite3` for a separate database; `PREDICT60_DB` is also supported. `P60_DB` is also supported, with legacy `BTC60_DB` as the final environment fallback. If no database path is configured and `data/p60.sqlite3` does not exist, an existing `data/btc60.sqlite3` remains in use. For the backup command only, `--backup-dir /path/to/backups` changes the destination. These commands never push, deploy, or send data externally. TRUMP remains disabled; LINK, AVAX and SUI join the original seven default crypto selections.
 
 A reset invalidates all sessions and removes all users, prediction records, settlements, and custom coin edits. The backup retains the previous state. It is never run implicitly by `init` or server startup.
 
@@ -33,7 +33,7 @@ legacy `coins` instrument table. Existing instruments become `crypto` / `coinbas
 / `USD`. Five oil instruments are added once as `oil` / `simulated` / `USD/barrel`.
 The migration preserves accounts, orders, balances, and previous settlements.
 
-Enabled instrument limits apply per category (eight each). Category integrity is
+Enabled instrument limits apply per category (ten each). Category integrity is
 enforced by triggers so populated legacy SQLite tables can migrate without a
 rebuild. Categories containing instruments cannot be deleted or renamed by ID.
 An instrument with orders cannot change category, product, feed, or demo base.
@@ -57,3 +57,13 @@ instrument merely to populate a quote. Credentials belong in the server environm
 never SQLite, source files, or browser code.
 
 Version 5 allows OilPriceAPI source overrides in instrument_sources. Existing prediction_sources snapshots remain unchanged. Credentials stay outside SQLite in a server-only ignored file or environment variable.
+
+## Ten-coin catalog upgrade
+
+Startup migration 6 adds/enables LINK, AVAX and SUI within the ten-instrument
+crypto limit, without resetting accounts, changing saved prediction sources or
+disabling custom coins. A custom catalog may fill the limit before all additions
+are enabled; inspect `python3 scripts/database.py status` and adjust explicitly
+if needed. Later restarts do not re-enable coins you subsequently disable.
+The browser and database both support ten selections; the five-column picker
+therefore displays two complete rows for the default crypto set.

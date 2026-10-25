@@ -128,11 +128,14 @@ OilPriceAPI mode shows dated physical spot assessments for all five crudes. Thes
 
 ## Laptop and phone displays
 
+Duration tiers are labeled **60m**, **30m** and **15m**, each with the selected
+coin icon centered underneath. The icons update when you switch coins.
+
 On a laptop, the chart and the 60-, 30-, and 15-minute segment rows share one
 hourly timeline. Compact navigation and cards leave more room for predictions.
 On phone screens up to 600 pixels wide, the chart fits the screen and segments
 stack by duration. Choose coins from the five-column icon grid in the live price
-panel. Use **← Categories** in the top bar to switch market categories; the coin grid has no separate heading row. Each icon shows its ticker; the inner highlight marks the selected coin,
+panel. Use **← Categories** in the top bar to switch market categories; the coin grid has no separate heading row. The default ten coins are BTC, ETH, SOL, XRP, DOGE, ADA, LTC, LINK, AVAX and SUI, arranged in two rows of five. Each icon shows its ticker; the inner highlight marks the selected coin,
 and the outer ring shows your hourly prediction direction.
 
 Each card starts with a bold UTC time range, Up/Down model percentages and status.

@@ -27,9 +27,12 @@ Predict60 is a buildless web app for exploring hourly direction predictions with
   <img src="src/frontend/assets/coins/doge.svg" width="32" height="32" alt="Dogecoin (DOGE)">
   <img src="src/frontend/assets/coins/ada.svg" width="32" height="32" alt="Cardano (ADA)">
   <img src="src/frontend/assets/coins/ltc.svg" width="32" height="32" alt="Litecoin (LTC)">
+  <img src="src/frontend/assets/coins/link.svg" width="32" height="32" alt="Chainlink (LINK)">
+  <img src="src/frontend/assets/coins/avax.svg" width="32" height="32" alt="Avalanche (AVAX)">
+  <img src="src/frontend/assets/coins/sui.svg" width="32" height="32" alt="Sui (SUI)">
 </p>
 
-BTC · ETH · SOL · XRP · DOGE · ADA · LTC. The database catalog controls availability; all coins share the same account balance.
+BTC · ETH · SOL · XRP · DOGE · ADA · LTC · LINK · AVAX · SUI. This is a curated Coinbase-supported selection, not a continuously re-ranked global top ten. The database catalog controls availability; all coins share the same account balance.
 
 ### Prediction rules
 
@@ -269,14 +272,14 @@ Tests cover market calculations, catalog/bootstrap behavior, portfolio summaries
 
 New installations use `data/p60.sqlite3`; `PREDICT60_DB` or `P60_DB` selects another path. Existing `data/btc60.sqlite3` databases remain in use when the new default does not exist. Legacy `BTC60_*` environment variables remain fallbacks after `PREDICT60_*` and `P60_*`. Session cookies and browser theme storage now use the `p60_` prefix; users must sign in again and reselect their theme after upgrading. Startup creates missing tables and applies catalog migrations. Players receive 1,000 contest credits per hour, resetting independently at each GMT hour boundary. Browser-only positions are not imported. Database files and backups are excluded from Git.
 
-The database `coins` table is authoritative. The crypto seed has ten records: BTC, ETH, SOL, XRP, DOGE, ADA, and LTC enabled; LINK, TRUMP, and AVAX disabled. Existing databases can have administrator edits. Triggers allow at most eight enabled instruments per category. Disabling a coin blocks new orders while preserving history and settlement. Keep referenced symbols and product mappings stable.
+The database `coins` table is authoritative. The crypto seed has eleven records: BTC, ETH, SOL, XRP, DOGE, ADA, LTC, LINK, AVAX and SUI enabled; TRUMP remains disabled. Existing databases can have administrator edits. Triggers allow at most ten enabled instruments per category. Disabling a coin blocks new orders while preserving history and settlement. Keep referenced symbols and product mappings stable.
 
-`src/seeds/coins.seed.json` seeds new databases; editing it does not overwrite existing catalog rows. One-time migrations add catalog entries and replace LINK selection with LTC while retaining LINK history. Refresh the terminal after database catalog edits.
+`src/seeds/coins.seed.json` seeds new databases; editing it does not overwrite existing catalog rows. One-time migration 6 expands the default selection to ten with LINK, AVAX and SUI. It preserves saved bets/provider mappings and respects capacity when custom coins are enabled; later administrator edits remain intact on restart. Earlier migrations retain their historical catalog behavior. Refresh the terminal after database catalog edits.
 
 ```sql
 BEGIN;
 UPDATE coins SET enabled=0 WHERE symbol='DOGE';
-UPDATE coins SET enabled=1 WHERE symbol='AVAX';
+UPDATE coins SET enabled=1 WHERE symbol='TRUMP';
 COMMIT;
 ```
 

@@ -182,7 +182,7 @@
   /** Render markets from the latest account, market, and interface state. */ function renderMarkets() {
     $('market-grid').innerHTML=[60,30,15].map(minutes=>{
       const items=markets.filter(m=>m.minutes===minutes);
-      return `<div class="tier" data-duration="${minutes}"><div class="tier-label">${minutes}<small>MINUTES</small></div><div class="tier-cards" style="--columns:${items.length}">${items.map(m=>{
+      return `<div class="tier" data-duration="${minutes}"><div class="tier-label"><span>${minutes}m</span><img class="tier-coin-icon" width="24" height="24" alt=""></div><div class="tier-cards" style="--columns:${items.length}">${items.map(m=>{
         const settled=m.status==='settled',queued=m.status==='queued',result=settled&&Number.isFinite(m.strike)&&Number.isFinite(m.close)?outcome(m.strike,m.close):null;
         const actionIcon=settled?'<path d="M4 19h16M7 15v-4m5 4V5m5 10V8"/>':queued?'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>':'<path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z"/>';
         const action=`<button type="button" class="segment-action" data-segment-action="${m.id}" aria-haspopup="dialog" aria-controls="prediction-dialog" aria-label="${settled?'View result for':queued?'View details for':'Predict on'} ${minutes} minute segment ${m.start} to ${m.end} UTC"><svg class="segment-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${actionIcon}</svg><span class="segment-action-label">${settled?'Result':queued?'Details':'Predict'}</span></button>`;
@@ -190,7 +190,7 @@
         const status=queued?'UPCOMING':settled?(compact?'PENDING':'COMPLETED'):'● OPEN';
         const prices=compact?'':`<div class="segment-price-row"><span class="segment-price-values"><span class="segment-benchmark-price" title="Benchmark price">${Number.isFinite(m.strike)?price(m.strike):'—'}</span><span class="settlement-separator" aria-label="to">→</span><strong class="segment-current-price" title="${settled?'Closing price':'Current price'}">${settled&&Number.isFinite(m.close)?price(m.close):'—'}</strong><span data-reference-price="${m.id}" hidden></span></span></div>`;
         const probabilities=compact?'':`<div class="segment-odds" aria-label="${settled?'Final direction result':'Estimated direction probabilities'}"><span class="segment-odds-up">Up —</span><span class="segment-odds-divider" aria-hidden="true">|</span><span class="segment-odds-down">Down —</span></div>`;
-        const remaining=compact?'':`<span class="segment-countdown" ${settled?'':`data-remaining="${m.id}"`} aria-label="Time remaining">${settled?'0m 00s':m.remaining}</span>`;
+        const remaining=compact||settled?'':`<span class="segment-countdown" data-remaining="${m.id}" aria-label="Time remaining">${m.remaining}</span>`;
         return `<div role="group" class="market-card ${m.status} ${result?'result-'+result:''} ${settled&&compact?'pending':''} ${m.id===market.id?'selected':''}" data-market="${m.id}" aria-label="${minutes} minute market ${m.start} to ${m.end} UTC, ${m.status}">
           <div class="card-top"><span class="card-time">${m.start} – ${m.end}</span>${probabilities}<span class="segment-meta"><span class="badge ${queued||compact?'neutral':settled?(result==='up'?'green':'red'):'green'}">${status}</span></span></div>
           ${prices}
@@ -201,6 +201,10 @@
         </div>`;
       }).join('')}</div></div>`;
     }).join('');
+    $('market-grid').querySelectorAll('.tier-coin-icon').forEach(icon=>{
+      icon.src=window.PredictModel.coin.icon||'assets/coins/btc.svg';
+      icon.alt=window.PredictModel.coin.symbol;
+    });
     marketElements.clear();
     $('market-grid').querySelectorAll('[data-market]').forEach(card=>{
       marketElements.set(card.dataset.market,{card,reference:card.querySelector('[data-reference-price]'),predictions:card.querySelector('[data-predictions]'),up:card.querySelector('.segment-odds-up'),down:card.querySelector('.segment-odds-down'),price:card.querySelector('.segment-current-price'),direction:card.querySelector('[data-direction-indicator]'),arrow:card.querySelector('.segment-direction-arrow'),change:card.querySelector('.segment-direction-change')});
