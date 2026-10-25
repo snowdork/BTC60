@@ -520,6 +520,24 @@ class AccountsTest(unittest.TestCase):
             self.assertNotEqual(queries[0]['start'], queries[1]['start'])
             self.assertEqual(queries[0]['end'], queries[1]['end'])
 
+    def test_benchmark_recovers_from_malformed_or_truncated_provider_data(self):
+        from io import BytesIO
+        bad_responses = [b'{', b'{"message":"unavailable"}', b'[null, [], [60], [60,0,0,0,"bad"], [60,0,0,0,true]]']
+        for payload in bad_responses:
+            with self.subTest(payload=payload), patch.dict(server.HISTORY_CACHE, {}, clear=True), patch('server.time.sleep'), patch(
+                    'server.urllib.request.urlopen', side_effect=[BytesIO(payload), BytesIO(b'[[60,0,0,0,101]]')]) as network:
+                self.assertEqual(server.candle_close('BTC', 120, {'feed': 'coinbase', 'product': 'BTC-USD'}), 101)
+                self.assertEqual(network.call_count, 2)
+
+    def test_benchmark_does_not_retry_permanent_provider_rejection(self):
+        error = server.urllib.error.HTTPError('https://example.invalid', 404, 'Not found', {}, None)
+        with patch.dict(server.HISTORY_CACHE, {}, clear=True), patch('server.time.sleep') as sleep, patch(
+                'server.urllib.request.urlopen', side_effect=error) as network:
+            with self.assertRaises(server.urllib.error.HTTPError):
+                server.candle_close('BTC', 120, {'feed': 'coinbase', 'product': 'BTC-USD'})
+            self.assertEqual(network.call_count, 1)
+            sleep.assert_not_called()
+
     def test_benchmark_retry_is_bounded_and_never_uses_another_minute(self):
         from io import BytesIO
         with patch('server.time.sleep'), patch('server.urllib.request.urlopen',

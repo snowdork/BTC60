@@ -12,10 +12,12 @@ DB_KEYS = ('PREDICT60_DB', 'P60_DB', 'BTC60_DB')
 
 
 def output(command):
+    """Run a checked metadata command and return its trimmed text output."""
     return subprocess.check_output(command, text=True).strip()
 
 
 def reset_service(args, command_name='reset'):
+    """Run a database command using systemd configuration, stopping only for a reset."""
     properties = {}
     for key in ('LoadState', 'User', 'WorkingDirectory', 'Environment', 'EnvironmentFiles'):
         properties[key] = output(['systemctl', 'show', 'predict60.service',
@@ -67,6 +69,7 @@ def reset_service(args, command_name='reset'):
 
 
 def reset_docker(args, command_name='reset'):
+    """Run a database command against one app container's volumes, stopping only for a reset."""
     if args.container:
         ids = [args.container]
     else:
@@ -119,6 +122,7 @@ def deployment_options(parser):
 
 
 def main():
+    """Require reset confirmation and dispatch to the selected database runtime."""
     parser = argparse.ArgumentParser(description=__doc__)
     deployment_options(parser)
     parser.add_argument('--confirm-reset', action='store_true', help='Required: back up and clear account/prediction data')

@@ -26,6 +26,7 @@ import threading
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+from http.client import IncompleteRead
 from http import cookies
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -365,6 +366,18 @@ def instrument_source(coin, legacy=False):
     return source
 
 
+def exact_candle_close(candles, boundary):
+    """Return a positive numeric close for the exact preceding minute, ignoring malformed rows."""
+    if not isinstance(candles, (list, tuple)):
+        return None
+    for candle in candles:
+        if (isinstance(candle, (list, tuple)) and len(candle) >= 5
+                and type(candle[0]) in (int, float) and candle[0] == boundary - 60
+                and type(candle[4]) in (int, float) and math.isfinite(candle[4]) and candle[4] > 0):
+            return float(candle[4])
+    return None
+
+
 def candle_close(coin, boundary, source=None):
     """Fetch the exact closing benchmark immediately before a UTC interval boundary; fail if it is unavailable."""
     record=source or instrument_source(coin)
@@ -379,12 +392,11 @@ def candle_close(coin, boundary, source=None):
         return simulated_prices.price(coin, record['demo_base'], boundary-1)
     # Reuse only the exact completed minute for the same provider product.
     with HISTORY_LOCK:
-        snapshots = [candles for key, candles in sorted(HISTORY_CACHE.items(), reverse=True)
-                     if key[0] == record['product']]
-    for candles in snapshots:
-        for candle in candles:
-            if candle[0] == boundary - 60 and math.isfinite(float(candle[4])) and float(candle[4]) > 0:
-                return float(candle[4])
+        snapshots = [(key[1], candles) for key, candles in HISTORY_CACHE.items() if key[0] == record['product']]
+    for _, candles in sorted(snapshots, key=lambda item: item[0], reverse=True):
+        close = exact_candle_close(candles, boundary)
+        if close is not None:
+            return close
     product = urllib.parse.quote(record['product'], safe='')
     # Widen retries to bypass a cached empty narrow response, retaining the exact minute.
     for attempt, padding in enumerate((0, 120, 300)):
@@ -396,13 +408,13 @@ def candle_close(coin, boundary, source=None):
         try:
             with urllib.request.urlopen(request, timeout=3) as response:
                 candles = json.load(response)
-            for candle in candles:
-                if candle[0] == boundary - 60 and math.isfinite(float(candle[4])) and float(candle[4]) > 0:
-                    return float(candle[4])
+            close = exact_candle_close(candles, boundary)
+            if close is not None:
+                return close
         except urllib.error.HTTPError as error:
             if error.code != 429 and error.code < 500:
                 raise
-        except (urllib.error.URLError, TimeoutError, ConnectionError):
+        except (urllib.error.URLError, TimeoutError, ConnectionError, IncompleteRead, json.JSONDecodeError):
             pass
         if attempt < 2:
             time.sleep(0.5 * (attempt + 1))

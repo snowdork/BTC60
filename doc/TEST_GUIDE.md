@@ -45,15 +45,15 @@ manual procedure explicitly says to use a live feed.
 | `test/frontend/account.test.js`, `test/frontend/auth.test.js`, `test/frontend/password.test.js` | Restored/expired sessions, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery, bounded retries, and request/body timeouts without automatic order replay. |
 | `test/frontend/bootstrap.test.js`, `test/frontend/coins.test.js`, `test/frontend/categories.test.js` | Catalog-first startup, offline/static-server failures, instrument selection, category configuration, coming-soon availability and displayed-hour coin prediction rings (direction, settled retention, hour navigation and logout). |
 | `test/frontend/btc-chart.test.js` | Minute history and heat maps, current/historical-hour navigation, page-cache restoration, two-second price display with one-second clocks, stale response rejection, benchmark/quote freshness and oil-feed error states. |
-| `test/frontend/app.test.js` | Segment popups, winner badges, per-prediction budgets, and pending countdowns that skip settled history and clear after settlement/logout. |
+| `test/frontend/app.test.js` | Segment popups, omitted pending/upcoming values, stable DOM writes, disconnected live comparisons, winner badges, per-prediction budgets, and pending countdowns that skip settled history and clear after settlement/logout. |
 | `test/frontend/market-model.test.js`, `test/frontend/portfolio-model.test.js` | Interval layout, Up/Down outcomes, probability and volatility calculations, cutoff rules, credit limits, payout rounding, settled P/L and numeric history sorting. |
 | `test/frontend/community.test.js`, `test/frontend/contests.test.js`, `test/frontend/sponsor.test.js` | Community polling recovery, hourly score states, contest history and lookup, pending resets, safe sponsor links and absent/failed sponsor configuration. |
-| `server_test.py` | HTTP accounts, signup code, password changes, CSRF/origin/proxy/cookie rules, credit cap, idempotent predictions, settlement, health, catalog, community, protected pages and static allowlist/compression/HEAD. |
+| `server_test.py` | Exact-minute benchmark cache reuse, wider-window bounded recovery, malformed/truncated responses, permanent provider rejection, HTTP accounts, signup code, password changes, CSRF/origin/proxy/cookie rules, credit cap, idempotent predictions, settlement, health, catalog, community, protected pages and static allowlist/compression/HEAD. |
 | `contests_test.py` | Shared hourly wallet, concurrent spending, reusable winnings, hour boundaries, independent resets, finalization, ties, history, migration, gift-card pools and private-reference isolation. |
 | `categories_test.py` | Idempotent catalog migrations and preservation of legacy simulated settlement sources. |
 | `odds_test.py` | Browser/server parity, volatility response, calibration, settlement horizon and resumable/deduplicated history downloads. |
 | `live_oil_test.py`, `oilprice_api_test.py`, `weather_test.py` | Provider timestamps, exact observation boundaries, unavailable/stale/mismatched data, credential/error handling and dormant category behavior. These tests do not enable Oil or Weather trading. |
-| `performance_test.py` | Bounded HTTP concurrency, database lifecycle, constant catalog query counts, bounded finalized leaderboard reads with complete tied winners/personal ranks, history coalescing and settlement retry deduplication. |
+| `performance_test.py` | Bounded HTTP concurrency, database lifecycle, constant catalog query counts, bounded finalized leaderboard reads with complete tied winners/personal ranks, history coalescing, zero provider reads for 32 parallel cached interval benchmarks, and settlement retry deduplication. |
 | `logging_test.py`, `docs_test.py` | Log levels/rotation and source documentation coverage/control-flow ownership. |
 | `test/scripts/build_static_test.py`, `test/scripts/database_test.py` | Public-only static builds, preservation after a missing source, database initialization/backup/reset and process locking. |
 | `test/scripts/server_control_test.py`, `test/scripts/docker_restart_test.py` | Watchdog crash/stop lifecycle and Docker restart command ordering/container options. Docker calls are mocked. |
@@ -308,3 +308,22 @@ accessible labels should describe predictions in the displayed hour. Synthetic
 preview must not show real prediction rings.
 
 Test files are grouped in `test/backend`, `test/frontend`, and `test/scripts`; application sources live in `src/backend`, `src/frontend`, and `src/seeds`. Run the commands above from the repository root.
+
+## Segment and benchmark maintenance checks
+
+Use a disposable account to review one 60-minute prediction followed by a
+15-minute prediction in a different interval; verify that each keeps its exact
+opening benchmark. Provider tests mock data and cannot establish live recovery.
+Force empty/malformed provider responses in tests and confirm bounded retries,
+unchanged target minute, and no debit/order on failure. Cached reads must match
+both product and minute; HTTP 404 must not enter the transient retry loop.
+
+Check rendered cards at 1366×768 and phone widths of 390 and 320 pixels, in both
+themes. Include open, completed, upcoming and pending-result intervals. Confirm
+neutral benchmark text, green/red current prices, blue Open status, bold model
+percentages, signed movement above the arrow, and visible controls without
+horizontal overflow. Pending/upcoming cards omit unavailable rows. Disconnect
+or pause the live feed and verify live movement clears while completed prices
+remain. A standalone fixture validates layout only, not login, orders or live
+provider behavior. Sphinx HTML still needs the documented optional dependency;
+`python3 doc/conf.py` regenerates source reference pages without Sphinx.

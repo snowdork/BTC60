@@ -163,6 +163,17 @@ class ResourceTest(unittest.TestCase):
         finally:
             server.HISTORY_CACHE.clear()
 
+    def test_cached_benchmarks_avoid_network_across_parallel_interval_reads(self):
+        candles = [[minute, 0, 0, 0, 100 + minute / 3600] for minute in range(0, 3600, 60)]
+        cached = {('BENCHMARK-USD', 3600): candles}
+        boundaries = [900, 1800, 2700, 3600] * 8
+        source = {'feed': 'coinbase', 'product': 'BENCHMARK-USD'}
+        with patch.dict(server.HISTORY_CACHE, cached, clear=True), patch('server.urllib.request.urlopen') as provider:
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                results = list(pool.map(lambda boundary: server.candle_close('TEST', boundary, source), boundaries))
+            self.assertEqual(results, [100 + (boundary - 60) / 3600 for boundary in boundaries])
+            provider.assert_not_called()
+
     def test_history_failure_does_not_poison_subsequent_retry(self):
         server.HISTORY_CACHE.clear()
         with patch('server.urllib.request.urlopen', side_effect=OSError('offline')):

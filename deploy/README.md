@@ -21,6 +21,16 @@ Docker copies the `src/` tree into the image.
 After source changes, regenerate it with `python3 scripts/build-static.py` if you
 need a synchronized export. Static hosting alone cannot run accounts or trading.
 
+### Segment and benchmark maintenance
+
+The October 25 cleanup updates browser sources and backend benchmark recovery;
+no database reset or new migration is required. Use the normal update/restart
+command for your selected mode above; Docker must rebuild to include the source
+changes. Rebuilding only `dist/` does not change the backend. A missing exact
+benchmark remains a provider-data failure even after recovery retries; logging
+out does not repair it. See [troubleshooting](../doc/ADMIN_GUIDE.md#troubleshooting-and-validation)
+and [current validation](../doc/TEST_RESULTS.md).
+
 ## VPS capacity and upkeep
 
 Keep the default 32 request handlers initially. Measure memory, CPU, HTTP 503s,

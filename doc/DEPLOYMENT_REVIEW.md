@@ -1,8 +1,24 @@
-# Deployment readiness review — October 21, 2026
+# Deployment readiness review — October 25, 2026
 
 The current source passes local regression checks for a single-instance VPS
 installation. Actual VPS configuration, capacity, public HTTPS, and container
 startup still need verification on the deployment host. No deployment was made.
+
+## October 25 maintenance update
+
+The segment controller and responsive styles are consolidated; unavailable
+pending/upcoming data is omitted rather than hidden. Benchmark reads reuse exact
+cached minutes, retry wider windows and validate malformed/truncated provider
+responses. Missing exact data still blocks execution; no order replay or session
+replacement is added. Maintenance-script source documentation now passes.
+
+The latest local run passes all **235 tests**, with mocked providers and temporary
+databases. Phone/laptop segment fixtures were inspected; these checks do not
+establish live order recovery or production capacity. See
+[test results](TEST_RESULTS.md) and [performance review](VPS_PERFORMANCE.md).
+Apply backend changes by restarting the selected runtime or rebuilding its Docker
+image. Source is served from `src/frontend/`; the regenerated `dist/` is a static
+export. No database migration or data reset is required by this maintenance.
 
 ## Corrections completed
 

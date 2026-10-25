@@ -4,9 +4,30 @@
 
 The primary view presents a complete UTC hour: one 60-minute card, two aligned 30-minute cards, and four aligned 15-minute cards. There are no 5-minute markets. A single chart sits above the 60-minute card, matching its width; cards do not contain individual graphs. One red dashed UTC cursor crosses the live chart and all tiers.
 
-Laptop layouts place a persistent ticket beside the markets. Smaller screens move the ticket below the playfield and let the timeline scroll horizontally within its own container. Coin selection and portfolio tables have independent scroll containers. Account and welcome pages reflow to the viewport.
+The ticket opens in a dialog from each segment action. Screens from 601 to 850 pixels keep the timeline in its own horizontal scroll container; at 600 pixels and below, duration tiers stack readable cards beneath a full-width chart. Coin selection and portfolio tables have independent scroll containers. Account and welcome pages reflow to the viewport.
 
 Dark surfaces use near-black tones with emerald Up/selection, crimson Down, amber data warnings, and cyan explanatory cues. Light and dark themes use shared variables. Financial values use monospace styling with native font fallbacks. Theme preference is applied before rendering, stored locally, and synchronized across tabs. Coin logos are local SVGs; the welcome page links a static terminal preview.
+
+## Segment layout and refresh
+
+Segment layout lives in the final, shared segment section of `responsive.css`;
+`styles.css` supplies the reusable arrow shape. Keep viewport/state changes in
+that section rather than appending successive overrides. Time range, bold model
+probabilities and status lead; benchmark → current/closing price follows;
+action and countdown share the control row. Open uses blue, price direction
+uses green/red, and benchmark text contrasts with the actual card background.
+Completed cards use darker direction colors against their pale surfaces.
+
+The lower-right arrow has its signed movement percentage above it. This measures
+`(current - benchmark) / benchmark`, not the model's chance of winning. Phones
+wrap probabilities below time/status and use buttons at least 44 pixels tall.
+Upcoming and pending-result cards omit price, odds and countdown markup entirely.
+
+`renderMarkets` builds structural state only when the market view changes.
+`renderChances` reuses indexed nodes and writes text, direction attributes and
+accessible labels only when values change. It calculates quote freshness once
+per refresh. Disconnected or paused live prices clear the live comparison;
+completed prices remain based on their exact historical close.
 
 ## Market state and navigation
 
@@ -24,6 +45,16 @@ The database catalog supplies selectable coins, Coinbase products, precision, ic
 `btc-chart.js` uses Coinbase Exchange public ticker WebSocket updates and REST minute candles. The status strip distinguishes spot freshness, history availability, and order readiness. The browser blocks orders for historical/synthetic views, paused charts, disconnected feeds, source timestamps older than 15 seconds or more than 5 seconds in the future, history errors, missing opening benchmarks, missing quote configuration, and closed intervals.
 
 Demo preview explicitly uses animated synthetic data and cannot save predictions. Pause freezes chart rendering and blocks orders; UTC interval availability continues advancing. Reconnect reloads live data. The backend independently checks the interval, retrieves the benchmark, fetches a fresh Coinbase ticker, and recomputes pricing before accepting an order.
+
+Benchmark reads first search same-product history snapshots for the exact
+preceding minute. Cold reads use three attempts at most, with 3-second socket
+timeouts and 0.5/1-second delays, widening the start by 0/120/300 seconds while
+keeping the same end/target minute. This is bounded recovery, not a hard overall
+HTTP deadline. Empty/malformed/truncated responses and transient network errors
+retry; HTTP 429 and 5xx retry, while other 4xx errors fail immediately. Only
+numeric, finite, positive exact-minute closes are accepted. No nearby minute,
+ticker or browser-provided benchmark is substituted. Failed reads are not cached,
+and prediction POSTs are not automatically replayed by this recovery path.
 
 ## Prediction pane context
 

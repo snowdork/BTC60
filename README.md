@@ -9,6 +9,7 @@ Predict60 is a buildless web app for exploring hourly direction predictions with
 ## Overview
 
 - **Complete-hour workspace:** inspect open, upcoming, and completed intervals without hiding duration tiers; navigate previous hours and return to the current hour.
+- **Readable segment cards:** time and bold Up/Down probabilities lead, benchmark → current/closing price follows, and controls stay grouped. Phone layouts wrap the header; pending/upcoming cards omit unavailable values.
 - **Live market context:** Coinbase Exchange ticker updates and minute-candle history, with separate spot freshness, history, and order-readiness indicators.
 - **Points predictions:** choose Up or Down, set a budget, and review fractional shares, cost, possible return, and potential profit. Model percentages determine simulated contract prices.
 - **Live confirmation:** review follows the market; the server executes at its current model price within your budget. Final quantity and return can differ from review.
@@ -44,6 +45,14 @@ documented in [contest operations](doc/CONTEST_OPERATIONS.md);
 Live advertising networks and automatic prize delivery are not connected.
 
 Up wins when the closing benchmark is greater than or equal to the opening benchmark; Down wins when it is lower. Each benchmark uses the minute candle close immediately before its interval boundary. A winning contract returns 1 credit; a losing contract returns 0 credits, with zero demo fees. Missing history leaves orders awaiting settlement for retry.
+
+Benchmark reads first reuse the exact product/minute from server history. On a
+cache miss, Coinbase reads retry up to three times with wider history windows;
+invalid/missing minutes still block an order. A successful 60-minute prediction
+does not supply the benchmark for a later 15-minute interval. A history failure
+is a provider-data problem, not a reason to log out. See the
+[user guide](doc/USER_GUIDE.md#troubleshooting) and
+[performance review](doc/VPS_PERFORMANCE.md#october-25-2026-segment-and-benchmark-maintenance).
 
 These are uncalibrated model estimates, simulated prices, and Coinbase minute-close proxy results. Predict60 does not trade real money or claim official Kalshi or CF Benchmarks settlement. Synthetic preview and historical views cannot place orders.
 

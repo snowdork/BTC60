@@ -29,6 +29,19 @@ orders again, including the thirty-second cutoff, CSRF, budget and authoritative
 provider quote. Database transactions protect balance changes and duplicate
 request IDs. Prediction-source snapshots preserve original settlement semantics.
 
+``app.js`` renders compact upcoming/pending cards without unavailable data.
+Its segment node index supports in-place updates; unchanged refreshes do not
+rewrite price text, direction classes or accessible movement labels.
+``responsive.css`` owns the final segment layout and phone touch sizes.
+
+``candle_close`` reuses exact same-product minute history before making a
+provider request. ``exact_candle_close`` validates cache and provider rows through
+one shared path. Three cold-read attempts widen the requested history window
+without changing the exact target minute. Missing or malformed history remains
+retryable; permanent provider errors are not repeatedly requested. Recovery never
+replays an order or changes session credentials. Exhausted retries log product
+and target minute, without account credentials.
+
 The settlement loop retries missing benchmarks. A nonblocking lock prevents
 concurrent settlement passes; persisted settlement rows prevent duplicate credits.
 No synthetic preview price can execute a new order. OilPriceAPI physical spot

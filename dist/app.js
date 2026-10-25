@@ -47,8 +47,13 @@
     $('selected-countdown').textContent=label;
   }
   /** Read the market model readiness checks used to block invalid order submission. */ function health(){return window.PredictModel.dataStatus(window.PredictModel,market);}
+  /** Show insufficient credit state only for a loaded, signed-in open-market ticket. */ function renderCreditState(){
+    const exhausted=account.ready&&!!account.user&&market.status==='open'&&balance()<=0;
+    $('no-credits-banner').hidden=!exhausted;
+    return exhausted;
+  }
   /** Render execution state from the latest account, market, and interface state. */ function renderExecutionState(){
-    const model=window.PredictModel,state=health();
+    const model=window.PredictModel,state=health(),exhausted=renderCreditState();
     const chance=market.status==='open'&&(state.ready||model.feedMode==='demo')?model.estimateChances(market,model.spot,model.now,model.volatility):null;
     $('up-chance').textContent=chance?`${chance.up}%`:'—';
     $('down-chance').textContent=chance?`${chance.down}%`:'—';
@@ -58,10 +63,12 @@
     $('history-health').textContent=model.feedMode==='demo'?'Synthetic benchmarks':model.historyStatus==='ready'?'History loaded':model.historyStatus==='error'?'History unavailable':'Loading history';
     $('execution-health').textContent=state.ready?`Data ready · ${model.calibrations?.[model.coin.symbol]?'Calibrated':'Uncalibrated'} model`:state.reason;
     $('execution-health').style.color=state.ready?'var(--green)':'var(--amber)';
-    $('submit-prediction').disabled=!state.ready||(side!==null&&!q)||!account.ready;
-    $('submit-prediction').textContent=!state.ready?state.reason:side===null?'Pick Up or Down':!account.user?'Log in to predict →':`Review ${side==='up'?'Up':'Down'} prediction →`;
-    sideButtons.forEach(button=>{button.disabled=market.status!=='open'||!state.ready;});
-    $('confirm-prediction').disabled=submitting||!state.ready||reviewExpired();
+    $('submit-prediction').disabled=exhausted||!state.ready||(side!==null&&!q)||!account.ready;
+    $('submit-prediction').textContent=exhausted?'NO CREDITS':!state.ready?state.reason:side===null?'Pick Up or Down':!account.user?'Log in to predict →':`Review ${side==='up'?'Up':'Down'} prediction →`;
+    sideButtons.forEach(button=>{button.disabled=exhausted||market.status!=='open'||!state.ready;});
+    $('stake').disabled=exhausted||market.status!=='open';
+    stakeButtons.forEach(button=>{button.disabled=exhausted||market.status!=='open';});
+    $('confirm-prediction').disabled=exhausted||submitting||!state.ready||reviewExpired();
     if(review&&!reviewExpired()&&!state.ready&&!submitting){review=null;$('review-dialog').close();notify('Data unavailable. Wait for reconnection and review again.');}
   }
   /** Check whether the reviewed interval has reached its final thirty-second order cutoff. */ function reviewExpired(){return !!review&&Date.now()>=review.endsAt-30000;}
@@ -97,46 +104,41 @@
     }
 
   }
-  /** Render chances from the latest account, market, and interface state. */ function renderChances() {
+  /** Refresh segment probabilities and benchmark movement without rebuilding cards. */ function renderChances() {
     const model=window.PredictModel;
     renderStatusLine();
     renderExecutionState();
     renderReviewChance();
+    const assessment=model.coin.feed==='oilpriceapi'&&model.feedMode==='live'&&!model.isHistorical;
+    const age=Date.now()-model.priceUpdatedAt;
+    const fresh=model.feedMode==='demo'||(model.feedConnection==='connected'&&!model.paused&&Number.isFinite(age)&&model.priceUpdatedAt>0&&age>=-5000&&age<=(model.coin.maxPriceAgeMs||15000));
     markets.forEach(m=>{
-      const assessment=model.coin.feed==='oilpriceapi'&&model.feedMode==='live'&&!model.isHistorical;
-      const reference=marketElements.get(m.id)?.reference;
-      if(reference){reference.hidden=!assessment;setText(reference,assessment&&Number.isFinite(model.spot)?price(model.spot):'—');}
-      const oddsNodes=marketElements.get(m.id);
-      if(oddsNodes?.up&&oddsNodes?.down){
-        const ready=m.status!=='queued'&&(m.status!=='open'||model.feedMode!=='live'||model.dataStatus(model,m).ready);
-        const chances=ready?model.estimateChances(m,model.spot,model.now,model.volatility):null;
-        setText(oddsNodes.up,`Up ${chances?chances.up+'%':'—'}`);
-        setText(oddsNodes.down,`Down ${chances?chances.down+'%':'—'}`);
+      const nodes=marketElements.get(m.id);
+      if(!nodes?.price)return; // Upcoming and pending cards have no prices or probabilities.
+      if(nodes.reference){
+        if(nodes.reference.hidden===assessment)nodes.reference.hidden=!assessment;
+        setText(nodes.reference,assessment&&Number.isFinite(model.spot)?price(model.spot):'—');
       }
-      const element=marketElements.get(m.id)?.chances;if(!element)return;
-      element.hidden=m.status==='queued';
-      if(element.hidden)return;
-      const nodes=marketElements.get(m.id),indicator=nodes.direction;
-      if(!indicator)return;
+      const ready=!assessment&&(m.status!=='open'||model.feedMode!=='live'||model.dataStatus(model,m).ready);
+      const chances=ready?model.estimateChances(m,model.spot,model.now,model.volatility):null;
+      setText(nodes.up,`Up ${chances?chances.up+'%':'—'}`);
+      setText(nodes.down,`Down ${chances?chances.down+'%':'—'}`);
       const current=m.status==='settled'?m.close:model.spot;
-      const age=Date.now()-model.priceUpdatedAt;
-      const fresh=m.status==='settled'||model.feedMode==='demo'||(Number.isFinite(age)&&model.priceUpdatedAt>0&&age>=-5000&&age<=(model.coin.maxPriceAgeMs||15000));
-      const valid=!assessment&&Number.isFinite(current)&&current>0&&Number.isFinite(m.strike)&&m.strike>0&&fresh;
-      indicator.hidden=!valid;
-      nodes.change.hidden=!valid;
-      if(nodes.price){
-        nodes.price.dataset.direction=valid?(current>=m.strike?'up':'down'):'';
-        setText(nodes.price,valid?price(current):'—');
-        nodes.price.title=m.status==='settled'?'Closing price':'Current price';
-      }
+      const valid=!assessment&&(m.status==='settled'||fresh)&&Number.isFinite(current)&&current>0&&Number.isFinite(m.strike)&&m.strike>0;
+      if(nodes.direction.hidden===valid)nodes.direction.hidden=!valid;
+      if(nodes.change.hidden===valid)nodes.change.hidden=!valid;
+      const delta=current-m.strike,direction=valid?(delta>=0?'up':'down'):'';
+      if(nodes.price.dataset.direction!==direction)nodes.price.dataset.direction=direction;
+      setText(nodes.price,valid?price(current):'—');
       if(!valid)return;
-      const delta=current-m.strike,direction=delta>=0?'up':'down';
-      indicator.className=`segment-direction ${direction}`;
-      nodes.change.className=`segment-direction-change ${direction}`;
-      const label=`${direction==='up'?'Up':'Down'} ${(Math.abs(delta)/m.strike*100).toFixed(2)}% ${m.status==='settled'?'at close':'from benchmark'}`;
-      indicator.setAttribute('aria-label',label);
+      const movement=(Math.abs(delta)/m.strike*100).toFixed(2);
+      const directionClass=`segment-direction ${direction}`,changeClass=`segment-direction-change ${direction}`;
+      if(nodes.direction.className!==directionClass)nodes.direction.className=directionClass;
+      if(nodes.change.className!==changeClass)nodes.change.className=changeClass;
+      const label=`${direction==='up'?'Up':'Down'} ${movement}% ${m.status==='settled'?'at close':'from benchmark'}`;
+      if(nodes.direction.getAttribute('aria-label')!==label)nodes.direction.setAttribute('aria-label',label);
       setText(nodes.arrow,direction==='up'?'↑':'↓');
-      setText(nodes.change,`${direction==='up'?'Up +':'Down −'}${(Math.abs(delta)/m.strike*100).toFixed(2)}%`);
+      setText(nodes.change,`${direction==='up'?'Up +':'Down −'}${movement}%`);
     });
   }
   /** Render segment predictions from the latest account, market, and interface state. */ function renderSegmentPredictions(){
@@ -150,8 +152,15 @@
         const lost=saved.some(p=>p.settled_at!=null&&p.outcome!==p.side);
         const wonCents=saved.filter(p=>p.settled_at!=null&&p.outcome===p.side).reduce((total,p)=>total+(p.payout_cents||0)-p.cost_cents,0);
         const lostCents=saved.filter(p=>p.settled_at!=null&&p.outcome!==p.side).reduce((total,p)=>total+p.cost_cents,0);
-        const winLabel=`Win +${money(wonCents/100)}`,lossLabel=`Loss −${money(lostCents/100)}`;
-        stamp.textContent=!saved.length?'No wager':pending?'Awaiting settlement':won&&lost?`${winLabel} / ${lossLabel}`:won?winLabel:lossLabel;
+        const winLabel=`Win +${currency.format(wonCents/100)}`,lossLabel=`Loss −${currency.format(lostCents/100)}`;
+        if(!saved.length||pending){
+          stamp.textContent=!saved.length?'No wager':'Awaiting settlement';
+        }else{
+          const resultLabels=[];
+          if(won){const label=document.createElement('span');label.className='segment-win';label.textContent=winLabel;resultLabels.push(label);}
+          if(lost){const label=document.createElement('span');label.className='segment-loss';label.textContent=lossLabel;resultLabels.push(label);}
+          stamp.replaceChildren(...resultLabels);
+        }
         stamp.title=!saved.length?'No wager in this segment':pending?'Waiting for all your wagers to settle':`Net result: ${money((wonCents-lostCents)/100)}. Winnings exclude the original wager cost.`;
         stamp.classList.toggle('has-wager',saved.length>0);
         stamp.classList.toggle('won',!pending&&won&&!lost);
@@ -177,12 +186,24 @@
         const settled=m.status==='settled',queued=m.status==='queued',result=settled&&Number.isFinite(m.strike)&&Number.isFinite(m.close)?outcome(m.strike,m.close):null;
         const actionIcon=settled?'<path d="M4 19h16M7 15v-4m5 4V5m5 10V8"/>':queued?'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>':'<path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z"/>';
         const action=`<button type="button" class="segment-action" data-segment-action="${m.id}" aria-haspopup="dialog" aria-controls="prediction-dialog" aria-label="${settled?'View result for':queued?'View details for':'Predict on'} ${minutes} minute segment ${m.start} to ${m.end} UTC"><svg class="segment-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${actionIcon}</svg><span class="segment-action-label">${settled?'Result':queued?'Details':'Predict'}</span></button>`;
-        return `<div role="group" class="market-card ${m.status} ${result?'result-'+result:''} ${settled&&result===null?'pending':''} ${m.id===market.id?'selected':''}" data-market="${m.id}" aria-label="${minutes} minute market ${m.start} to ${m.end} UTC, ${m.status}"><div class="card-top"><span class="card-time">${m.start} – ${m.end}</span><div class="segment-odds" aria-label="Direction probabilities"><span class="segment-odds-up">Up —</span><span class="segment-odds-divider" aria-hidden="true">|</span><span class="segment-odds-down">Down —</span></div><span class="segment-meta"><span class="badge ${queued?'neutral':settled?(result===null?'neutral':result==='up'?'green':'red'):'green'}">${queued?'UPCOMING':settled?(result===null?'PENDING':'COMPLETED'):'● OPEN'}</span></span></div><div class="segment-price-row"><span class="segment-price-values"><span class="segment-benchmark-price" title="Benchmark price">${Number.isFinite(m.strike)?price(m.strike):'—'}</span><span class="settlement-separator" aria-label="to">→</span><strong class="initial-price" title="${settled?'Closing price':'Current price'}">${settled&&Number.isFinite(m.close)?price(m.close):'—'}</strong><span data-reference-price="${m.id}" hidden></span></span></div><div class="segment-controls">${action}<span class="segment-countdown" ${m.status==='open'?`data-remaining="${m.id}"`:''} aria-label="${queued?'Time remaining available when open':'Time remaining'}">${m.status==='open'?m.remaining:settled?'0m 00s':'—'}</span></div><div class="card-benchmark"><div class="segment-price"></div>${queued?'<small>Benchmark set at open</small>':''}</div><div class="card-context"><div class="card-bottom">${queued?`<span class="queued-label">Opens at ${m.start}</span>`:settled?`${Number.isFinite(m.close)?'':'<span>Awaiting history</span>'}`:''}</div></div><div class="chance-block" data-chances="${m.id}"><div class="chance-row">${settled?'<span class="settled-stamp">No wager</span>':''}</div></div><span class="segment-direction" data-direction-indicator hidden role="img"><span class="segment-direction-change" aria-hidden="true" hidden></span><span class="segment-direction-arrow" aria-hidden="true"></span></span><span class="segment-predictions" data-predictions="${m.id}" hidden></span></div>`;
+        const compact=queued||(settled&&result===null);
+        const status=queued?'UPCOMING':settled?(compact?'PENDING':'COMPLETED'):'● OPEN';
+        const prices=compact?'':`<div class="segment-price-row"><span class="segment-price-values"><span class="segment-benchmark-price" title="Benchmark price">${Number.isFinite(m.strike)?price(m.strike):'—'}</span><span class="settlement-separator" aria-label="to">→</span><strong class="segment-current-price" title="${settled?'Closing price':'Current price'}">${settled&&Number.isFinite(m.close)?price(m.close):'—'}</strong><span data-reference-price="${m.id}" hidden></span></span></div>`;
+        const probabilities=compact?'':`<div class="segment-odds" aria-label="${settled?'Final direction result':'Estimated direction probabilities'}"><span class="segment-odds-up">Up —</span><span class="segment-odds-divider" aria-hidden="true">|</span><span class="segment-odds-down">Down —</span></div>`;
+        const remaining=compact?'':`<span class="segment-countdown" ${settled?'':`data-remaining="${m.id}"`} aria-label="Time remaining">${settled?'0m 00s':m.remaining}</span>`;
+        return `<div role="group" class="market-card ${m.status} ${result?'result-'+result:''} ${settled&&compact?'pending':''} ${m.id===market.id?'selected':''}" data-market="${m.id}" aria-label="${minutes} minute market ${m.start} to ${m.end} UTC, ${m.status}">
+          <div class="card-top"><span class="card-time">${m.start} – ${m.end}</span>${probabilities}<span class="segment-meta"><span class="badge ${queued||compact?'neutral':settled?(result==='up'?'green':'red'):'green'}">${status}</span></span></div>
+          ${prices}
+          <div class="segment-controls">${action}${remaining}</div>
+          ${settled&&!compact?'<div class="chance-block"><div class="chance-row"><span class="settled-stamp">No wager</span></div></div>':''}
+          ${compact?'':'<span class="segment-direction" data-direction-indicator hidden role="img"><span class="segment-direction-change" aria-hidden="true" hidden></span><span class="segment-direction-arrow" aria-hidden="true"></span></span>'}
+          <span class="segment-predictions" data-predictions="${m.id}" hidden></span>
+        </div>`;
       }).join('')}</div></div>`;
     }).join('');
     marketElements.clear();
     $('market-grid').querySelectorAll('[data-market]').forEach(card=>{
-      marketElements.set(card.dataset.market,{card,chances:card.querySelector('[data-chances]'),distance:card.querySelector('[data-distance]'),reference:card.querySelector('[data-reference-price]'),predictions:card.querySelector('[data-predictions]'),up:card.querySelector('.segment-odds-up'),down:card.querySelector('.segment-odds-down'),price:card.querySelector('.initial-price'),direction:card.querySelector('[data-direction-indicator]'),arrow:card.querySelector('.segment-direction-arrow'),change:card.querySelector('.segment-direction-change')});
+      marketElements.set(card.dataset.market,{card,reference:card.querySelector('[data-reference-price]'),predictions:card.querySelector('[data-predictions]'),up:card.querySelector('.segment-odds-up'),down:card.querySelector('.segment-odds-down'),price:card.querySelector('.segment-current-price'),direction:card.querySelector('[data-direction-indicator]'),arrow:card.querySelector('.segment-direction-arrow'),change:card.querySelector('.segment-direction-change')});
     });
     renderSegmentPredictions();
     renderChances();
