@@ -78,7 +78,7 @@ button,a,input{touch-action:manipulation}
 .terminal-page .interval-guides,.terminal-page .time-cursor,.terminal-page .chart-coin-icon{top:29px}
 .terminal-page .hour-chart{margin-bottom:6px}
 .terminal-page .chart-times{height:19px}
-.terminal-page .minute-heatmap-wrap{padding:4px 6px 2px}
+.terminal-page .minute-heatmap-wrap{padding:4px 0 2px}
 .terminal-page .tier{margin-bottom:8px}
 .terminal-page .market-card{min-height:112px!important;padding:10px 12px!important;gap:5px!important}
 @media(min-width:1500px){

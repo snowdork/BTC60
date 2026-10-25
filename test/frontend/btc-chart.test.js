@@ -171,6 +171,10 @@ test('minute heat map renders sixty time-aligned candle directions',async()=>{
  const h=chartHarness();await flush();
  const map=h.element('minute-heatmap'),dots=map.children;
  assert.equal(dots.length,60);
+ assert.equal(dots[14].style.left,'25%');
+ assert.equal(dots[29].style.left,'50%');
+ assert.equal(dots[44].style.left,'75%');
+ assert.equal(dots[59].style.left,'100%');
  assert.equal(dots.filter(dot=>dot.className.includes(' up')).length,25);
  assert.equal(dots[25].className,'minute-dot current');
  assert.match(dots[0].title,/17:00–17:01 UTC · Up/);
