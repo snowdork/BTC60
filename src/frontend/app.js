@@ -106,23 +106,37 @@
       const assessment=model.coin.feed==='oilpriceapi'&&model.feedMode==='live'&&!model.isHistorical;
       const reference=marketElements.get(m.id)?.reference;
       if(reference){reference.hidden=!assessment;setText(reference,assessment&&Number.isFinite(model.spot)?price(model.spot):'—');}
+      const oddsNodes=marketElements.get(m.id);
+      if(oddsNodes?.up&&oddsNodes?.down){
+        const ready=m.status!=='queued'&&(m.status!=='open'||model.feedMode!=='live'||model.dataStatus(model,m).ready);
+        const chances=ready?model.estimateChances(m,model.spot,model.now,model.volatility):null;
+        setText(oddsNodes.up,`Up ${chances?chances.up+'%':'—'}`);
+        setText(oddsNodes.down,`Down ${chances?chances.down+'%':'—'}`);
+      }
       const element=marketElements.get(m.id)?.chances;if(!element)return;
       element.hidden=m.status==='queued';
       if(element.hidden)return;
-      const stale=m.status==='open'&&model.feedMode==='live'&&!model.dataStatus(model,m).ready;
-      const chance=stale?null:model.estimateChances(m,model.spot,model.now,model.volatility);
-      const distance=marketElements.get(m.id)?.distance;
-      if(distance){
-        const delta=model.spot-m.strike,hasPrice=Number.isFinite(model.spot)&&model.spot>0,hasTarget=Number.isFinite(m.strike)&&m.strike>0;
-        const age=Date.now()-model.priceUpdatedAt;
-        const fresh=model.feedMode==='demo'||(Number.isFinite(age)&&model.priceUpdatedAt>0&&age>=-5000&&age<=(model.coin.maxPriceAgeMs||15000));
-        const valid=hasPrice&&hasTarget&&fresh;
-        distance.textContent=assessment?'Latest spot assessment · reference only':valid?`${delta>=0?'↗ +':'↘ −'}${(Math.abs(delta)/m.strike*100).toFixed(2)}% ${delta>=0?'above':'below'}`:!hasTarget?'Waiting for target':!hasPrice?'Waiting for price':'Waiting for fresh price';
-        distance.style.color=valid?(delta>=0?'var(--green)':'var(--red)'):'var(--muted)';
+      const nodes=marketElements.get(m.id),indicator=nodes.direction;
+      if(!indicator)return;
+      const current=m.status==='settled'?m.close:model.spot;
+      const age=Date.now()-model.priceUpdatedAt;
+      const fresh=m.status==='settled'||model.feedMode==='demo'||(Number.isFinite(age)&&model.priceUpdatedAt>0&&age>=-5000&&age<=(model.coin.maxPriceAgeMs||15000));
+      const valid=!assessment&&Number.isFinite(current)&&current>0&&Number.isFinite(m.strike)&&m.strike>0&&fresh;
+      indicator.hidden=!valid;
+      nodes.change.hidden=!valid;
+      if(nodes.price){
+        nodes.price.dataset.direction=valid?(current>=m.strike?'up':'down'):'';
+        setText(nodes.price,valid?price(current):'—');
+        nodes.price.title=m.status==='settled'?'Closing price':'Current price';
       }
-      setText(marketElements.get(m.id).up,`↗ Up ${chance?chance.up+'%':'—'}`);
-      setText(marketElements.get(m.id).down,`↘ Down ${chance?chance.down+'%':'—'}`);
-      element.title=chance?.label==='ESTIMATE'?'Model probability based on adaptive 24-hour volatility and time to settlement. Historical calibration applies when validated for this coin; prediction credit costs follow these percentages.':chance?.label==='BASELINE'?'Neutral baseline for an upcoming interval.':chance?.label==='RESULT'?'Completed result, not a forecast.':'Waiting for a fresh price and valid benchmark.';
+      if(!valid)return;
+      const delta=current-m.strike,direction=delta>=0?'up':'down';
+      indicator.className=`segment-direction ${direction}`;
+      nodes.change.className=`segment-direction-change ${direction}`;
+      const label=`${direction==='up'?'Up':'Down'} ${(Math.abs(delta)/m.strike*100).toFixed(2)}% ${m.status==='settled'?'at close':'from benchmark'}`;
+      indicator.setAttribute('aria-label',label);
+      setText(nodes.arrow,direction==='up'?'↑':'↓');
+      setText(nodes.change,`${direction==='up'?'Up +':'Down −'}${(Math.abs(delta)/m.strike*100).toFixed(2)}%`);
     });
   }
   /** Render segment predictions from the latest account, market, and interface state. */ function renderSegmentPredictions(){
@@ -163,12 +177,12 @@
         const settled=m.status==='settled',queued=m.status==='queued',result=settled&&Number.isFinite(m.strike)&&Number.isFinite(m.close)?outcome(m.strike,m.close):null;
         const actionIcon=settled?'<path d="M4 19h16M7 15v-4m5 4V5m5 10V8"/>':queued?'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>':'<path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z"/>';
         const action=`<button type="button" class="segment-action" data-segment-action="${m.id}" aria-haspopup="dialog" aria-controls="prediction-dialog" aria-label="${settled?'View result for':queued?'View details for':'Predict on'} ${minutes} minute segment ${m.start} to ${m.end} UTC"><svg class="segment-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${actionIcon}</svg><span class="segment-action-label">${settled?'Result':queued?'Details':'Predict'}</span></button>`;
-        return `<div role="group" class="market-card ${m.status} ${result?'result-'+result:''} ${m.id===market.id?'selected':''}" data-market="${m.id}" aria-label="${minutes} minute market ${m.start} to ${m.end} UTC, ${m.status}"><div class="card-top"><span class="card-time">${m.start} – ${m.end}</span>${action}</div><div class="card-benchmark"><div class="segment-price"><span class="segment-price-values"><span class="initial-price" ${window.PredictModel.coin.feed==='oilpriceapi'&&window.PredictModel.feedMode==='live'&&!window.PredictModel.isHistorical?'hidden':''}>${Number.isFinite(m.strike)?price(m.strike):'—'}</span>${settled&&Number.isFinite(m.close)?`<span class="settlement-separator" aria-label="to">→</span><strong class="settlement-price ${result||''}">${price(m.close)}</strong>`:''}<span data-reference-price="${m.id}" hidden></span></span><span class="segment-meta">${m.status==='open'?`<span class="segment-countdown" data-remaining="${m.id}">${m.remaining}</span>`:''}<span class="badge ${queued?'neutral':settled?(result===null?'neutral':result==='up'?'green':'red'):'green'}">${queued?'UPCOMING':settled?(result===null?'CLOSED':result==='up'?'↗ UP WON':'↘ DOWN WON'):'● OPEN'}</span></span></div>${queued?'<small>Benchmark set at open</small>':''}</div><div class="card-context"><div class="card-distance" data-distance="${m.id}" ${m.status!=='open'?'hidden':''}>Spot distance unavailable</div><div class="card-bottom">${queued?`<span class="queued-label">Opens at ${m.start}</span>`:settled?`${Number.isFinite(m.close)?'':'<span>Awaiting history</span>'}`:''}</div></div><div class="chance-block" data-chances="${m.id}"><div class="chance-row">${settled&&result!==null?`<span class="segment-result ${result}" role="img" aria-label="${result==='up'?'Up':'Down'} won" title="${result==='up'?'Up':'Down'} won">${result==='up'?'↑':'↓'}</span>`:''}${settled?'<span class="settled-stamp">No wager</span>':''}<span class="chance-up" ${settled?'hidden':''}>↗ Up —</span><span class="chance-down" ${settled?'hidden':''}>↘ Down —</span></div></div><span class="segment-predictions" data-predictions="${m.id}" hidden></span></div>`;
+        return `<div role="group" class="market-card ${m.status} ${result?'result-'+result:''} ${settled&&result===null?'pending':''} ${m.id===market.id?'selected':''}" data-market="${m.id}" aria-label="${minutes} minute market ${m.start} to ${m.end} UTC, ${m.status}"><div class="card-top"><span class="card-time">${m.start} – ${m.end}</span><div class="segment-odds" aria-label="Direction probabilities"><span class="segment-odds-up">Up —</span><span class="segment-odds-divider" aria-hidden="true">|</span><span class="segment-odds-down">Down —</span></div><span class="segment-meta"><span class="badge ${queued?'neutral':settled?(result===null?'neutral':result==='up'?'green':'red'):'green'}">${queued?'UPCOMING':settled?(result===null?'PENDING':'COMPLETED'):'● OPEN'}</span></span></div><div class="segment-price-row"><span class="segment-price-values"><span class="segment-benchmark-price" title="Benchmark price">${Number.isFinite(m.strike)?price(m.strike):'—'}</span><span class="settlement-separator" aria-label="to">→</span><strong class="initial-price" title="${settled?'Closing price':'Current price'}">${settled&&Number.isFinite(m.close)?price(m.close):'—'}</strong><span data-reference-price="${m.id}" hidden></span></span></div><div class="segment-controls">${action}<span class="segment-countdown" ${m.status==='open'?`data-remaining="${m.id}"`:''} aria-label="${queued?'Time remaining available when open':'Time remaining'}">${m.status==='open'?m.remaining:settled?'0m 00s':'—'}</span></div><div class="card-benchmark"><div class="segment-price"></div>${queued?'<small>Benchmark set at open</small>':''}</div><div class="card-context"><div class="card-bottom">${queued?`<span class="queued-label">Opens at ${m.start}</span>`:settled?`${Number.isFinite(m.close)?'':'<span>Awaiting history</span>'}`:''}</div></div><div class="chance-block" data-chances="${m.id}"><div class="chance-row">${settled?'<span class="settled-stamp">No wager</span>':''}</div></div><span class="segment-direction" data-direction-indicator hidden role="img"><span class="segment-direction-change" aria-hidden="true" hidden></span><span class="segment-direction-arrow" aria-hidden="true"></span></span><span class="segment-predictions" data-predictions="${m.id}" hidden></span></div>`;
       }).join('')}</div></div>`;
     }).join('');
     marketElements.clear();
     $('market-grid').querySelectorAll('[data-market]').forEach(card=>{
-      marketElements.set(card.dataset.market,{card,chances:card.querySelector('[data-chances]'),distance:card.querySelector('[data-distance]'),reference:card.querySelector('[data-reference-price]'),predictions:card.querySelector('[data-predictions]'),up:card.querySelector('.chance-up'),down:card.querySelector('.chance-down')});
+      marketElements.set(card.dataset.market,{card,chances:card.querySelector('[data-chances]'),distance:card.querySelector('[data-distance]'),reference:card.querySelector('[data-reference-price]'),predictions:card.querySelector('[data-predictions]'),up:card.querySelector('.segment-odds-up'),down:card.querySelector('.segment-odds-down'),price:card.querySelector('.initial-price'),direction:card.querySelector('[data-direction-indicator]'),arrow:card.querySelector('.segment-direction-arrow'),change:card.querySelector('.segment-direction-change')});
     });
     renderSegmentPredictions();
     renderChances();

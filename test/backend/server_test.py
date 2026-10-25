@@ -490,6 +490,26 @@ class AccountsTest(unittest.TestCase):
             self.assertEqual(server.candle_close('TEST', 120), 1.5)
             self.assertIn('/products/CUSTOM-USD/candles?', request.call_args.args[0].full_url)
 
+    def test_benchmark_reconnects_after_missing_candle_or_network_failure(self):
+        from io import BytesIO
+        source = {'feed': 'coinbase', 'product': 'BTC-USD'}
+        failures = (BytesIO(b'[]'), server.urllib.error.URLError('connection lost'))
+        for failure in failures:
+            with self.subTest(failure=failure), patch('server.time.sleep') as sleep, patch(
+                    'server.urllib.request.urlopen',
+                    side_effect=[failure, BytesIO(b'[[60,0,0,0,101]]')]) as network:
+                self.assertEqual(server.candle_close('BTC', 120, source), 101)
+                self.assertEqual(network.call_count, 2)
+                sleep.assert_called_once_with(0.5)
+
+    def test_benchmark_retry_is_bounded_and_never_uses_another_minute(self):
+        from io import BytesIO
+        with patch('server.time.sleep'), patch('server.urllib.request.urlopen',
+                side_effect=[BytesIO(b'[[0,0,0,0,101]]') for _ in range(3)]) as network:
+            with self.assertRaisesRegex(ValueError, 'Benchmark history is unavailable'):
+                server.candle_close('BTC', 120, {'feed': 'coinbase', 'product': 'BTC-USD'})
+            self.assertEqual(network.call_count, 3)
+
     def test_win_loss_settlement_credits_once_and_is_user_scoped(self):
         status, _, cookie = self.request('POST','/api/signup',{'confirmPassword': 'pass-999', 'signupCode': '777', 'name':'Settlement user','email':'settle@example.com','password':'pass-999'})
         self.assertEqual(status,200)

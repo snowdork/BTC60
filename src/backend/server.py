@@ -382,11 +382,22 @@ def candle_close(coin, boundary, source=None):
     end = datetime.fromtimestamp(boundary, timezone.utc).isoformat()
     query = urllib.parse.urlencode({'granularity': 60, 'start': start, 'end': end})
     request = urllib.request.Request(f'https://api.exchange.coinbase.com/products/{product}/candles?{query}', headers={'User-Agent': 'Predict60-local-demo/1.0'})
-    with urllib.request.urlopen(request, timeout=8) as response:
-        candles = json.load(response)
-    for candle in candles:
-        if candle[0] == boundary - 60 and math.isfinite(float(candle[4])) and float(candle[4]) > 0:
-            return float(candle[4])
+    # A newly published candle or an interrupted provider connection can recover
+    # without replacing the user's session. Retry only this read, never the order.
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=3) as response:
+                candles = json.load(response)
+            for candle in candles:
+                if candle[0] == boundary - 60 and math.isfinite(float(candle[4])) and float(candle[4]) > 0:
+                    return float(candle[4])
+        except urllib.error.HTTPError as error:
+            if error.code != 429 and error.code < 500:
+                raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            pass
+        if attempt < 2:
+            time.sleep(0.5 * (attempt + 1))
     raise ValueError('Benchmark history is unavailable. Try again shortly.')
 
 

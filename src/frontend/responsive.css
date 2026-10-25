@@ -382,3 +382,141 @@ button,a,input{touch-action:manipulation}
  .terminal-page .terminal-overview .score-hud{grid-column:1/-1;grid-row:4;max-width:none;border-left:0;padding:8px 0 0}
  .coin-selection-heading .category-switch{min-height:44px;font-size:11px}
 }
+
+/* Shared segment layout, after viewport rules so laptop and phone agree. */
+.terminal-page .market-card{
+ position:relative;display:flex;flex-direction:column;align-items:stretch;
+ min-width:0;min-height:168px!important;padding:12px!important;gap:8px!important;
+}
+.terminal-page .market-card .card-top{display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-width:0;padding:0}
+.terminal-page .market-card .card-top .card-time{position:static;display:block;padding-right:85px;font:600 11px/1.4 'JetBrains Mono',monospace;white-space:normal}
+.terminal-page .market-card .segment-meta{position:absolute;top:12px;right:12px;margin:0;display:flex}
+.terminal-page .market-card .segment-meta .badge{font-size:8px;line-height:1.4;white-space:nowrap}
+.terminal-page .market-card .card-top .segment-price-values{display:flex;flex:0 1 auto;flex-wrap:wrap;align-items:baseline;gap:4px 6px;margin:0;padding:0;background:none;font:800 19px/1.3 'JetBrains Mono',monospace;max-width:100%;min-width:0}
+.terminal-page .market-card .initial-price{font-weight:800}
+.terminal-page .market-card.settled .card-top .initial-price{font-size:12px;font-weight:500;color:var(--muted)}
+.terminal-page .market-card .card-top .settlement-price{font-size:inherit;font-weight:800}
+.terminal-page .market-card .card-top .settlement-separator{font-size:12px;color:var(--muted)}
+.terminal-page .market-card .segment-controls{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:6px;margin-top:2px;padding-right:58px}
+.terminal-page .market-card .segment-controls .segment-action{display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:0 0 auto;min-height:36px;width:auto;margin:0;padding:7px 10px;border:1px solid var(--action-border);border-radius:6px;background:var(--action-bg);color:var(--action-fg);font-size:12px;font-weight:600;line-height:1.2}
+.terminal-page .market-card .segment-controls .segment-action:hover{background:var(--action-hover)}
+.terminal-page .market-card .segment-action-icon{width:15px;height:15px;flex-basis:15px}
+.terminal-page .market-card .segment-controls .segment-countdown{display:inline-flex;align-items:center;gap:6px;margin:0;font:500 11px/1.4 'JetBrains Mono',monospace;white-space:nowrap}
+.terminal-page .market-card .segment-controls .segment-countdown::before{content:'|';color:#fff}
+[data-theme="light"] .terminal-page .market-card .segment-controls .segment-countdown::before,.terminal-page .market-card.queued .segment-controls .segment-countdown::before{color:#000}
+.terminal-page .market-card .segment-direction{position:absolute;left:auto;top:auto;bottom:12px;right:12px;transform:none}
+.terminal-page .market-card .card-benchmark{padding:0;font-size:10px;line-height:1.4}
+.terminal-page .market-card .card-benchmark .segment-price{padding:0;min-height:0;background:none}
+.terminal-page .market-card:not(.queued) .card-benchmark{height:0;margin:0}
+.terminal-page .market-card .card-context{padding:0 58px 0 0;min-width:0}
+.terminal-page .market-card .card-context:has(.card-bottom:empty){display:none}
+.terminal-page .market-card .chance-block{margin-top:auto;padding-right:58px}
+.terminal-page .market-card:not(.settled) .chance-block{display:none}
+.terminal-page .market-card .chance-row .settled-stamp{font-size:11px;color:var(--muted)}
+.terminal-page .market-card .chance-row .settled-stamp.won{color:var(--green)}
+.terminal-page .market-card .chance-row .settled-stamp.lost{color:var(--red)}
+.terminal-page .market-card>.segment-predictions{padding-right:58px;display:flex;flex-wrap:wrap;gap:4px}
+.terminal-page .market-card>.segment-predictions[hidden]{display:none}
+@media(max-width:600px),(pointer:coarse){
+ .terminal-page .market-card{min-height:182px!important;padding:14px!important;gap:10px!important}
+ .terminal-page .market-card .segment-controls .segment-action{min-height:44px;padding:10px 14px;font-size:14px}
+ .terminal-page .market-card .card-top .segment-price-values{font-size:22px}
+ .terminal-page .market-card .segment-controls .segment-countdown{font-size:12px}
+ .terminal-page .market-card .card-top .card-time{font-size:12px}
+}
+/* Completed cards have a pale background in both themes. */
+.terminal-page .market-card.settled{--green:#007c40;--red:#b51d3c}
+.terminal-page .market-card.settled .card-top .settlement-price.up{color:var(--green)}
+.terminal-page .market-card.settled .card-top .settlement-price.down{color:var(--red)}
+/* Compact header: time and price share a row below the corner status. */
+.terminal-page .market-card{min-height:132px!important;padding:29px 12px 10px!important;gap:6px!important}
+.terminal-page .market-card .card-top{flex-direction:row;align-items:baseline;flex-wrap:wrap;gap:5px 8px}
+.terminal-page .market-card .card-top .card-time{padding-right:0;white-space:nowrap}
+.terminal-page .market-card .card-top .segment-price-values{font-size:17px;gap:4px;flex:0 1 auto}
+.terminal-page .market-card .card-top .segment-price-values::before{content:'|';font:400 12px/1 Arial,sans-serif;color:#fff;margin-right:3px}
+[data-theme="light"] .terminal-page .market-card .card-top .segment-price-values::before,.terminal-page .market-card:is(.queued,.settled) .card-top .segment-price-values::before{color:#000}
+.terminal-page .market-card .segment-meta{top:7px}
+.terminal-page .market-card .segment-direction{bottom:8px}
+@media(max-width:600px),(pointer:coarse){
+ .terminal-page .market-card{min-height:144px!important;padding:29px 12px 10px!important;gap:7px!important}
+ .terminal-page .market-card .card-top .segment-price-values{font-size:18px}
+}
+/* Emphasize the interval alongside its price. */
+.terminal-page .market-card .card-top .card-time{font-size:14px;font-weight:800;line-height:1.3}
+
+/* Keep status readable above the longer lower-right movement arrow. */
+.terminal-page .market-card .segment-meta{z-index:2}
+.terminal-page .market-card .segment-meta .badge{font-size:9px;line-height:1.4}
+/* Blue denotes an open interval; price direction keeps its own colors. */
+.terminal-page .market-card.open .segment-meta .badge{color:#66b5ff;background:#2589e51a;border-color:#66b5ff66}
+[data-theme="light"] .terminal-page .market-card.open .segment-meta .badge{color:#0964b5;background:#1677d212;border-color:#0964b566}
+
+/* The signed benchmark movement occupies a dedicated bottom row. */
+.terminal-page .market-card{padding-bottom:32px!important}
+.terminal-page .market-card .segment-direction-change{position:absolute;left:12px;bottom:9px;font:700 12px/1.4 'JetBrains Mono',monospace;white-space:nowrap}
+.terminal-page .market-card .segment-direction-change[hidden]{display:none}
+.terminal-page .market-card .segment-direction-change.up{color:var(--green)}
+.terminal-page .market-card .segment-direction-change.down{color:var(--red)}
+
+/* Center the signed percentage directly above its right-side arrow. */
+.terminal-page .market-card .segment-direction{right:12px;bottom:9px;gap:5px;align-items:center;text-align:center}
+.terminal-page .market-card .segment-direction .segment-direction-change{position:static;left:auto;bottom:auto;font-size:11px;line-height:1.3}
+.terminal-page .market-card .segment-controls,.terminal-page .market-card .card-context,.terminal-page .market-card .chance-block,.terminal-page .market-card>.segment-predictions{padding-right:85px}
+
+/* Both direction probabilities form the third row below the controls. */
+.terminal-page .market-card .segment-odds{display:flex;align-items:center;flex-wrap:wrap;gap:5px 8px;padding-right:85px;font:700 12px/1.4 'JetBrains Mono',monospace}
+.segment-odds-up{color:var(--green);white-space:nowrap}
+.segment-odds-down{color:var(--red);white-space:nowrap}
+.segment-odds-divider{color:#fff}
+[data-theme="light"] .segment-odds-divider,.market-card:is(.queued,.settled) .segment-odds-divider{color:#000}
+.terminal-page .market-card{min-height:154px!important}
+@media(max-width:600px),(pointer:coarse){.terminal-page .market-card{min-height:168px!important}}
+
+/* The top row reads benchmark → current, with only current carrying direction. */
+.terminal-page .market-card .card-top .segment-benchmark-price{color:#fff;font-size:inherit;font-weight:700;white-space:nowrap}
+[data-theme="light"] .terminal-page .market-card .card-top .segment-benchmark-price{color:#000}
+.terminal-page .market-card:is(.settled,.queued) .card-top .segment-benchmark-price{color:#000}
+.terminal-page .market-card.settled .card-top .initial-price{font-size:inherit;font-weight:800}
+.terminal-page .market-card .card-top .initial-price[data-direction="up"]{color:var(--green)}
+.terminal-page .market-card .card-top .initial-price[data-direction="down"]{color:var(--red)}
+
+/* Status shares the top row; pending intervals show only time and action. */
+.terminal-page .market-card{padding-top:12px!important}
+.terminal-page .market-card .card-top{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;gap:6px}
+.terminal-page .market-card .card-top .card-time{font-size:12px}
+.terminal-page .market-card .card-top .segment-price-values{font-size:14px;min-width:0;white-space:normal}
+.terminal-page .market-card .card-top .segment-meta{position:static;top:auto;right:auto;justify-self:end;margin:0}
+.terminal-page .market-card:is(.pending,.queued) .card-top{grid-template-columns:minmax(0,1fr) auto}
+.terminal-page .market-card:is(.pending,.queued) .segment-price-values,
+.terminal-page .market-card:is(.pending,.queued) .segment-odds,
+.terminal-page .market-card:is(.pending,.queued) .segment-countdown,
+.terminal-page .market-card:is(.pending,.queued) .card-benchmark,
+.terminal-page .market-card:is(.pending,.queued) .card-context,
+.terminal-page .market-card:is(.pending,.queued) .chance-block,
+.terminal-page .market-card:is(.pending,.queued) .segment-direction{display:none}
+
+/* Time and probabilities lead; benchmark → current gets a full second row. */
+.terminal-page .market-card .card-top{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px}
+.terminal-page .market-card .card-top .card-time{font-size:13px;font-weight:800;flex-shrink:0}
+.terminal-page .market-card .card-top .segment-odds{display:flex;flex-wrap:wrap;gap:4px 6px;padding:0;font-size:11px}
+.terminal-page .market-card .card-top .segment-meta{margin-left:auto;flex-shrink:0}
+.terminal-page .market-card .segment-price-row{min-width:0}
+.terminal-page .market-card .segment-price-row .segment-price-values{display:flex;align-items:baseline;flex-wrap:wrap;flex:0 1 auto;gap:4px 7px;padding:0;margin:0;background:none;font:800 17px/1.4 'JetBrains Mono',monospace}
+.terminal-page .market-card .segment-price-row .segment-price-values::before{content:none}
+.terminal-page .market-card .segment-price-row .segment-benchmark-price{color:#fff;font-weight:600;white-space:nowrap}
+[data-theme="light"] .terminal-page .market-card .segment-price-row .segment-benchmark-price,.terminal-page .market-card:is(.settled,.queued) .segment-price-row .segment-benchmark-price{color:#000}
+.terminal-page .market-card .segment-price-row .initial-price{font-size:inherit;font-weight:800}
+.terminal-page .market-card .segment-price-row .initial-price[data-direction="up"]{color:var(--green)}
+.terminal-page .market-card .segment-price-row .initial-price[data-direction="down"]{color:var(--red)}
+.terminal-page .market-card .segment-price-row .settlement-separator{color:var(--muted);font-size:13px}
+.terminal-page .market-card:is(.pending,.queued) .segment-price-row,.terminal-page .market-card:is(.pending,.queued) .card-top .segment-odds{display:none}
+@media(max-width:600px){
+ .terminal-page .market-card .card-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px}
+ .terminal-page .market-card .card-top .card-time{grid-column:1;grid-row:1}
+ .terminal-page .market-card .card-top .segment-meta{grid-column:2;grid-row:1;margin-left:0}
+ .terminal-page .market-card .card-top .segment-odds{grid-column:1/-1;grid-row:2;font-size:12px}
+ .terminal-page .market-card .segment-price-row .segment-price-values{font-size:18px}
+}
+/* Larger interval and probability text across laptop and phone cards. */
+.terminal-page .market-card .card-top .card-time{font-size:15px;font-weight:800}
+.terminal-page .market-card .card-top .segment-odds{font-size:14px;font-weight:800;line-height:1.4}
