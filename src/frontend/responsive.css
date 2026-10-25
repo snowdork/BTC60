@@ -1,0 +1,522 @@
+/* Preserve the common hourly axis: narrow screens scroll the playfield only. */
+body,body.auth-page{min-width:0}
+button,a,input{touch-action:manipulation}
+.timeline-scroll{min-width:0}
+@media(max-width:1100px){.topbar{height:auto;min-height:55px;flex-wrap:wrap;gap:10px!important;padding:10px 16px}.topbar .workspace-label{order:3;width:100%;overflow:auto}.topbar-right{margin-left:auto}.topbar .coin-button span{display:inline}.topbar .coin-button{padding:7px}.workspace{grid-template-columns:minmax(0,1fr) 290px;gap:12px}.overview-top{align-items:flex-start;flex-wrap:wrap}.overview-top .hour-window{margin-left:auto}.selected-status{flex-wrap:wrap;white-space:normal;row-gap:6px}.market-status-strip .market-legend{display:none}}
+@media(max-width:850px){body:not(.auth-page) main{padding:12px 14px 0}.workspace{grid-template-columns:minmax(0,1fr)}.ticket{position:static;padding:16px}.timeline-scroll{overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:5px}.timeline-stack{min-width:650px}.market-workspace{--tier-gutter:49px}.tier{grid-template-columns:42px minmax(0,1fr);gap:7px}.market-card{min-height:110px}.card-top{flex-wrap:wrap}.chart-plot{height:130px}.timeline-stack{--chart-height:130px}.chart-toolbar{height:34px}.interval-guides,.time-cursor{top:35px}.chart-times{height:23px}.market-card .chance-row{font-size:12px;gap:8px}.portfolio-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.portfolio-main{padding:20px 14px!important}.portfolio-heading{gap:14px;align-items:flex-start}.portfolio-heading h1{font-size:24px}.history-panel{padding:12px}.history-toolbar{gap:12px;flex-wrap:wrap}.history-scroll{max-width:100%}.auth-nav{gap:15px}.auth-nav nav{gap:12px}.positions-heading{flex-wrap:wrap}.positions-heading>.muted{display:none}footer{gap:12px;flex-wrap:wrap}}
+@media(max-width:480px){.topbar{padding:9px 12px}.topbar .brand{font-size:16px}.brand small{font-size:7px}.topbar-right{gap:6px}.topbar-right>.muted{display:none}.topbar-right strong{font-size:10px}.topbar .brand-mark{width:27px;height:30px;font-size:21px}.topbar .account-link{font-size:9px;padding:7px}.theme-toggle,.portfolio-icon{width:28px;height:28px}.workspace-label>.badge{display:none}.coin-picker{min-width:max-content}.overview-top{gap:12px}.price-row{gap:8px}.price-clock{padding-left:8px}.spot{font-size:22px}.spot>#btc-change{font-size:9px}.hour-window{width:100%;text-align:left;grid-template-columns:1fr auto}.selected-status{font-size:9px;gap:8px}.position-row{align-items:flex-start}.position-row>div:last-child{min-width:100px}.positions-heading h2{font-size:11px}.pending-history-link{font-size:8px}.rules-strip{align-items:flex-start;flex-wrap:wrap}.rules-strip p{flex:1;min-width:220px}.rules-strip button{margin-left:22px}.auth-nav{padding:18px 16px}.auth-nav nav{gap:8px;font-size:10px}.auth-nav .brand{font-size:17px}.auth-card{margin:20px 14px;padding:24px}.auth-card input{font-size:16px}.portfolio-heading{flex-wrap:wrap}.portfolio-stats{gap:8px}.portfolio-stats>.panel{padding:12px}.portfolio-stats strong{font-size:19px}.portfolio-stats span{font-size:8px}.history-filters{width:100%}.history-filters button{flex:1;padding:10px 8px}.history-scroll table{min-width:850px}dialog{padding:18px}footer>span:last-child{display:none}}
+
+.timeline-scroll,.topbar .workspace-label,.history-scroll{scrollbar-width:thin;scrollbar-color:var(--muted) transparent}
+
+/* Prominent instrument choices on prediction screens. */
+.topbar:has(.coin-picker){height:auto;min-height:76px;flex-wrap:wrap;padding-block:12px;gap:14px 24px}
+.topbar .workspace-label:has(.coin-picker){order:3;width:100%;overflow-x:auto;padding-bottom:3px}
+.topbar .coin-picker{display:flex;gap:8px}
+.topbar .coin-button{min-height:58px;padding:9px 14px;gap:10px;border-color:var(--border);background:var(--surface);border-radius:12px;font-size:13px;white-space:nowrap;color:var(--text)}
+.topbar .coin-button img{width:38px;height:38px;object-fit:contain;filter:drop-shadow(0 2px 4px #0003)}
+.topbar .coin-button:hover{background:var(--raised);border-color:var(--category-accent,var(--green))}
+.topbar .coin-button[aria-pressed="true"]{border-color:var(--category-accent,var(--green));color:var(--category-accent,var(--green));background:color-mix(in srgb,var(--category-accent,var(--green)) 12%,var(--surface));box-shadow:inset 0 0 0 1px var(--category-accent,var(--green))}
+.topbar .coin-button:focus-visible{outline:2px solid var(--category-accent,var(--green));outline-offset:3px}
+.ticket .ticket-coin{gap:12px}
+.ticket #ticket-coin-icon{width:44px;height:44px;object-fit:contain;flex-shrink:0}
+.chart-coin-icon img{width:42px;height:42px}
+@media(max-width:650px){.topbar .coin-button{min-height:54px;padding:8px 11px;font-size:12px}.topbar .coin-button img{width:34px;height:34px}.topbar .coin-picker{gap:7px}}
+
+/* Pair pending and history actions with readable labels and distinct icons. */
+.prediction-label-icon{width:20px;height:20px;flex-shrink:0;vertical-align:middle}
+.positions-heading h2,.history-toolbar h2{display:flex;align-items:center;gap:9px}
+.positions-heading h2{font-size:14px}
+.positions-heading h2>.prediction-label-icon{color:var(--amber)}
+.topbar .portfolio-icon{width:auto;height:auto;min-height:40px;padding:9px 12px;gap:8px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
+.pending-history-link{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--raised);font-size:12px;font-weight:600;text-decoration:none}
+.pending-history-link:hover{border-color:var(--green)}
+.portfolio-icon:focus-visible,.pending-history-link:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+.history-filters button[data-filter="pending"]{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.history-filters .prediction-label-icon{width:16px;height:16px}
+@media(max-width:650px){.topbar-right{flex-wrap:wrap}.topbar .portfolio-icon{font-size:11px;padding:8px}.positions-heading h2{font-size:13px}.pending-history-link{font-size:11px}}
+
+/* Keep the balance prominent at every screen size. */
+.account-balance{display:flex;flex-direction:column;gap:3px;flex-shrink:0;white-space:nowrap}
+.account-balance>span{font-size:13px;color:var(--muted)}
+.topbar-right .account-balance>strong{font-size:22px;line-height:1.2;font-variant-numeric:tabular-nums}
+.portfolio-stats .panel:has(#portfolio-balance)>span{font-size:13px}
+.portfolio-stats #portfolio-balance{font-size:30px}
+@media(max-width:480px){.account-balance>span{font-size:11px}.topbar-right .account-balance>strong{font-size:18px}.portfolio-stats #portfolio-balance{font-size:25px}}
+
+/* Keep the signed-in name beside its logout control, including on mobile. */
+.account-identity{display:inline-flex;align-items:center;gap:12px;min-width:0}
+.account-identity .signed-in-name{display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'Sora',sans-serif;font-size:15px;font-weight:600;letter-spacing:.2px;line-height:1.4;color:var(--text)}
+@media(max-width:650px){.account-identity{gap:8px}.account-identity .signed-in-name{max-width:120px;font-size:13px}.auth-nav{flex-wrap:wrap}.auth-nav nav{flex-wrap:wrap}}
+
+.community-counts{display:flex;align-items:center;gap:12px;white-space:nowrap;font:11px 'Sora',sans-serif;color:var(--muted)}
+.community-counts>span{display:inline-flex;align-items:center;gap:5px}.community-counts strong{font-size:14px;font-variant-numeric:tabular-nums;color:var(--text)}
+.community-counts i{width:6px;height:6px;border-radius:50%;background:var(--green)}
+@media(max-width:650px){.community-counts{gap:8px;font-size:10px}.community-counts strong{font-size:12px}}
+
+/* Give the prediction segments priority over chart and header chrome. */
+.terminal-page main{max-width:1920px;padding:12px 18px 0}
+.terminal-page .workspace{gap:12px}
+.terminal-page .topbar{display:flex;min-height:0;height:auto;padding:8px 18px;gap:8px 16px!important}
+.terminal-page .topbar .workspace-label:has(.coin-picker){order:0;flex:1;min-width:0;width:auto;padding:0;overflow-x:auto}
+.terminal-page .topbar .coin-picker{gap:5px;padding:3px;flex-shrink:0}
+.terminal-page .topbar .coin-button{min-height:40px;padding:5px 8px;gap:6px;font-size:11px;border-radius:8px}
+.terminal-page .topbar .coin-button img{width:26px;height:26px}
+.terminal-page .topbar .coin-button span{display:inline}
+.terminal-page .topbar-right{gap:8px;flex-wrap:wrap}
+.terminal-page .terminal-overview.overview{padding:9px 12px!important}
+.terminal-page .terminal-overview .overview-top{gap:8px 12px}
+.terminal-page .terminal-overview .price-row{margin-top:4px}
+.terminal-page .terminal-overview .spot{font-size:23px;gap:3px}
+.terminal-page .terminal-overview .hour-window{gap:4px}
+.terminal-page .terminal-overview .hour-time-navigation{padding:2px;gap:6px}
+.terminal-page .terminal-overview .hour-time-navigation button{height:30px;width:32px}
+.terminal-page .market-status-strip{margin:8px 0 6px;padding:6px 8px}
+.terminal-page .data-health{margin-bottom:5px}
+.terminal-page .timeline-stack{--chart-height:80px}
+.terminal-page .chart-plot{height:var(--chart-height)}
+.terminal-page .chart-toolbar{height:28px}
+.terminal-page .interval-guides,.terminal-page .time-cursor,.terminal-page .chart-coin-icon{top:29px}
+.terminal-page .hour-chart{margin-bottom:6px}
+.terminal-page .chart-times{height:19px}
+.terminal-page .minute-heatmap-wrap{padding:4px 6px 2px}
+.terminal-page .tier{margin-bottom:8px}
+.terminal-page .market-card{min-height:112px!important;padding:10px 12px!important;gap:5px!important}
+@media(min-width:1500px){
+ .terminal-page .topbar{flex-wrap:nowrap}
+ .terminal-page .topbar-right{flex-wrap:nowrap;flex-shrink:0}
+}
+@media(max-width:1499px){
+ .terminal-page .topbar-right{flex-basis:100%;margin-left:0}
+}
+@media(min-width:851px) and (max-height:820px){
+ .terminal-page .timeline-stack{--chart-height:64px}
+ .terminal-page .market-card{min-height:100px!important;padding:8px 10px!important}
+}
+@media(max-width:850px){
+ .terminal-page main{padding:10px 12px 0}
+ .terminal-page .timeline-stack{--chart-height:72px}
+ .terminal-page .topbar{padding:8px 12px}
+ .terminal-page .terminal-overview .price-clock{padding-top:6px}
+}
+
+/* Compact last-hour scoreboard stays separate from spendable contest credits. */
+.score-hud{display:flex;align-items:center;gap:12px;padding:9px 12px;margin-bottom:8px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.score-hud>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.score-hud small,.score-hud-result>span{font-size:10px;color:var(--muted)}
+.score-hud-result{margin-left:auto}
+.score-hud-result strong{font-size:19px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.score-history-button{padding:9px 10px;border:1px solid var(--border);border-radius:7px;background:var(--raised);font-size:11px;white-space:nowrap}
+.score-history-button:hover{border-color:var(--green);color:var(--green)}
+@media(max-width:650px){.score-hud{flex-wrap:wrap;gap:8px}.score-history-button{flex-basis:100%;text-align:center}.score-hud-result strong{font-size:17px}}
+
+
+/* Share one compact overview row with the previous hour's result. */
+.terminal-page .terminal-overview .overview-top{display:grid;grid-template-columns:minmax(150px,1fr) auto auto minmax(210px,auto);align-items:center;gap:10px}
+.terminal-page .terminal-overview .price-clock{grid-column:auto;grid-row:auto;flex-direction:column;gap:3px;padding:0 10px}
+.terminal-page .terminal-overview .price-clock strong{font-size:13px}
+.terminal-page .terminal-overview .clock-divider{display:none}
+.terminal-page .terminal-overview .hour-window{grid-column:auto;grid-row:auto;width:auto;min-width:0}
+.terminal-page .terminal-overview .hour-time-navigation{gap:4px}
+.terminal-page .terminal-overview .hour-time-navigation>#hour-window-label{font-size:14px}
+.terminal-page .terminal-overview .score-hud{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;margin:0;padding:0 0 0 12px;border:0;border-left:1px solid var(--border);border-radius:0;background:transparent}
+.terminal-page .terminal-overview .score-hud .eyebrow{font-size:9px}
+.terminal-page .terminal-overview .score-hud-result{margin:0;text-align:right}
+.terminal-page .terminal-overview .score-hud-result strong{font-size:16px}
+.terminal-page .terminal-overview .score-history-button{grid-column:1/-1;justify-self:end;padding:3px 0;border:0;background:transparent;font-size:10px}
+@media(max-width:1200px){
+ .terminal-page .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto}
+ .terminal-page .terminal-overview .price-clock{grid-column:2;grid-row:1;border:0;padding:0}
+ .terminal-page .terminal-overview .hour-window{grid-column:1;grid-row:2;align-items:flex-start}
+ .terminal-page .terminal-overview .score-hud{grid-column:2;grid-row:2;max-width:300px}
+}
+@media(max-width:480px){
+ .terminal-page .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr)}
+ .terminal-page .terminal-overview .price-clock{grid-column:1;grid-row:2;flex-direction:row;justify-content:flex-start;gap:12px}
+ .terminal-page .terminal-overview .hour-window{grid-column:1;grid-row:3}
+ .terminal-page .terminal-overview .score-hud{grid-column:1;grid-row:4;max-width:none;border-left:0;border-top:1px solid var(--border);padding:8px 0 0}
+}
+
+
+/* Segment actions open the ticket without reserving a sidebar. */
+.terminal-page .workspace{grid-template-columns:minmax(0,1fr)}
+.segment-action{display:block;align-self:stretch;min-height:44px;margin-top:5px;padding:8px 14px;border:1px solid var(--green);border-radius:7px;background:var(--raised);color:var(--green);font-size:12px;font-weight:600;cursor:pointer;text-align:center}
+.segment-action:hover{background:var(--surface)}
+.segment-action:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+.market-card.settled .segment-action,.market-card.queued .segment-action{border-color:var(--border);color:var(--text)}
+#prediction-dialog{width:min(440px,calc(100vw - 24px));max-width:none;max-height:calc(100dvh - 24px);padding:0;overflow-y:auto;overscroll-behavior:contain}
+#prediction-dialog .ticket{position:static;top:auto;width:100%;min-width:0;box-sizing:border-box;border:0;margin:0;padding:16px}
+.prediction-popup-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.prediction-popup-header h2{font-size:19px;margin:0}
+.prediction-popup-header button{min-width:44px;min-height:44px}
+#prediction-dialog #stake{font-size:16px}
+@media(max-width:480px){
+ #prediction-dialog{width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}
+ #prediction-dialog .ticket{padding:14px}
+
+}
+
+
+/* Segment actions sit beside the time range in a compact header. */
+.terminal-page .market-card{--action-bg:#44484d;--action-fg:#fff;--action-border:#686d73;--action-edge:#2b2e32;--action-hover:#555b61}
+.terminal-page .market-card.settled{--action-bg:#3c5362;--action-fg:#f4f8fb;--action-border:#69818f;--action-edge:#273c49;--action-hover:#4b6575}
+.terminal-page .market-card.queued{--action-bg:#765a2b;--action-fg:#fff8e8;--action-border:#a88c51;--action-edge:#503b19;--action-hover:#8a6b34}
+[data-theme="light"] .terminal-page .market-card{--action-bg:#e1e3e6;--action-fg:#202326;--action-border:#b6bbc1;--action-edge:#969da5;--action-hover:#d1d5d9}
+[data-theme="light"] .terminal-page .market-card.settled{--action-bg:#d5e1e7;--action-fg:#203f50;--action-border:#91a8b5;--action-edge:#708b9b;--action-hover:#c2d3dd}
+[data-theme="light"] .terminal-page .market-card.queued{--action-bg:#f0d590;--action-fg:#51380f;--action-border:#b9954e;--action-edge:#927133;--action-hover:#e7c575}
+.terminal-page .market-card .segment-price{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 12px}
+.terminal-page .market-card .segment-price-values{display:inline-flex;align-items:center;flex:1 1 100px;flex-wrap:wrap;gap:4px 6px;min-width:0;max-width:none}
+.terminal-page .market-card .segment-price-values>:is(.initial-price,.settlement-price){white-space:nowrap}
+.terminal-page .market-card.settled .segment-price{padding:0;background:none}
+.terminal-page .market-card.settled .segment-price-values{padding:5px 7px;border-radius:5px;background:var(--surface)}
+.terminal-page .market-card .card-top .segment-action{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 112px;align-self:flex-start;gap:8px;width:112px;min-height:36px;margin:0;padding:6px 10px;background:var(--action-bg);color:var(--action-fg);border:1px solid var(--action-border);border-bottom:2px solid var(--action-edge);border-radius:6px;font-size:14px;font-weight:600;line-height:1.2;white-space:nowrap;box-shadow:0 1px 2px #0002}
+.terminal-page .market-card .card-top .segment-action:hover{background:var(--action-hover)}
+.terminal-page .market-card .card-top .segment-action:active{transform:translateY(1px);box-shadow:none}
+.terminal-page .market-card .card-top .segment-action:focus-visible{outline:2px solid var(--text);outline-offset:3px}
+.terminal-page .market-card .card-top{display:flex;align-items:center;justify-content:flex-start;gap:8px 12px}
+.terminal-page .market-card .card-top .card-time{font-size:16px;font-weight:600;line-height:1.3;white-space:nowrap;letter-spacing:0}
+.terminal-page .market-card .segment-meta{display:inline-flex;align-items:center;gap:6px;margin-left:auto}
+.terminal-page .market-card .segment-meta .segment-countdown{margin:0;white-space:nowrap;font-size:11px}
+.segment-action-icon{width:20px;height:20px;flex:0 0 20px}
+@media(max-width:600px),(pointer:coarse){.terminal-page .market-card .card-top .segment-action{min-height:44px}}
+
+.hour-winner{display:inline-flex;align-items:center;gap:4px;align-self:flex-end;font-size:11px;font-weight:700;color:var(--text)}
+.hour-winner[hidden]{display:none}
+
+/* Laptop workspace: readable cards with less header and chart height. */
+.terminal-page .market-workspace{min-width:0}
+.terminal-page .market-card{min-width:0}
+.terminal-page .card-top{gap:6px;flex-wrap:wrap}
+.terminal-page .card-distance,.terminal-page .segment-price{white-space:normal;overflow-wrap:anywhere}
+.terminal-page .segment-action{margin-top:auto}
+.terminal-page .terminal-overview .score-hud-result .hour-winner{color:var(--text);font-weight:700}
+@media(min-width:901px) and (max-height:900px){
+ .terminal-page main{padding-top:8px}
+ .terminal-page .topbar{padding-block:5px;gap:5px 12px!important}
+ .terminal-page .topbar .coin-button{min-height:36px;padding:4px 8px}
+ .terminal-page .terminal-overview.overview{padding:7px 10px!important}
+ .terminal-page .timeline-stack{--chart-height:64px}
+ .terminal-page .tier{padding-top:5px;margin-bottom:6px}
+ .terminal-page .market-card{min-height:0!important;padding:7px 10px!important;gap:4px!important}
+ .terminal-page .market-card .card-benchmark{font-size:16px;line-height:1.25}
+ .terminal-page .market-card .segment-price{font-size:16px}
+ .terminal-page .market-card .chance-row{font-size:12px}
+ .terminal-page .market-card .segment-result{font-size:24px}
+ .terminal-page .segment-action{min-height:36px;padding:6px 12px}
+ .terminal-page .rules-strip{margin-block:4px;padding-block:4px}
+}
+@media(min-width:901px) and (max-width:1200px){
+ .terminal-page .terminal-overview .overview-top{grid-template-columns:minmax(150px,1fr) auto auto minmax(210px,auto)}
+ .terminal-page .terminal-overview .price-clock,.terminal-page .terminal-overview .hour-window,.terminal-page .terminal-overview .score-hud{grid-row:auto;grid-column:auto}
+ .terminal-page .terminal-overview .price-clock{padding-inline:8px;border-inline:1px solid var(--border)}
+ .terminal-page .terminal-overview .spot{font-size:21px;flex-wrap:wrap}
+ .terminal-page .terminal-overview .spot>#btc-change{font-size:10px}
+}
+
+/* Keep laptop navigation to two deliberate rows. */
+@media(min-width:601px) and (max-width:1499px){
+ .terminal-page .topbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto}
+ .terminal-page .topbar>.brand{grid-column:1;grid-row:1}
+ .terminal-page .topbar .workspace-label:has(.coin-picker){grid-column:2/-1;grid-row:1;width:100%}
+ .terminal-page .topbar-right{grid-column:1/3;grid-row:2;flex-basis:auto;margin:0;flex-wrap:nowrap}
+ .terminal-page .topbar>.account-link{grid-column:3;grid-row:2;justify-self:end}
+ .terminal-page .topbar-right .account-balance>strong{font-size:19px}
+ .terminal-page .topbar .account-identity .signed-in-name{max-width:120px;font-size:12px}
+ .terminal-page .terminal-overview .score-hud-result{display:grid;grid-template-columns:auto auto;align-items:center;gap:3px 6px}
+ .terminal-page .terminal-overview .score-hud-result>span:last-child{grid-column:1/-1}
+ .terminal-page .terminal-overview .score-hud-result>strong{grid-column:2}
+}
+@media(min-width:601px) and (max-width:1000px){
+ .terminal-page .topbar-right .community-counts{display:none}
+ .terminal-page .topbar .portfolio-icon{font-size:11px;padding:8px}
+ .terminal-page .topbar .account-identity .signed-in-name{max-width:80px}
+}
+
+/* Phones use readable segment cards below a full-width hourly chart. */
+@media(max-width:600px){
+ .terminal-page main{padding:8px 10px 0}
+ .terminal-page .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;padding:8px 10px;gap:6px 10px!important}
+ .terminal-page .topbar>.brand{grid-column:1;grid-row:1;font-size:17px}
+ .terminal-page .topbar>.phone-view-controls{grid-column:2;grid-row:1;justify-self:end}
+ .terminal-page .topbar>.account-link{grid-column:1/-1;grid-row:3;justify-self:end;min-height:44px;display:flex;align-items:center;font-size:11px}
+ .terminal-page .topbar-right{grid-column:1/-1;grid-row:2;flex-basis:auto;width:100%;margin:0;gap:6px}
+ .terminal-page .topbar-right .community-counts{display:none}
+ .terminal-page .account-balance{order:-1;margin-right:auto}
+ .terminal-page .topbar-right .account-balance>strong{font-size:clamp(14px,4.4vw,18px)}
+ .terminal-page .topbar .theme-toggle,.terminal-page .topbar #rules-open{width:44px;height:44px;flex-shrink:0}
+ .terminal-page .topbar .portfolio-icon{width:44px;height:44px;padding:10px;justify-content:center}
+ .terminal-page .topbar .portfolio-icon>span{display:none}
+ .terminal-page .account-identity{flex-basis:100%;justify-content:flex-end;gap:8px}
+ .terminal-page .account-identity .signed-in-name{max-width:160px;font-size:12px}
+ .terminal-page .account-identity:has([data-logout][hidden]){display:none}
+ .terminal-page .account-identity .account-link{min-height:44px;display:inline-flex;align-items:center}
+ .terminal-page .topbar .workspace-label:has(.coin-picker){grid-column:1/-1;grid-row:3;width:100%;gap:8px;overflow-x:auto;overscroll-behavior-x:contain}
+ .terminal-page .category-switch{min-height:44px;display:flex;align-items:center;font-size:11px;white-space:nowrap}
+ .terminal-page .topbar .coin-button{min-height:44px;padding:6px 9px;font-size:12px}
+ .terminal-page .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto;gap:8px}
+ .terminal-page .terminal-overview .price-summary{grid-column:1;grid-row:1}
+ .terminal-page .terminal-overview .price-heading{flex-wrap:wrap;gap:4px}
+ .terminal-page .terminal-overview .price-context{margin-left:0}
+ .terminal-page .terminal-overview .spot{font-size:22px;flex-wrap:wrap;gap:3px;margin-top:0}
+ .terminal-page .terminal-overview .spot>#btc-change{flex-basis:100%;margin-left:0;font-size:11px}
+ .terminal-page .terminal-overview .price-clock{grid-column:2;grid-row:1;flex-direction:column;align-items:flex-end;gap:4px;border:0;padding:0}
+ .terminal-page .terminal-overview .price-clock strong{font-size:12px}
+ .terminal-page .terminal-overview .hour-window{grid-column:1/-1;grid-row:2;width:100%;align-items:stretch;border-top:1px solid var(--border);padding-top:8px}
+ .terminal-page .terminal-overview .window-heading{justify-content:space-between}
+ .terminal-page .terminal-overview .hour-time-navigation{justify-content:space-between;gap:8px}
+ .terminal-page .terminal-overview .hour-time-navigation button{width:44px;height:44px}
+ .terminal-page .terminal-overview .hour-time-navigation>#hour-window-label{font-size:17px}
+ .terminal-page .terminal-overview .score-hud{grid-column:1/-1;grid-row:3;max-width:none;padding:8px 0 0;border:0;border-top:1px solid var(--border)}
+ .terminal-page .terminal-overview .score-history-button{min-height:36px;display:flex;align-items:center;justify-self:start;font-size:11px}
+ .terminal-page .market-status-strip{margin-top:6px}
+ .terminal-page .selected-status{font-size:11px;gap:6px;line-height:1.5}
+ .terminal-page .data-health{gap:4px 8px;font-size:10px;line-height:1.4}
+ .terminal-page .data-health strong{flex-basis:100%;margin-left:0}
+ .terminal-page .timeline-scroll{overflow:visible;padding-bottom:0}
+ .terminal-page .timeline-stack{min-width:0;--chart-height:96px}
+ .terminal-page .hour-chart{margin-left:0}
+ .terminal-page .chart-coin-icon{display:none}
+ .terminal-page .interval-guides{left:1px}
+ .terminal-page .time-cursor{display:none}
+ .terminal-page .tier{display:block;padding-top:8px;margin-bottom:12px}
+ .terminal-page .tier-label{display:flex;align-items:baseline;gap:5px;margin-bottom:6px;font-size:18px;line-height:1.3}
+ .terminal-page .tier-label small{font-size:11px}
+ .terminal-page .tier-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:8px}
+ .terminal-page .market-card{min-height:0!important;padding:12px!important;gap:8px!important}
+ .terminal-page .tier[data-duration] .market-card::before,.terminal-page .tier[data-duration] .market-card::after{display:none}
+ .terminal-page .card-top{justify-content:space-between;font-size:12px}
+ .terminal-page .card-time{font-size:13px}
+ .terminal-page .market-card .badge{font-size:10px}
+ .terminal-page .market-card .segment-price{font-size:20px;flex-wrap:wrap;line-height:1.4}
+ .terminal-page .market-card .segment-countdown{font-size:13px}
+ .terminal-page .market-card .card-distance{font-size:12px}
+ .terminal-page .market-card .chance-row{font-size:15px;gap:10px}
+ .terminal-page .segment-action{min-height:44px;font-size:14px}
+ .terminal-page .positions-heading{gap:8px}
+ .terminal-page .positions-heading h2{font-size:13px}
+ .terminal-page .pending-history-link{min-height:44px;font-size:11px;padding:8px}
+ .terminal-page .position-row{flex-wrap:wrap;gap:8px;font-size:12px}
+ .terminal-page .rules-strip p{min-width:0;flex-basis:calc(100% - 30px);font-size:11px;line-height:1.5}
+ .terminal-page .rules-strip button{min-height:44px;font-size:12px}
+}
+
+/* Dialogs remain usable with the phone keyboard and browser bars visible. */
+.terminal-page:has(dialog[open]){overflow:hidden}
+#prediction-dialog,#review-dialog,#rules-dialog{max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain;scroll-padding-block:64px}
+#prediction-dialog .prediction-popup-header{position:sticky;top:-16px;z-index:2;background:var(--surface);padding-block:4px}
+@media(pointer:coarse){.segment-action,.ticket .stake-presets button,.review-actions button{min-height:44px}}
+@media(max-width:600px){
+ #prediction-dialog,#review-dialog,#rules-dialog{width:calc(100vw - 16px);max-width:480px;max-height:calc(100dvh - 16px)}
+ #review-dialog,#rules-dialog{padding:16px}
+ #prediction-dialog .ticket{padding:14px;padding-bottom:max(14px,env(safe-area-inset-bottom))}
+ #prediction-dialog .prediction-popup-header{top:-14px}
+ .ticket .stake-presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+ .ticket .stake-presets button{min-height:44px;font-size:13px}
+ #review-dialog .dialog-top{gap:8px;align-items:center}
+ #review-dialog .review-close,#rules-dialog .icon-button{width:44px;height:44px;flex-shrink:0}
+ #review-dialog .review-actions{flex-wrap:wrap}
+ #review-dialog .review-actions button{min-height:48px}
+ .ticket .ticket-status-line{flex-wrap:wrap;gap:8px}
+ .ticket .order-math>div{gap:8px}
+ .ticket .order-math strong{white-space:nowrap}
+ #notification{max-width:calc(100vw - 24px);width:max-content;bottom:max(12px,env(safe-area-inset-bottom));font-size:12px}
+}
+
+@media(min-width:601px) and (max-width:900px){
+ .terminal-page .topbar-right{min-width:0;flex-wrap:wrap}
+ .terminal-page .terminal-overview .hour-window{margin-left:0}
+}
+
+.terminal-page .market-card.open .chance-block{align-self:stretch}
+[data-theme="light"] .terminal-page .market-card.open{background:#fff;color:var(--text)}
+[data-theme="light"] .terminal-page .market-card.open:hover{background:#eef1f3}
+
+
+/* Keep phone rotation beside the title, with guidance below the header. */
+.phone-view-controls{display:none}
+@media(max-width:600px),(max-width:1000px) and (pointer:coarse),(max-height:600px) and (pointer:coarse){
+ .phone-view-controls{display:flex;align-items:center;margin-left:auto;flex-shrink:0}
+ .landscape-button{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:8px;min-height:44px;padding:8px 12px;border:1px solid var(--muted);border-radius:7px;background:var(--raised);color:var(--text);font-size:12px;font-weight:600}
+ .landscape-button svg{width:24px;height:24px;flex-shrink:0}
+ .landscape-button:hover:not(:disabled){border-color:var(--text)}
+ .landscape-button[aria-pressed="true"]{border-color:var(--text)}
+ .landscape-button:disabled{opacity:.75}
+ .landscape-hint{margin:0 0 8px;max-width:38ch;color:var(--muted);font-size:12px;line-height:1.5}
+}
+
+
+/* A five-column coin grid shares the live price panel. */
+.terminal-page .terminal-overview.overview{display:grid;grid-template-columns:240px minmax(0,1fr);align-items:center;gap:16px}
+.terminal-page .coin-selection{min-width:0}
+.coin-selection-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px}
+.coin-selection-heading .category-switch{display:inline-flex;align-items:center;min-height:28px;font-size:10px;white-space:nowrap}
+.terminal-page .coin-selection .coin-picker{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:stretch;gap:8px;width:100%;padding:4px;border:0;border-radius:0;background:transparent}
+.terminal-page .coin-selection .coin-button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;min-height:44px;width:100%;padding:3px;border:1px solid var(--border);border-radius:7px;background:var(--raised);color:var(--text);font:600 10px/1.1 'JetBrains Mono',monospace;white-space:nowrap}
+.terminal-page .coin-selection .coin-button img{width:22px;height:22px;object-fit:contain}
+.terminal-page .coin-selection .coin-button:hover{background:var(--surface)}
+.terminal-page .coin-selection .coin-button:focus-visible{outline:2px solid var(--text);outline-offset:3px}
+.terminal-page .terminal-overview .overview-top{min-width:0}
+@media(min-width:601px){
+ .terminal-page .topbar{display:flex;flex-wrap:wrap}
+ .terminal-page .topbar .topbar-right{flex:1 1 auto;min-width:0;margin-left:auto;justify-content:flex-end}
+ .terminal-page .topbar>.account-link{flex-shrink:0}
+}
+@media(min-width:1101px){
+ .terminal-page .topbar{flex-wrap:nowrap}
+ .terminal-page .topbar .topbar-right{flex-wrap:nowrap}
+}
+@media(min-width:601px) and (max-width:1100px){
+ .terminal-page .topbar .community-counts{display:none}
+ .terminal-page .terminal-overview .overview-top{grid-template-columns:minmax(0,1fr) auto}
+ .terminal-page .terminal-overview .price-summary{grid-column:1;grid-row:1}
+ .terminal-page .terminal-overview .price-clock{grid-column:2;grid-row:1;border:0;padding:0}
+ .terminal-page .terminal-overview .hour-window{grid-column:1;grid-row:2}
+ .terminal-page .terminal-overview .score-hud{grid-column:2;grid-row:2;max-width:none}
+}
+@media(max-width:700px){
+ .terminal-page .terminal-overview.overview{grid-template-columns:minmax(0,1fr) auto;gap:8px}
+ .terminal-page .terminal-overview .overview-top{display:contents}
+ .terminal-page .terminal-overview .coin-selection{grid-column:1/-1;grid-row:2;padding-block:4px 8px;border-block:1px solid var(--border)}
+ .terminal-page .terminal-overview .price-summary{grid-column:1;grid-row:1}
+ .terminal-page .terminal-overview .price-clock{grid-column:2;grid-row:1;border:0;padding:0}
+ .terminal-page .terminal-overview .hour-window{grid-column:1/-1;grid-row:3;margin:0;padding:0;border:0}
+ .terminal-page .terminal-overview .score-hud{grid-column:1/-1;grid-row:4;max-width:none;border-left:0;padding:8px 0 0}
+ .coin-selection-heading .category-switch{min-height:44px;font-size:11px}
+}
+
+/* Shared segment layout, after viewport rules so laptop and phone agree. */
+.terminal-page .market-card{
+ position:relative;display:flex;flex-direction:column;align-items:stretch;
+ min-width:0;min-height:168px!important;padding:12px!important;gap:8px!important;
+}
+.terminal-page .market-card .card-top{display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-width:0;padding:0}
+.terminal-page .market-card .card-top .card-time{position:static;display:block;padding-right:85px;font:600 11px/1.4 'JetBrains Mono',monospace;white-space:normal}
+.terminal-page .market-card .segment-meta{position:absolute;top:12px;right:12px;margin:0;display:flex}
+.terminal-page .market-card .segment-meta .badge{font-size:8px;line-height:1.4;white-space:nowrap}
+.terminal-page .market-card .card-top .segment-price-values{display:flex;flex:0 1 auto;flex-wrap:wrap;align-items:baseline;gap:4px 6px;margin:0;padding:0;background:none;font:800 19px/1.3 'JetBrains Mono',monospace;max-width:100%;min-width:0}
+.terminal-page .market-card .initial-price{font-weight:800}
+.terminal-page .market-card.settled .card-top .initial-price{font-size:12px;font-weight:500;color:var(--muted)}
+.terminal-page .market-card .card-top .settlement-price{font-size:inherit;font-weight:800}
+.terminal-page .market-card .card-top .settlement-separator{font-size:12px;color:var(--muted)}
+.terminal-page .market-card .segment-controls{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:6px;margin-top:2px;padding-right:58px}
+.terminal-page .market-card .segment-controls .segment-action{display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:0 0 auto;min-height:36px;width:auto;margin:0;padding:7px 10px;border:1px solid var(--action-border);border-radius:6px;background:var(--action-bg);color:var(--action-fg);font-size:12px;font-weight:600;line-height:1.2}
+.terminal-page .market-card .segment-controls .segment-action:hover{background:var(--action-hover)}
+.terminal-page .market-card .segment-action-icon{width:15px;height:15px;flex-basis:15px}
+.terminal-page .market-card .segment-controls .segment-countdown{display:inline-flex;align-items:center;gap:6px;margin:0;font:500 11px/1.4 'JetBrains Mono',monospace;white-space:nowrap}
+.terminal-page .market-card .segment-controls .segment-countdown::before{content:'|';color:#fff}
+[data-theme="light"] .terminal-page .market-card .segment-controls .segment-countdown::before,.terminal-page .market-card.queued .segment-controls .segment-countdown::before{color:#000}
+.terminal-page .market-card .segment-direction{position:absolute;left:auto;top:auto;bottom:12px;right:12px;transform:none}
+.terminal-page .market-card .card-benchmark{padding:0;font-size:10px;line-height:1.4}
+.terminal-page .market-card .card-benchmark .segment-price{padding:0;min-height:0;background:none}
+.terminal-page .market-card:not(.queued) .card-benchmark{height:0;margin:0}
+.terminal-page .market-card .card-context{padding:0 58px 0 0;min-width:0}
+.terminal-page .market-card .card-context:has(.card-bottom:empty){display:none}
+.terminal-page .market-card .chance-block{margin-top:auto;padding-right:58px}
+.terminal-page .market-card:not(.settled) .chance-block{display:none}
+.terminal-page .market-card .chance-row .settled-stamp{font-size:11px;color:var(--muted)}
+.terminal-page .market-card .chance-row .settled-stamp.won{color:var(--green)}
+.terminal-page .market-card .chance-row .settled-stamp.lost{color:var(--red)}
+.terminal-page .market-card>.segment-predictions{padding-right:58px;display:flex;flex-wrap:wrap;gap:4px}
+.terminal-page .market-card>.segment-predictions[hidden]{display:none}
+@media(max-width:600px),(pointer:coarse){
+ .terminal-page .market-card{min-height:182px!important;padding:14px!important;gap:10px!important}
+ .terminal-page .market-card .segment-controls .segment-action{min-height:44px;padding:10px 14px;font-size:14px}
+ .terminal-page .market-card .card-top .segment-price-values{font-size:22px}
+ .terminal-page .market-card .segment-controls .segment-countdown{font-size:12px}
+ .terminal-page .market-card .card-top .card-time{font-size:12px}
+}
+/* Completed cards have a pale background in both themes. */
+.terminal-page .market-card.settled{--green:#007c40;--red:#b51d3c}
+.terminal-page .market-card.settled .card-top .settlement-price.up{color:var(--green)}
+.terminal-page .market-card.settled .card-top .settlement-price.down{color:var(--red)}
+/* Compact header: time and price share a row below the corner status. */
+.terminal-page .market-card{min-height:132px!important;padding:29px 12px 10px!important;gap:6px!important}
+.terminal-page .market-card .card-top{flex-direction:row;align-items:baseline;flex-wrap:wrap;gap:5px 8px}
+.terminal-page .market-card .card-top .card-time{padding-right:0;white-space:nowrap}
+.terminal-page .market-card .card-top .segment-price-values{font-size:17px;gap:4px;flex:0 1 auto}
+.terminal-page .market-card .card-top .segment-price-values::before{content:'|';font:400 12px/1 Arial,sans-serif;color:#fff;margin-right:3px}
+[data-theme="light"] .terminal-page .market-card .card-top .segment-price-values::before,.terminal-page .market-card:is(.queued,.settled) .card-top .segment-price-values::before{color:#000}
+.terminal-page .market-card .segment-meta{top:7px}
+.terminal-page .market-card .segment-direction{bottom:8px}
+@media(max-width:600px),(pointer:coarse){
+ .terminal-page .market-card{min-height:144px!important;padding:29px 12px 10px!important;gap:7px!important}
+ .terminal-page .market-card .card-top .segment-price-values{font-size:18px}
+}
+/* Emphasize the interval alongside its price. */
+.terminal-page .market-card .card-top .card-time{font-size:14px;font-weight:800;line-height:1.3}
+
+/* Keep status readable above the longer lower-right movement arrow. */
+.terminal-page .market-card .segment-meta{z-index:2}
+.terminal-page .market-card .segment-meta .badge{font-size:9px;line-height:1.4}
+/* Blue denotes an open interval; price direction keeps its own colors. */
+.terminal-page .market-card.open .segment-meta .badge{color:#66b5ff;background:#2589e51a;border-color:#66b5ff66}
+[data-theme="light"] .terminal-page .market-card.open .segment-meta .badge{color:#0964b5;background:#1677d212;border-color:#0964b566}
+
+/* The signed benchmark movement occupies a dedicated bottom row. */
+.terminal-page .market-card{padding-bottom:32px!important}
+.terminal-page .market-card .segment-direction-change{position:absolute;left:12px;bottom:9px;font:700 12px/1.4 'JetBrains Mono',monospace;white-space:nowrap}
+.terminal-page .market-card .segment-direction-change[hidden]{display:none}
+.terminal-page .market-card .segment-direction-change.up{color:var(--green)}
+.terminal-page .market-card .segment-direction-change.down{color:var(--red)}
+
+/* Center the signed percentage directly above its right-side arrow. */
+.terminal-page .market-card .segment-direction{right:12px;bottom:9px;gap:5px;align-items:center;text-align:center}
+.terminal-page .market-card .segment-direction .segment-direction-change{position:static;left:auto;bottom:auto;font-size:11px;line-height:1.3}
+.terminal-page .market-card .segment-controls,.terminal-page .market-card .card-context,.terminal-page .market-card .chance-block,.terminal-page .market-card>.segment-predictions{padding-right:85px}
+
+/* Both direction probabilities form the third row below the controls. */
+.terminal-page .market-card .segment-odds{display:flex;align-items:center;flex-wrap:wrap;gap:5px 8px;padding-right:85px;font:700 12px/1.4 'JetBrains Mono',monospace}
+.segment-odds-up{color:var(--green);white-space:nowrap}
+.segment-odds-down{color:var(--red);white-space:nowrap}
+.segment-odds-divider{color:#fff}
+[data-theme="light"] .segment-odds-divider,.market-card:is(.queued,.settled) .segment-odds-divider{color:#000}
+.terminal-page .market-card{min-height:154px!important}
+@media(max-width:600px),(pointer:coarse){.terminal-page .market-card{min-height:168px!important}}
+
+/* The top row reads benchmark → current, with only current carrying direction. */
+.terminal-page .market-card .card-top .segment-benchmark-price{color:#fff;font-size:inherit;font-weight:700;white-space:nowrap}
+[data-theme="light"] .terminal-page .market-card .card-top .segment-benchmark-price{color:#000}
+.terminal-page .market-card:is(.settled,.queued) .card-top .segment-benchmark-price{color:#000}
+.terminal-page .market-card.settled .card-top .initial-price{font-size:inherit;font-weight:800}
+.terminal-page .market-card .card-top .initial-price[data-direction="up"]{color:var(--green)}
+.terminal-page .market-card .card-top .initial-price[data-direction="down"]{color:var(--red)}
+
+/* Status shares the top row; pending intervals show only time and action. */
+.terminal-page .market-card{padding-top:12px!important}
+.terminal-page .market-card .card-top{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;gap:6px}
+.terminal-page .market-card .card-top .card-time{font-size:12px}
+.terminal-page .market-card .card-top .segment-price-values{font-size:14px;min-width:0;white-space:normal}
+.terminal-page .market-card .card-top .segment-meta{position:static;top:auto;right:auto;justify-self:end;margin:0}
+.terminal-page .market-card:is(.pending,.queued) .card-top{grid-template-columns:minmax(0,1fr) auto}
+.terminal-page .market-card:is(.pending,.queued) .segment-price-values,
+.terminal-page .market-card:is(.pending,.queued) .segment-odds,
+.terminal-page .market-card:is(.pending,.queued) .segment-countdown,
+.terminal-page .market-card:is(.pending,.queued) .card-benchmark,
+.terminal-page .market-card:is(.pending,.queued) .card-context,
+.terminal-page .market-card:is(.pending,.queued) .chance-block,
+.terminal-page .market-card:is(.pending,.queued) .segment-direction{display:none}
+
+/* Time and probabilities lead; benchmark → current gets a full second row. */
+.terminal-page .market-card .card-top{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px}
+.terminal-page .market-card .card-top .card-time{font-size:13px;font-weight:800;flex-shrink:0}
+.terminal-page .market-card .card-top .segment-odds{display:flex;flex-wrap:wrap;gap:4px 6px;padding:0;font-size:11px}
+.terminal-page .market-card .card-top .segment-meta{margin-left:auto;flex-shrink:0}
+.terminal-page .market-card .segment-price-row{min-width:0}
+.terminal-page .market-card .segment-price-row .segment-price-values{display:flex;align-items:baseline;flex-wrap:wrap;flex:0 1 auto;gap:4px 7px;padding:0;margin:0;background:none;font:800 17px/1.4 'JetBrains Mono',monospace}
+.terminal-page .market-card .segment-price-row .segment-price-values::before{content:none}
+.terminal-page .market-card .segment-price-row .segment-benchmark-price{color:#fff;font-weight:600;white-space:nowrap}
+[data-theme="light"] .terminal-page .market-card .segment-price-row .segment-benchmark-price,.terminal-page .market-card:is(.settled,.queued) .segment-price-row .segment-benchmark-price{color:#000}
+.terminal-page .market-card .segment-price-row .initial-price{font-size:inherit;font-weight:800}
+.terminal-page .market-card .segment-price-row .initial-price[data-direction="up"]{color:var(--green)}
+.terminal-page .market-card .segment-price-row .initial-price[data-direction="down"]{color:var(--red)}
+.terminal-page .market-card .segment-price-row .settlement-separator{color:var(--muted);font-size:13px}
+.terminal-page .market-card:is(.pending,.queued) .segment-price-row,.terminal-page .market-card:is(.pending,.queued) .card-top .segment-odds{display:none}
+@media(max-width:600px){
+ .terminal-page .market-card .card-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px}
+ .terminal-page .market-card .card-top .card-time{grid-column:1;grid-row:1}
+ .terminal-page .market-card .card-top .segment-meta{grid-column:2;grid-row:1;margin-left:0}
+ .terminal-page .market-card .card-top .segment-odds{grid-column:1/-1;grid-row:2;font-size:12px}
+ .terminal-page .market-card .segment-price-row .segment-price-values{font-size:18px}
+}
+/* Larger interval and probability text across laptop and phone cards. */
+.terminal-page .market-card .card-top .card-time{font-size:15px;font-weight:800}
+.terminal-page .market-card .card-top .segment-odds{font-size:14px;font-weight:800;line-height:1.4}

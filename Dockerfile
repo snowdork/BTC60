@@ -10,13 +10,11 @@ RUN groupadd --gid 10001 p60 \
     && mkdir /app/data \
     && chown p60:p60 /app/data
 
-COPY server.py contests.py p60_logging.py odds.py simulated_prices.py live_oil.py oilprice_api.py weather.py ./
-COPY *.html *.css *.js *.seed.json ./
-COPY assets/ ./assets/
+COPY src/ ./src/
 COPY scripts/database.py scripts/contest-admin.py ./scripts/
 
 USER p60
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD ["python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3).read()"]
-CMD ["python3", "-u", "server.py", "--bind", "0.0.0.0", "--port", "8000"]
+CMD ["python3", "-u", "src/backend/server.py", "--bind", "0.0.0.0", "--port", "8000"]

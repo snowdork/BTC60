@@ -12,7 +12,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / 'src/backend'))
 import server
 
 
@@ -68,9 +68,20 @@ def status(path):
             raise ValueError('Database integrity or foreign-key check failed.')
 
 
+def list_usernames(path):
+    """Print display names only, using a read-only connection."""
+    with closing(readonly(path)) as conn:
+        for (name,) in conn.execute('SELECT name FROM users ORDER BY name COLLATE NOCASE, id'):
+            # Keep each stored name on one output line, including unusual input.
+            print(str(name).replace('\r', r'\r').replace('\n', r'\n'))
+
+
 def reset(path):
     """Back up the database before clearing account state and restoring seeded catalogs."""
     with maintenance_lock(path):
+        if not path.is_file():
+            raise ValueError(f'Database does not exist: {path}. Use --db to select the deployed database, or init to create one.')
+        print(f'Resetting database: {path}', flush=True)
         # Build and validate the replacement before touching the existing database.
         with tempfile.TemporaryDirectory(prefix='p60-reset-', dir=path.parent) as folder:
             original = server.DB
@@ -85,6 +96,11 @@ def reset(path):
                 print(f'Backup saved: {saved}')
             with closing(sqlite3.connect(fresh)) as source, closing(sqlite3.connect(path)) as destination:
                 source.backup(destination)
+                for table in ('users', 'sessions', 'predictions', 'settlements'):
+                    count = destination.execute(f'SELECT count(*) FROM {table}').fetchone()[0]
+                    if count:
+                        raise ValueError(f'Reset verification failed: {table} still contains {count} rows.')
+                    print(f'{table}: {count}')
             os.chmod(path, 0o600)
     print('Database reset. Users, sessions, predictions, and settlements cleared; category and instrument seeds restored.')
 
@@ -92,7 +108,7 @@ def reset(path):
 def main():
     """Parse maintenance commands and enforce locks and explicit reset confirmation."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['init', 'backup', 'status', 'reset'])
+    parser.add_argument('command', choices=['init', 'backup', 'status', 'reset', 'usernames'])
     parser.add_argument('--db', type=Path, default=server.DB, help='SQLite path (default: PREDICT60_DB or project data/p60.sqlite3)')
     parser.add_argument('--confirm-reset', action='store_true', help='Required for reset; clears all account/order data after backup')
     parser.add_argument('--backup-dir', type=Path, help='Optional destination for the backup command')
@@ -109,6 +125,8 @@ def main():
             print(f'Backup saved: {backup(path, args.backup_dir.expanduser().resolve() if args.backup_dir else None)}')
         elif args.command == 'status':
             status(path)
+        elif args.command == 'usernames':
+            list_usernames(path)
         elif args.command == 'reset':
             if not args.confirm_reset:
                 raise ValueError('Reset clears users, sessions, predictions, and settlements. Re-run with --confirm-reset to back up and reset.')

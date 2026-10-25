@@ -19,7 +19,7 @@ fi
 command -v systemctl >/dev/null
 command -v systemd-analyze >/dev/null
 [[ -d /run/systemd/system ]] || { echo 'This installer requires a host running systemd.' >&2; exit 1; }
-runuser -u "$owner" -- test -r "$root/server.py"
+runuser -u "$owner" -- test -r "$root/src/backend/server.py"
 install -d -m 700 /etc/predict60
 if [[ ! -e /etc/predict60/predict60.env ]]; then
   # Preserve the checkout's database selection, including the legacy filename.
@@ -52,7 +52,7 @@ systemctl daemon-reload
 systemctl enable predict60.service
 if [[ ${1:-} == --start ]]; then
   # Hand over supervision; never run the watchdog and service together.
-  runuser -u "$owner" -- python3 "$root/scripts/stop-server.py"
+  runuser -u "$owner" -- bash "$root/scripts/stop-server.sh"
   systemctl restart predict60.service
   curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 2 --max-time 5 http://127.0.0.1:8000/healthz
   echo

@@ -9,11 +9,11 @@ You do not need to install Python or Docker on your own computer. New signups
 require the secret signup code provided by the organizer, an 8–16-character
 password, and a matching verification password. Show/Hide controls reveal or
 conceal the signup code and password fields. Existing accounts can
-log in without the code. Sign up or log in, then choose **Crypto** from the category screen. New accounts receive 10,000
-credits. Accounts and saved predictions belong to that installation;
+log in without the code. Sign up or log in, then choose **Crypto** from the category screen. Players receive 1,000 contest credits each hour, resetting independently
+at each GMT hour boundary. Accounts and saved predictions belong to that installation;
 a separate local installation does not automatically share them.
 
-For local use, run `python3 server.py` from the project folder and open
+For local use, run `python3 src/backend/server.py` from the project folder and open
 http://127.0.0.1:8000. The default bind address remains local-only. Administrators
 setting up a VPS should follow the [Docker deployment guide](../deploy/DOCKER.md).
 
@@ -47,7 +47,11 @@ also completes when another tab has already ended that session.
 
 ## Read the terminal
 
-Choose a coin using the header buttons. The default choices are BTC, ETH, SOL, XRP, DOGE, ADA, and LTC; administrators can change availability. Coin selection updates prices, chart, and market context. All coins share your account balance.
+Choose a coin using the icon grid beside the price. The default choices are BTC, ETH, SOL, XRP, DOGE, ADA, and LTC; administrators can change availability. Coin selection updates prices, chart, and market context. All coins share your account balance.
+
+Selecting a coin immediately requests a current price and shows **Loading…** while it arrives. If no valid, recent quote is available, the price reads **Data Not Available**. The terminal retries automatically; you do not need to refresh or switch coins again. Historical candles never substitute for a current quote, and predictions remain blocked until the required price and benchmark data are ready.
+
+The live price display updates every two seconds. Clocks and betting countdowns continue to update every second. Selecting another coin or reporting unavailable data updates the price state immediately.
 
 Each UTC hour shows one 60-minute interval, two 30-minute intervals, and four 15-minute intervals. Select any card to inspect its benchmark and details in the ticket. Open cards accept predictions when data is ready. Upcoming and completed cards are read-only. A red dashed cursor shows the current UTC time across the chart and markets.
 
@@ -86,8 +90,9 @@ The sun/moon button switches themes and saves your preference across tabs. On sm
 
 | Message or symptom | Action |
 | --- | --- |
-| Coins unavailable / terminal offline | On a hosted site, refresh and contact the administrator if it persists. For local use, start `python3 server.py` and open the localhost URL. |
+| Coins unavailable / terminal offline | On a hosted site, refresh and contact the administrator if it persists. For local use, start `python3 src/backend/server.py` and open the localhost URL. |
 | Price feed disconnected or stale | Check internet access and use Reconnect; wait for a fresh live update. |
+| Data Not Available | No valid current quote was received. Automatic retries continue; check internet access if it persists. Available chart history can still be viewed. |
 | History or opening benchmark unavailable | Wait for Coinbase candle history, then reconnect if needed. Orders stay blocked until required data is available. |
 | Chart paused / synthetic preview / historical market | Resume, reconnect to live data, or select Current hour. |
 | Too late to place | Select an open interval and review a new prediction. |
@@ -121,17 +126,41 @@ then choose the category you want to play. No real money is used.
 
 OilPriceAPI mode shows dated physical spot assessments for all five crudes. These series do not provide minute settlement benchmarks, so hourly oil predictions are unavailable; Crypto continues normally.
 
+## Laptop and phone displays
+
+On a laptop, the chart and the 60-, 30-, and 15-minute segment rows share one
+hourly timeline. Compact navigation and cards leave more room for predictions.
+On phone screens up to 600 pixels wide, the chart fits the screen and segments
+stack by duration. Choose coins from the five-column icon grid in the live price
+panel. Each icon shows its ticker; the inner highlight marks the selected coin,
+and the outer ring shows your hourly prediction direction.
+
+Tap **Predict** on an open segment to open the prediction popup, select Up or
+Down, enter a budget, and review before confirming. Tap **Result** on a closed
+segment to see its outcome and your returns. **Details** describes an upcoming
+segment. Popups scroll on short screens; use the close button or Escape to close
+them. The hourly balance and last-hour results remain in the header.
+
+On a phone, tap **Rotate** in the top title bar to request landscape view.
+If the browser permits it, the page enters full screen and rotates. Tap
+**Auto rotate** to release the orientation lock and leave full screen. On
+browsers without automatic rotation support, follow the on-screen prompt to
+turn the phone sideways and disable the phone’s rotation lock if necessary.
+The button shows **Landscape** when the phone is already sideways.
+
 ## Hourly contests
 
 The game uses **Hourly contest** only. Each user starts with 1,000 credits
 per GMT hour across all instruments and intervals. Settled payouts refill the
 balance and can be spent again that hour. Losses reduce the balance; the final
 score is ending credits minus 1,000. Unspent
-credits do not carry forward. Practice mode is no longer available.
+credits do not carry forward.
 
 At HH:00 GMT the contest closes. Final winners and results are saved after all
-predictions settle, then the next hourly allowance unlocks. If a price benchmark
-is unavailable, results and the credit reset wait; no winner is guessed. GMT is
+predictions settle. Every player starts the next GMT hour with a fresh 1,000 credits.
+If a price benchmark is unavailable, results wait while the new hour continues;
+no winner is guessed. A trophy marked Winner appears in Last hour for finalized
+first-place results, including ties. GMT is
 UTC+00:00 year-round. The highest net tally wins, including when all tallies are
 negative. Ties share first place; an empty hour has no winner.
 

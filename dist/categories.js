@@ -67,7 +67,7 @@
     refreshQuotes();setInterval(refreshQuotes,5000);
     document.addEventListener('visibilitychange',refreshQuotes);
   }catch{
-    status.textContent='Markets unavailable. Start or restart the local app with python3 server.py, then try again.';
+    status.textContent='Markets unavailable. Start or restart the local app with python3 src/backend/server.py, then try again.';
     retry.hidden=false;
   }
 })();

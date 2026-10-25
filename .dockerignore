@@ -1,4 +1,11 @@
 .git
+# Local credentials, agent state, and editor files must not enter the build context.
+.aws
+.agents
+.codex
+.openai
+.vscode
+.venv
 .env
 .env.*
 *.key

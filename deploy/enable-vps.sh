@@ -29,7 +29,7 @@ if not target.exists():
             continue
         try:
             args = (proc / 'cmdline').read_bytes().split(b'\0')
-            if str(root / 'server.py').encode() not in args:
+            if str(root / 'src/backend/server.py').encode() not in args:
                 continue
             for entry in (proc / 'environ').read_bytes().split(b'\0'):
                 name, sep, value = entry.partition(b'=')

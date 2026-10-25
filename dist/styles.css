@@ -71,7 +71,7 @@ body:not(.auth-page) main{padding:10px 20px 0}
 
 /* Bright interval edges separate adjacent prediction segments. */
 .tier-cards>.market-card:not(:last-child){border-right-color:#ffd54f;box-shadow:2px 0 5px #ffb30018}
-.tier-cards>.market-card.selected{border-color:var(--green);box-shadow:0 0 0 1px #00e67612}
+.tier-cards>.market-card.selected{border-color:var(--tier-color);box-shadow:0 0 0 1px var(--tier-color)}
 
 /* Each prediction horizon has its own outline and horizontal divider. */
 .tier[data-duration="60"]{--tier-color:#ffd54f}
@@ -82,7 +82,7 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .tier[data-duration] .market-card{border-color:color-mix(in srgb,var(--tier-color) 65%,transparent)}
 .tier[data-duration] .market-card:not(:last-child){border-right-color:var(--tier-color);box-shadow:none}
 .tier[data-duration] .market-card:hover{border-color:var(--tier-color)}
-.tier[data-duration] .market-card.selected{border-color:var(--green);box-shadow:0 0 0 1px #00e67625}
+.tier[data-duration] .market-card.selected{border-color:var(--tier-color);box-shadow:0 0 0 1px var(--tier-color)}
 
 /* Quarter-hour guides belong to the chart; each row marks only its own ends. */
 .interval-guides{bottom:auto;height:var(--chart-height)}
@@ -141,15 +141,12 @@ body:not(.auth-page) main{padding:10px 20px 0}
 
 .review-time{margin:10px 0;padding:9px 12px;border:1px solid var(--border);border-radius:6px;color:var(--amber);font:700 14px monospace;font-variant-numeric:tabular-nums}.review-time.expired{color:var(--red);border-color:var(--red)}
 
-/* Selection distinguishes an available interval from a closed one. */
-:root .tier[data-duration] .market-card.open.selected{border-color:#2979ff;border-style:solid;box-shadow:inset 0 0 0 2px #2979ff,0 0 0 1px #2979ff,0 0 12px #2979ff30}
+/* Selected segments use their interval color in every market state. */
+:root .tier[data-duration] .market-card.selected{border-color:var(--tier-color);border-style:solid;outline:none;box-shadow:inset 0 0 0 2px var(--tier-color),0 0 0 1px var(--tier-color),0 0 12px color-mix(in srgb,var(--tier-color) 20%,transparent)}
 
 
 
 /* Closed and upcoming selections have informational panes instead of order controls. */
-:root .tier[data-duration] .market-card.settled.selected{border:2px solid #89938d;outline:none;box-shadow:none}
-:root .tier[data-duration] .market-card.settled.result-up.selected{border-color:#00e676;box-shadow:inset 0 0 0 2px #00e676,0 0 0 1px #00e676}
-:root .tier[data-duration] .market-card.settled.result-down.selected{border-color:#ff1744;box-shadow:inset 0 0 0 2px #ff1744,0 0 0 1px #ff1744}
 .ticket-coin{display:flex;align-items:center;gap:9px;margin-top:9px}.ticket-coin h3{margin:0}.ticket-coin img{object-fit:contain}.interval-details h3{font-size:18px;margin:14px 0}.interval-details dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px 14px;font-size:10px;line-height:1.5}.interval-details dt{color:var(--muted)}.interval-details dd{margin:0;text-align:right;overflow-wrap:anywhere}.interval-details p{font-size:10px;line-height:1.7;color:var(--muted)}
 
 .ticket-market>.ticket-coin{justify-content:flex-start}.ticket-market>.ticket-coin h3{margin:0}
@@ -166,7 +163,6 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .wager-settlement.won,.segment-prediction.won{color:var(--green)}
 .wager-settlement.lost,.segment-prediction.lost{color:var(--red)}
 
-.prediction-context{margin:-4px 0 18px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--raised)}.prediction-context-top{display:flex;justify-content:space-between;align-items:center;gap:8px}.prediction-context-top span{font:8px monospace;color:var(--muted);letter-spacing:.6px}.prediction-context-top strong{font:600 15px monospace}.prediction-context-time,.prediction-context-note{font-size:9px;line-height:1.6;color:var(--muted);margin:6px 0 10px}.prediction-hour{position:relative;height:8px;border-radius:4px;background:var(--surface);overflow:hidden}.prediction-hour span{position:absolute;height:100%;background:var(--cyan);border-radius:4px}.prediction-hour-labels{display:flex;justify-content:space-between;gap:8px;margin-top:6px;font:8px monospace;color:var(--muted)}#ticket-interval-timing{color:var(--text)}#ticket-comparison{font:10px monospace;line-height:1.5;margin:12px 0}.prediction-win-rules{display:grid;gap:6px;font:10px monospace;line-height:1.5}.prediction-win-rules span:first-child{color:var(--green)}.prediction-win-rules span:last-child{color:var(--red)}.prediction-context[data-side="up"] .prediction-win-rules span:first-child,.prediction-context[data-side="down"] .prediction-win-rules span:last-child{font-weight:700;text-decoration:underline;text-underline-offset:3px}.prediction-context-note{margin:10px 0 0}
 
 .ticket-title.sr-only{margin:0;padding:0;border:0}
 
@@ -178,18 +174,6 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .ticket .ticket-coin h3{font-size:17px;line-height:1.3}
 .ticket .ticket-selected-window{margin-top:7px;padding:7px 8px;gap:4px 8px}
 .ticket .ticket-selected-window strong,.ticket .ticket-selected-window span{font-size:10px}
-.ticket .benchmark{padding:10px;margin-bottom:8px}
-.ticket .benchmark>div:first-child{width:100%}
-.ticket .benchmark strong{font-size:20px;margin-top:4px}
-.ticket .benchmark-delta{display:none}
-.ticket .benchmark .eyebrow{font-size:8px;color:var(--muted)}
-.ticket .prediction-context{padding:9px 10px;margin:0 0 12px}
-.ticket .prediction-context-top strong{font-size:16px}
-.ticket .prediction-context-time{font-size:9px;line-height:1.4;margin:4px 0 8px}
-.ticket .prediction-hour{height:6px}
-.ticket #ticket-comparison{font-size:11px;line-height:1.4;margin:8px 0}
-.ticket .prediction-win-rules{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:10px}
-.ticket .prediction-context-note{display:none}
 .ticket .side-label{margin:8px 0 7px;font-size:11px}
 .ticket .outcomes{gap:8px;margin-bottom:10px}
 .ticket .outcome{padding:10px;min-height:84px}
@@ -352,7 +336,8 @@ body:not(.auth-page) main{padding:10px 20px 0}
  .terminal-overview .price-clock{grid-row:3}
 }
 
-/* Only the banner fractional digits follow the latest one-second price move. */
+/* Only the banner fractional digits follow the latest displayed price move. */
+.spot>#btc-spot[data-state="loading"],.spot>#btc-spot[data-state="unavailable"]{font-size:14px;line-height:1.4;color:var(--muted);overflow-wrap:anywhere}
 #btc-spot .spot-decimals[data-trend="up"]{color:var(--green)}
 #btc-spot .spot-decimals[data-trend="down"]{color:var(--red)}
 
@@ -390,3 +375,28 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .market-card .chance-row [hidden]{display:none}
 
 .chart-toolbar>div[hidden]{display:none}
+
+/* Outer direction ring and inner selection ring remain visible together. */
+:root .coin-picker .coin-button{position:relative}
+:root .coin-picker .coin-button[data-prediction="up"]{--coin-ring:var(--green)}
+:root .coin-picker .coin-button[data-prediction="down"]{--coin-ring:var(--red)}
+:root .coin-picker .coin-button[data-prediction="mixed"]{--coin-ring:var(--green) var(--red) var(--red) var(--green)}
+:root .coin-picker .coin-button:is([data-prediction="up"],[data-prediction="down"],[data-prediction="mixed"]):after{content:'';position:absolute;inset:-3px;border:2px solid;border-color:var(--coin-ring);border-radius:calc(6px + 3px);pointer-events:none}
+:root .coin-picker .coin-button[aria-pressed="true"]{border-color:var(--border);box-shadow:inset 0 0 0 2px #fff}
+:root[data-theme="light"] .coin-picker .coin-button[aria-pressed="true"]{border-color:var(--border);box-shadow:inset 0 0 0 2px #000}
+
+.ticket .wager-limit{margin:0 0 8px;color:var(--muted);font-size:11px;line-height:1.5}.ticket .wager-limit strong{color:var(--text);font-weight:600}
+
+/* Segment movement: the dot sits beyond the arrowhead in either direction. */
+.segment-direction{display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none;font-variant-numeric:tabular-nums}
+.segment-direction[hidden]{display:none}
+.segment-direction.up{color:var(--green)}
+.segment-direction.down{color:var(--red)}
+.segment-direction-arrow{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:0}
+.segment-direction-arrow::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}
+.segment-direction-arrow::after{content:'';width:13px;height:33px;background:currentColor;clip-path:polygon(50% 0,100% 30%,68% 30%,68% 100%,32% 100%,32% 30%,0 30%)}
+.segment-direction.down .segment-direction-arrow{flex-direction:column-reverse}
+.segment-direction.down .segment-direction-arrow::after{transform:rotate(180deg)}
+.segment-direction-change{font:600 10px/1.4 'JetBrains Mono',monospace;white-space:nowrap}
+.market-card .initial-price[data-direction="up"]{color:var(--green)}
+.market-card .initial-price[data-direction="down"]{color:var(--red)}

@@ -6,17 +6,16 @@ context; launch countries/states and participant ages remain undecided.
 
 ## Implemented now
 
-The app now includes UTC hourly/daily contests, a separate 10,000-credit daily
-spending allowance, provisional leaderboards, immutable final rankings, shared
-first-place winners, and prize records. Contest submissions reserve at most
-1,000 credits per instrument/interval in aggregate across both directions.
-Practice predictions remain separate and retain the per-submission limit.
+The app includes UTC hourly contests with 1,000 credits per player each hour,
+provisional leaderboards, immutable final rankings, shared first-place winners,
+and prize records. Contest submissions reserve at most 1,000 credits per
+instrument/interval in aggregate across both directions. Daily contests are disabled.
 
-Scores are settled returns minus costs. Returns do not replenish the daily
-allowance. An interval ending at midnight belongs to the day just ended. Final
-rankings wait for all entries to settle; there is no automatic void deadline.
-Current and recent periods plus upcoming reserved pools appear on the contest
-page. No historical practice orders are imported.
+Settled payouts return to the hourly balance and can be reused that hour.
+Final score is ending credits minus 1,000. Final rankings wait for all entries
+to settle; the next GMT hour starts with 1,000 fresh credits independently of prior results.
+Unspent credits do not carry forward. Current and recent periods plus upcoming
+reserved pools appear on the contest page.
 
 Operators can record funded gift-card pools before a contest starts.
 Tied winners share the pool; remaining indivisible cents are assigned by

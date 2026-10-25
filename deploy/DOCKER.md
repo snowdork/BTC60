@@ -41,10 +41,43 @@ See [Docker restart policies](https://docs.docker.com/engine/containers/start-co
 To build an updated image and recreate changed VPS containers:
 
 ```bash
-sudo bash scripts/docker-restart.sh
+sudo bash scripts/restart-docker.sh
 ```
 
-Run this after updating the checkout and making a database backup. The script
+After a successful build, the restart helper stops `predict60.service` when it
+is installed, before replacing/starting the Docker app. Run the helper with
+`sudo` for this handoff. If stopping the service fails, Docker replacement is
+aborted. A failed build leaves the host service running. Stopping the service
+does not disable its boot startup; use `sudo systemctl disable predict60` if
+Docker will permanently replace the host service.
+
+### Switching to the host server
+
+For the development watchdog, run `python3 scripts/restart-server.py` from the
+checkout. It stops the `p60-local` container and all containers in the `p60` and
+`p60-local` Compose projects, including Caddy, before starting Python. Containers
+and volumes are retained; unrelated containers and the Docker daemon keep
+running. If Docker cannot be checked or stopped, host startup aborts. See
+[local switching instructions](LOCAL.md#switching-between-python-and-docker)
+for permissions, data locations, and switching back.
+
+For systemd, stop the stack explicitly before starting the host service:
+
+```bash
+docker compose stop
+sudo systemctl start predict60
+```
+
+Use `sudo` for Docker commands if your installation requires it. Stop any local
+Docker deployment as well (`docker stop p60-local`). Systemd startup and direct
+Python startup do not call the restart script's Docker shutdown. Docker data is
+not automatically imported into the host database. Stopping the stack also stops
+its HTTPS proxy; configure the host's HTTPS proxy before serving public traffic.
+
+### Rebuild behavior and persistent data
+
+Run `sudo bash scripts/restart-docker.sh` after updating the checkout and making
+a database backup. The script
 uses the VPS `compose.yaml` and `.env`, checks configuration and Docker access
 before building, and retains all database and certificate volumes. Existing
 containers continue serving during the build. If the build fails, they remain
@@ -131,7 +164,7 @@ assets or API responses.
 
 For Docker, edit the root `.env` and run `docker compose up -d` to recreate the
 app with the new environment. For systemd, edit `/etc/predict60/predict60.env`
-and restart `predict60.service`. A local `python3 server.py` process needs the
+and restart `predict60.service`. A local `python3 src/backend/server.py` process needs the
 variable exported in its shell; it does not automatically load `.env`.
 
 ## Routine operation
@@ -145,7 +178,7 @@ docker compose logs --tail=100 app caddy
 docker stats --no-stream
 
 # Apply application code changes after taking a backup
-bash scripts/docker-restart.sh
+bash scripts/restart-docker.sh
 
 # Apply .env changes without rebuilding the image
 docker compose up -d --no-build --wait --wait-timeout 120

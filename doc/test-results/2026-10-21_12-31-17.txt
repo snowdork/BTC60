@@ -1,0 +1,132 @@
+Predict60 unit-test run
+Log: /tmp/test_results/test_result_2026-10-21_12-31-17_318417.log
+
+▶ JavaScript
+$ node --test account.test.js auth.test.js bootstrap.test.js btc-chart.test.js categories.test.js coins.test.js community.test.js contests.test.js market-model.test.js password.test.js portfolio-model.test.js sponsor.test.js
+✔ restored session renders a plain-text name and skips welcome (6.052293ms)
+✔ expired session hides protected controls and redirects to welcome (0.680286ms)
+✔ logout sends CSRF token and clears user, predictions, and name (0.685436ms)
+✔ failed logout preserves the session and permits retry (0.654547ms)
+✔ settlement ignores overlapping requests and resumes after failure (1.129145ms)
+✔ background sync does not settle while the document is hidden (0.70376ms)
+✔ a settlement response arriving after logout cannot restore the account (1.329323ms)
+✔ logout succeeds locally when another tab has already ended the session (0.651892ms)
+✔ stale prediction token refreshes the same account and retries the identical order once (0.728808ms)
+✔ background settlement recovers a stale token without reloading the page (0.886797ms)
+✔ CSRF recovery never retries an order for a different account (0.743075ms)
+✔ CSRF retries are bounded and other errors never replay predictions (1.769335ms)
+✔ login and signup post form fields and navigate to categories (2.849488ms)
+✔ rejected credentials remain on the form with a retryable error (1.313444ms)
+✔ submission is disabled while pending and recovers from non-JSON responses (0.79857ms)
+✔ invalid signup code stays on signup with a retryable error (0.635762ms)
+✔ signup confirmation mismatch prevents the request (1.337078ms)
+✔ show controls toggle password and signup-code visibility without submitting (1.628509ms)
+✔ login change-password action authenticates before opening the protected form (0.753004ms)
+✔ file preview shows actionable offline state instead of Connecting (1.640211ms)
+✔ network errors and static-server HTML stop startup clearly (4.618382ms)
+✔ database catalog loads before terminal scripts (1.332459ms)
+✔ oil category configures the same framework with only oil instruments (0.812025ms)
+✔ coin outlines track live current-hour contest directions and expire without account polling (2.397142ms)
+✔ coin position markers refresh after an order, settlement, and logout (0.870205ms)
+✔ initial current hour backfills to its start before pricing history completes (21.641818ms)
+✔ minute heat map renders sixty time-aligned candle directions (2.122804ms)
+✔ returning to current hour restores history and ignores old pricing responses (4.118015ms)
+✔ banner fractional digits follow second-to-second moves and reset on navigation (2.939298ms)
+✔ oil uses server simulated prices and history through the shared chart (4.23127ms)
+✔ live oil uses provider timestamps and its minute quote freshness limit (1.715864ms)
+✔ missing oil credentials show an actionable error without simulated substitution (1.938235ms)
+✔ completed quarters show a green direction arrow with an outcome-colored dot (1.171135ms)
+✔ falling quarter points down and ties resolve Up (2.188057ms)
+✔ missing boundary candle leaves completed segment without an invented winner (1.429071ms)
+✔ category screen shows pending connection and unavailable grades without fake quotes (7.361758ms)
+✔ configured category shows a real quote and preserves its source timestamp (13.457995ms)
+✔ stale category quote is displayed as unavailable (1.521557ms)
+✔ dated spot assessments remain visible without being labeled live ticks (1.043282ms)
+✔ guests cannot load market choices or quotes (0.600896ms)
+✔ weather coming soon card has no market link or quote requests (0.806795ms)
+✔ oil coming soon card has no market link or quote requests (0.744568ms)
+✔ catalog uses supplied database records without a fixed coin list (1.266034ms)
+✔ formatting uses each database precision (13.3339ms)
+✔ empty and invalid catalogs are handled (0.309565ms)
+✔ category selection isolates instruments without truncating another category (0.267796ms)
+✔ shows actual counts including zero without caching (16.407821ms)
+✔ malformed and unavailable responses show unknown instead of invented counts (4.010373ms)
+✔ hidden tabs pause polling and visibility resumes it (0.73507ms)
+✔ concurrent refresh events share one in-flight request (1.61856ms)
+✔ recovers on the next refresh after a network error (0.891335ms)
+✔ last hour shows signed loss and final winner as text (22.999755ms)
+✔ older history uses the server cursor and GMT lookup selects an exact hour (1.889553ms)
+✔ pending settlement explains the locked reset and never labels provisional leaders winners (0.821223ms)
+✔ lookup with no recorded hour clears stale results (0.823086ms)
+✔ one hour contains exactly 60, 30 and 15 minute markets (1.285931ms)
+✔ binary outcome includes equal prices on Up (0.131809ms)
+✔ fractional shares use the full budget with upward penny payout rounding (0.166555ms)
+✔ closed and upcoming markets cannot be traded (0.082747ms)
+✔ invalid budgets and insufficient balances cannot be quoted (0.120478ms)
+✔ all quotes preserve funds and settle to one credit per contract (0.224334ms)
+✔ market without a loaded benchmark cannot accept a prediction (0.077185ms)
+✔ chance model is centered on the benchmark and complements to 100 (0.247969ms)
+✔ less time or lower volatility makes a price displacement more decisive (0.152729ms)
+✔ chance model is independent of coin price units (0.204136ms)
+✔ queued baseline and completed outcomes are distinguished from estimates (0.141718ms)
+✔ volatility uses only completed consecutive minute candles (0.21653ms)
+✔ opening probability responds immediately to price movement (0.135937ms)
+✔ prediction gate requires fresh connected data, benchmark and server quote (0.323752ms)
+✔ purchase prices are configured by server, independently of model chances (0.383956ms)
+✔ betting closes exactly 30 seconds before every interval ends (0.223984ms)
+✔ pricing backfill failures are distinct from benchmark failures (0.075623ms)
+✔ prediction cap accepts 1000 credits and rejects larger budgets even with sufficient balance (0.072868ms)
+✔ password change sends CSRF and clears secrets after success (2.254934ms)
+✔ confirmation mismatch prevents submission (0.726423ms)
+✔ incorrect current password permits retry without clearing fields (4.132303ms)
+✔ wins and losses use settlement outcome, never current spot (0.691087ms)
+✔ realized P/L excludes pending spend and win rate excludes pending orders (0.789773ms)
+✔ zero payout is a settled loss, not a pending prediction (0.114697ms)
+✔ history sorts amounts numerically without mutating account order (0.276423ms)
+✔ history keeps pending returns last in both directions and includes zero payouts (0.175772ms)
+✔ history sorts dates, market intervals, direction, status, and benchmarks (11.19158ms)
+✔ sponsor strip is absent when disabled, unavailable, or unsafe (3.542137ms)
+✔ sponsor content stays plain text and outbound link has safe sponsored attributes (0.644568ms)
+ℹ tests 84
+ℹ suites 0
+ℹ pass 84
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 79.894204
+PASS JavaScript · 84 tests · 0.10s
+
+▶ Python application
+$ /usr/bin/python3 -m unittest discover -p *_test.py
+...............................Downloading 1970-02-01T16:00:00+00:00 · 0.0%
+Downloading 1970-02-01T20:00:00+00:00 · 1.7%
+Resuming saved download.
+Downloading 1970-02-01T20:00:00+00:00 · 99.6%
+Saved 2 candles to /tmp/tmpdfcb9usy/candles.json.
+.....................HTTP failure method=GET path=/healthz status=503
+...HTTP failure method=GET path=/api/spot status=503
+HTTP failure method=GET path=/api/spot status=503
+......................
+----------------------------------------------------------------------
+Ran 77 tests in 5.100s
+
+OK
+PASS Python application · 77 tests · 5.15s
+
+▶ Python scripts
+$ /usr/bin/python3 -m unittest discover -s scripts -p *_test.py
+...........
+----------------------------------------------------------------------
+Ran 11 tests in 15.286s
+
+OK
+PASS Python scripts · 11 tests · 15.34s
+
+════════════ Test summary ════════════
+PASS  JavaScript                84 tests    0.10s
+PASS  Python application        77 tests    5.15s
+PASS  Python scripts            11 tests   15.34s
+ALL TESTS PASSED
+Tests: 172 · Passed: 172 · Failed: 0 · Skipped: 0
+Duration: 20.59s · Started: 2026-10-21T12:31:17-06:00

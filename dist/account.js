@@ -6,8 +6,15 @@
   const account={user:null,csrf:null,predictions:[],ready:false,error:null};
   /** Recover a stale CSRF token once for the same account, without replaying other failures. */ async function request(path,body,retry=true){
     const started=generation,userId=account.user?.id;
-    const response=await fetch('/api/'+path,{method:body?'POST':'GET',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':account.csrf||''},...(body?{body:JSON.stringify(body)}:{})});
-    let data;try{data=await response.json();}catch{throw Error('Start the local app with python3 server.py to use accounts.');}
+    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000);
+    let response,data;
+    try{
+      response=await fetch('/api/'+path,{method:body?'POST':'GET',cache:'no-store',signal:controller.signal,headers:{'Content-Type':'application/json','X-CSRF-Token':account.csrf||''},...(body?{body:JSON.stringify(body)}:{})});
+      try{data=await response.json();}catch(error){if(controller.signal.aborted)throw error;throw Error('Start the local app with python3 src/backend/server.py to use accounts.');}
+    }catch(error){
+      if(controller.signal.aborted)throw Error(body?'Request timed out. Refresh your account before retrying.':'Account request timed out. Try again shortly.');
+      throw error;
+    }finally{clearTimeout(timeout);}
     if(body&&retry&&response.status===403&&(data.code==='csrf_mismatch'||data.error==='Refresh the page and try again.')){
       const fresh=await request('account');
       if(started!==generation)throw Error('Your session changed. Please sign in again.');

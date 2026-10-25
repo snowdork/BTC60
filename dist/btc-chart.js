@@ -5,6 +5,7 @@
 (() => {
   'use strict';
   const model=window.PredictModel,/** Find an interface element by its stable DOM identifier. */ $=id=>document.getElementById(id);
+  const PRICE_UPDATE_MS=2000;
   let coin=model.coin;
   const /** Report whether the selected instrument uses the deterministic simulation feed. */ simulated=()=>coin.feed==='simulated';
   const /** Choose server polling for simulated and oil-provider instruments. */ serverFeed=()=>simulated()||['twelvedata','oilpriceapi'].includes(coin.feed);
@@ -18,21 +19,24 @@
   const localTimezone=localClock.resolvedOptions().timeZone;
   const /** Format a nonnegative duration as minutes and seconds. */ remaining=ms=>`${Math.max(0,Math.floor(ms/60000))}m ${String(Math.max(0,Math.floor(ms/1000)%60)).padStart(2,'0')}s`;
   let historical=false,historyFailed=false;
-  let mode='live',paused=false,socket=null,retryTimer=null,fetchController=null,historyVersion=0;
+  let mode='live',paused=false,socket=null,retryTimer=null,fetchController=null,historyVersion=0,feedVersion=0;
   let hour=hourOf(Date.now()),points=[],candles=[],lastPriceAt=0,lastPrice=null,lastHistoryAt=0,lastSpotPollAt=-Infinity,backoff=1000;
   let demoEpoch=Date.now(),demoStart=new Date().setUTCHours(17,42,12,0),demoSecond=-1,lastDraw=0;
   let lastPlotAt=-Infinity;
-  let previousBannerPrice,bannerTrend='';
+  let previousBannerPrice,bannerTrend='',lastBannerUpdate=-Infinity;
   /** Render banner price from the latest account, market, and interface state. */ function renderBannerPrice(){
-    const value=Number.isFinite(lastPrice)?lastPrice:null;
-    if(value===previousBannerPrice)return;
+    const state=historical?(Number.isFinite(lastPrice)?'ready':historyFailed?'unavailable':'loading'):model.spotStatus;
+    const value=state==='ready'&&Number.isFinite(lastPrice)?lastPrice:null,banner=$('btc-spot');
+    if(value===previousBannerPrice&&banner.dataset.state===state)return;
+    if(!historical&&state==='ready'&&banner.dataset.state===state&&Number.isFinite(previousBannerPrice)&&Date.now()-lastBannerUpdate<PRICE_UPDATE_MS)return;
+    lastBannerUpdate=Date.now();
     if(value!==null&&Number.isFinite(previousBannerPrice)){
       bannerTrend=value>previousBannerPrice?'up':'down';
     }
     if(value===null)bannerTrend='';
     previousBannerPrice=value;
-    const formatted=value===null?'—':money(value),decimal=formatted.lastIndexOf('.');
-    const banner=$('btc-spot');
+    const formatted=value===null?(state==='loading'?'Loading…':'Data Not Available'):money(value),decimal=formatted.lastIndexOf('.');
+    banner.dataset.state=state;
     if(decimal<0){banner.textContent=formatted;return;}
     const digits=document.createElement('span');
     digits.className='spot-decimals';
@@ -45,6 +49,15 @@
   const /** Return live wall-clock time or the synthetic preview timeline. */ currentTime=()=>mode==='demo'?demoStart+Date.now()-demoEpoch:Date.now();
   /** Update the feed badge label and visual tone. */ function status(text,tone='amber'){$('feed-status').textContent=text;$('feed-status').className=`badge ${tone}`;}
   /** Dispatch a chart state event for the prediction ticket and market renderer. */ function broadcast(name){window.dispatchEvent(new Event(name));}
+  /** Check quote freshness independently of the WebSocket connection or chart history. */ function hasFreshQuote(){
+    return Number.isFinite(lastPrice)&&Number.isFinite(model.priceUpdatedAt)&&Date.now()-model.priceUpdatedAt<=maxAge()&&model.priceUpdatedAt<=Date.now()+5000;
+  }
+  /** Explain unavailable quotes while retaining history and continuing automatic retries. */ function unavailableSpot(detail='Retrying automatically…'){
+    if(hasFreshQuote())return;
+    model.spotStatus='unavailable';model.feedConnection='disconnected';status('UNAVAILABLE');
+    $('feed-message').textContent=`Data Not Available for ${coin.symbol}/USD. ${detail}`;$('feed-message').hidden=false;
+    renderBannerPrice();broadcast('btc-chances-update');
+  }
   let volatilityCandles=null,volatilityMinute=-1;
   /** Align interval states and opening/closing benchmarks to the displayed hour. */ function syncMarkets(now,force=false) {
     const state=[];model.paused=paused;model.now=now;const minute=Math.floor(now/60000);
@@ -68,14 +81,17 @@
     broadcast('btc-chances-update');
   }
   /** Append or replace a quote sample while retaining the displayed hour history. */ function appendPoint(t,price) {
-    if(t<hour||t>hour+3600000||!Number.isFinite(price)||price<=0)return;
+    if(!Number.isFinite(price)||price<=0||t<model.priceUpdatedAt)return;
     // One plotted point per second bounds the in-memory series to one hour.
-    const bucket=Math.floor(t/1000)*1000,last=points.at(-1);
-    if(last&&Math.floor(last.t/1000)*1000===bucket)last.price=price;
-    else {points.push({t,price});if(last&&t<last.t)points.sort((a,b)=>a.t-b.t);}
-    if(points.length>3662)points.splice(0,points.length-3662);
-    lastPrice=price;lastPriceAt=Date.now();model.priceUpdatedAt=t;model.spot=price;
-    if(Date.now()-lastPriceBroadcast>=1000){lastPriceBroadcast=Date.now();broadcast('btc-price-update');}
+    if(t>=hour&&t<=hour+3600000){
+      const bucket=Math.floor(t/1000)*1000,last=points.at(-1);
+      if(last&&Math.floor(last.t/1000)*1000===bucket)last.price=price;
+      else {points.push({t,price});if(last&&t<last.t)points.sort((a,b)=>a.t-b.t);}
+      if(points.length>3662)points.splice(0,points.length-3662);
+    }
+    lastPrice=price;lastPriceAt=Date.now();model.priceUpdatedAt=t;model.spot=price;model.spotStatus='ready';
+    renderBannerPrice();
+    if(Date.now()-lastPriceBroadcast>=PRICE_UPDATE_MS){lastPriceBroadcast=Date.now();broadcast('btc-price-update');}
   }
   /** Calculate an illustrative synthetic price; these values cannot execute orders. */ function demoPrice(minute,second=0){return coin.demoBase*(1+(minute*1.5+Math.sin(minute*.48)*19+Math.sin(minute*1.8)*4+Math.sin(second*.5)*1.4)/67450);}
   /** Populate the synthetic preview hour with deterministic chart points. */ function demoHistory(now) {
@@ -140,18 +156,20 @@
       if(mode==='live'&&version===historyVersion){historyFailed=true;model.historyStatus='error';broadcast('btc-chances-update');$('chart-source').textContent='History unavailable · reconnect or use synthetic preview';}
     } finally {clearTimeout(timeout);if(fetchController===controller)fetchController=null;}
   }
-  /** Poll the server quote endpoint with timeout and freshness checks for non-WebSocket feeds. */ async function pollServerSpot(){
+  /** Fetch an initial quote and retry missing updates, validating provider timestamps before displaying prices. */ async function pollSpot(){
     if(spotController||stopped||historical||mode!=='live')return;
-    if(coin.category==='oil'&&Date.now()-lastSpotPollAt<5000)return;
+    if(Date.now()-lastSpotPollAt<5000)return;
     lastSpotPollAt=Date.now();
-    const controller=new AbortController(),requestedCoin=coin.symbol,version=historyVersion;
+    const controller=new AbortController(),requestedCoin=coin.symbol,version=feedVersion,useServer=serverFeed();
     spotController=controller;
     const timeout=setTimeout(()=>controller.abort(),8000);
     try{
-      const response=await fetch(`/api/spot?coin=${encodeURIComponent(requestedCoin)}`,{signal:controller.signal,cache:'no-store'});
-      const tick=await response.json();
-      if(!response.ok)throw Error(tick.error||'Oil price feed unavailable');
-      if(version!==historyVersion||coin.symbol!==requestedCoin||mode!=='live'||historical)return;
+      const url=useServer?`/api/spot?coin=${encodeURIComponent(requestedCoin)}`:`https://api.exchange.coinbase.com/products/${encodeURIComponent(coin.product)}/ticker`;
+      const response=await fetch(url,{signal:controller.signal,cache:'no-store'});
+      const data=await response.json();
+      if(!response.ok)throw Error(data?.error||data?.message||'Price feed unavailable');
+      if(version!==feedVersion||coin.symbol!==requestedCoin||mode!=='live'||historical||stopped)return;
+      const tick=useServer?data:{price:Number(data?.price),time:Date.parse(data?.time)};
       if(coin.feed==='oilpriceapi'&&tick.quoteKind==='assessment'){
         if(!Number.isFinite(tick.price)||tick.price<=0||!Number.isFinite(tick.time)||tick.time>Date.now()+5000)throw Error('Invalid oil assessment');
         appendPoint(Date.now(),tick.price);model.priceUpdatedAt=tick.time;model.feedConnection='disconnected';
@@ -159,12 +177,12 @@
         $('feed-message').textContent=`${tick.message} Source: ${new Date(tick.time).toISOString().slice(0,16).replace('T',' ')} UTC`;$('feed-message').hidden=false;
         status('SPOT ASSESSMENT','amber');broadcast('btc-price-update');return;
       }
-      if(!Number.isFinite(tick.price)||tick.price<=0||!Number.isFinite(tick.time)||Date.now()-tick.time>maxAge()||tick.time>Date.now()+5000)throw Error('Oil quote stale or invalid');
-      appendPoint(tick.time,tick.price);model.feedConnection='connected';
+      if(!Number.isFinite(tick?.price)||tick.price<=0||!Number.isFinite(tick.time)||Date.now()-tick.time>maxAge()||tick.time>Date.now()+5000)throw Error('Price quote stale or invalid');
+      model.feedConnection='connected';appendPoint(tick.time,tick.price);
       $('feed-message').textContent='';$('feed-message').hidden=true;
-      if(!paused)status(simulated()?'SIMULATED OIL':'LIVE OIL',simulated()?'amber':'green');
+      if(!paused)status(simulated()?'SIMULATED OIL':useServer?'LIVE OIL':'LIVE',simulated()?'amber':'green');
     }catch(error){
-      if(version===historyVersion&&coin.symbol===requestedCoin){model.feedConnection='disconnected';status('UNAVAILABLE');$('feed-message').textContent=controller.signal.aborted?'Oil provider timed out. Retry shortly.':error.message;$('feed-message').hidden=false;}
+      if(version===feedVersion&&coin.symbol===requestedCoin&&mode==='live'&&!historical&&!stopped)unavailableSpot(useServer?`${controller.signal.aborted?'Price provider timed out.':error.message} Retrying automatically…`:undefined);
     }finally{clearTimeout(timeout);if(spotController===controller)spotController=null;}
   }
   /** Close active quote transports and cancel their timers before switching feeds. */ function disconnect() {
@@ -172,13 +190,14 @@
     if(spotController){spotController.abort();spotController=null;}
     if(socket){const old=socket;socket=null;old.onclose=null;old.close();}
     if(fetchController){fetchController.abort();fetchController=null;}
-    historyVersion++;lastSpotPollAt=-Infinity;
+    historyVersion++;feedVersion++;lastSpotPollAt=-Infinity;
   }
   /** Start the selected quote transport and update feed connection state. */ function connect() {
     if(mode!=='live'||historical||stopped)return;
-    if(serverFeed()){pollServerSpot();return;}
-    status(lastPriceAt?'RECONNECTING':'CONNECTING');
-    connectionStartedAt=Date.now();model.feedConnection='connecting';
+    pollSpot();
+    if(serverFeed())return;
+    if(!hasFreshQuote()){status('CONNECTING');model.feedConnection='connecting';}
+    connectionStartedAt=Date.now();
     try {socket=new WebSocket('wss://ws-feed.exchange.coinbase.com');}catch{scheduleRetry();return;}
     const active=socket;
     active.onopen=/** Handle the open event for the current transport or resource. */ ()=>{if(socket!==active)return;model.feedConnection='connected';active.send(JSON.stringify({type:'subscribe',product_ids:[coin.product],channels:['ticker']}));};
@@ -189,20 +208,23 @@
       const price=Number(data.price),t=Date.parse(data.time);
       if(!Number.isFinite(price)||price<=0||!Number.isFinite(t)||Date.now()-t>15000||t>Date.now()+5000)return;
       if(hourOf(Date.now())!==hour)resetHour(Date.now());
-      appendPoint(t,price);backoff=1000;if(!paused)status('LIVE','green');
+      model.feedConnection='connected';appendPoint(t,price);backoff=1000;
+      $('feed-message').textContent='';$('feed-message').hidden=true;
+      if(!paused)status('LIVE','green');
     };
     active.onerror=/** Handle the error event for the current transport or resource. */ ()=>{if(socket===active)active.close();};
-    active.onclose=/** Handle the close event for the current transport or resource. */ ()=>{if(socket!==active)return;socket=null;model.feedConnection='disconnected';broadcast('btc-chances-update');scheduleRetry();};
+    active.onclose=/** Handle the close event for the current transport or resource. */ ()=>{if(socket!==active)return;socket=null;scheduleRetry();broadcast('btc-chances-update');};
   }
   /** Schedule a connection retry without creating multiple outstanding retry timers. */ function scheduleRetry() {
     if(mode!=='live'||historical||stopped)return;
-    model.feedConnection='disconnected';status('DISCONNECTED');clearTimeout(retryTimer);retryTimer=setTimeout(connect,backoff);backoff=Math.min(30000,backoff*2);
+    if(!hasFreshQuote()){model.feedConnection='disconnected';status('RECONNECTING');}
+    clearTimeout(retryTimer);retryTimer=setTimeout(connect,backoff);backoff=Math.min(30000,backoff*2);
   }
   /** Reset chart and benchmark state for a UTC hour before loading its history. */ function resetHour(now,targetHour=hourOf(now)) {
     lastPlotAt=-Infinity;
     previousBannerPrice=undefined;bannerTrend='';
     $('feed-message').textContent='';$('feed-message').hidden=true;
-    hour=targetHour;historical=hour<hourOf(now);model.isHistorical=historical;model.feedMode=mode;model.priceUpdatedAt=0;model.historyStatus='loading';model.feedConnection='disconnected';model.historyUpdatedAt=0;historyFailed=false;points=[];candles=[];lastPrice=null;lastPriceAt=0;model.spot=NaN;
+    hour=targetHour;historical=hour<hourOf(now);model.isHistorical=historical;model.feedMode=mode;model.priceUpdatedAt=0;model.spotStatus='loading';model.historyStatus='loading';model.feedConnection='disconnected';model.historyUpdatedAt=0;historyFailed=false;points=[];candles=[];lastPrice=null;lastPriceAt=0;model.spot=NaN;
     syncMarkets(now,true);if(mode==='demo'){demoHistory(historical?hour+3600000:now);if(historical){lastPrice=points.at(-1)?.price??null;model.spot=lastPrice??NaN;syncMarkets(now,true);}}else loadHistory();
   }
   /** Switch between live and synthetic preview modes and reload the selected hour. */ function setMode(next,targetHour) {
@@ -258,6 +280,26 @@
     }
     $('segment-results').replaceChildren(...markers);
   }
+  /** Interpolate samples with bounded cubic tangents, preserving prices and local extrema. */
+  function smoothPath(samples){
+    if(!samples.length)return '';
+    const slopes=samples.slice(1).map((point,index)=>{
+      const previous=samples[index],width=point.x-previous.x;
+      return width>0?(point.y-previous.y)/width:0;
+    });
+    const tangents=samples.map((point,index)=>{
+      if(index===0)return slopes[0]||0;
+      if(index===samples.length-1)return slopes[index-1]||0;
+      const before=slopes[index-1],after=slopes[index];
+      return before*after>0?Math.sign(before)*Math.min(Math.abs(before),Math.abs(after)):0;
+    });
+    let path=`M${samples[0].x.toFixed(3)},${samples[0].y.toFixed(3)}`;
+    for(let index=1;index<samples.length;index++){
+      const previous=samples[index-1],point=samples[index],third=(point.x-previous.x)/3;
+      path+=` C${(previous.x+third).toFixed(3)},${(previous.y+third*tangents[index-1]).toFixed(3)} ${(point.x-third).toFixed(3)},${(point.y-third*tangents[index]).toFixed(3)} ${point.x.toFixed(3)},${point.y.toFixed(3)}`;
+    }
+    return path;
+  }
   /** Project valid price points into SVG coordinates and update chart and benchmark labels. */ function draw(now,force=false) {
     const displayTime=historical?hour+3600000:now;
     $('time-cursor').hidden=historical;
@@ -278,23 +320,23 @@
     if($('chart-times').dataset.hour!==String(hour)){$('chart-times').dataset.hour=String(hour);$('chart-times').replaceChildren(...[0,15,30,45,60].map(minute=>{const span=document.createElement('span');span.textContent=time(hour+minute*60000);return span;}));}
     renderBannerPrice();
     const plotTime=Date.now();
-    if(!force&&plotTime-lastPlotAt<2000)return;
+    if(!force&&plotTime-lastPlotAt<5000)return;
     lastPlotAt=plotTime;
     const valid=points.filter(p=>p.t>=hour&&p.t<=displayTime);
     const hasPoints=valid.length>0;
     renderMinuteHeatmap(displayTime);
     renderSegmentResults(displayTime);
     $('chart-empty').hidden=hasPoints;
-    $('chart-empty').textContent=coin.feed==='oilpriceapi'&&mode==='live'?'Checking latest spot assessment every 5 seconds…':historical?(historyFailed?'History unavailable. Refresh the page to retry.':'Loading the selected hour…'):mode==='demo'?'Starting synthetic preview…':lastPriceAt?'Waiting for history…':`Waiting for live ${coin.symbol}/USD`;
+    $('chart-empty').textContent=historical?(historyFailed?'Data Not Available for this hour.':'Loading the selected hour…'):model.spotStatus==='unavailable'?'Data Not Available · retrying automatically…':coin.feed==='oilpriceapi'&&mode==='live'?'Checking latest spot assessment every 5 seconds…':mode==='demo'?'Starting synthetic preview…':lastPriceAt?'Waiting for history…':`Loading ${coin.symbol}/USD prices…`;
     const opening=candles.find(c=>c[0]*1000===hour-60000)?.[4];
-    const change=Number.isFinite(lastPrice)&&Number.isFinite(opening)?lastPrice-opening:null;
-    $('btc-change').textContent=change===null?'Waiting for price data':`${change>=0?'+':'−'}${money(Math.abs(change))} ${historical?'that hour':'this hour'}`;
+    const change=(historical||model.spotStatus==='ready')&&Number.isFinite(lastPrice)&&Number.isFinite(opening)?lastPrice-opening:null;
+    $('btc-change').textContent=change===null?(model.spotStatus==='unavailable'?'Retrying price feed…':'Waiting for price data'):`${change>=0?'+':'−'}${money(Math.abs(change))} ${historical?'that hour':'this hour'}`;
     $('btc-change').style.color=change!==null&&change<0?'var(--red)':'var(--green)';
     if(!hasPoints){$('btc-line').removeAttribute('d');$('btc-area').removeAttribute('d');$('btc-tip').setAttribute('visibility','hidden');return;}
     let low=Math.min(...valid.map(p=>p.price)),high=Math.max(...valid.map(p=>p.price));
     const pad=Math.max(coin.demoBase*.00012,(high-low)*.18);low-=pad;high+=pad;
     const /** Project a timestamp into the chart horizontal coordinate. */ x=t=>(t-hour)/3600000*1000,/** Project a price into the chart vertical coordinate. */ y=p=>116-(p-low)/(high-low)*102;
-    const path=valid.map((p,i)=>`${i?'L':'M'}${x(p.t).toFixed(3)},${y(p.price).toFixed(3)}`).join(' '),first=valid[0],last=valid.at(-1);
+    const path=smoothPath(valid.map(p=>({x:x(p.t),y:y(p.price)}))),first=valid[0],last=valid.at(-1);
     $('btc-line').setAttribute('d',path);
     $('btc-area').setAttribute('d',`${path} L${x(last.t)},130 L${x(first.t)},130 Z`);
     $('btc-tip').setAttribute('cx',x(last.t));$('btc-tip').setAttribute('cy',y(last.price));$('btc-tip').setAttribute('visibility','visible');
@@ -311,9 +353,8 @@
         if(second!==demoSecond){demoSecond=second;const minute=(now-hour)/60000;appendPoint(now,demoPrice(minute,second));}
         status('SIMULATED','amber');
       } else {
-        if(serverFeed())pollServerSpot();
-        if(coin.feed!=='oilpriceapi'&&lastPriceAt&&Date.now()-model.priceUpdatedAt>maxAge()){status('STALE');if(socket){socket.close();}}
-        if(!serverFeed()&&!lastPriceAt&&stamp>15000)status('DISCONNECTED');
+        if(serverFeed()||Date.now()-model.priceUpdatedAt>=5000)pollSpot();
+        if(coin.feed!=='oilpriceapi'&&lastPriceAt&&!hasFreshQuote()){unavailableSpot();if(socket){socket.close();}}
         if(socket&&Date.now()-connectionStartedAt>20000&&(!lastPriceAt||socket.readyState===WebSocket.CONNECTING))socket.close();
         if(!fetchController&&Date.now()-lastHistoryAt>60000){lastHistoryAt=Date.now();loadHistory();}
       }
@@ -329,6 +370,11 @@
   });
   document.addEventListener('visibilitychange',()=>{if(historical){if(!document.hidden){syncMarkets(currentTime());draw(currentTime());}return;}if(!document.hidden&&!paused){const now=currentTime();if(hourOf(now)!==hour)resetHour(now);syncMarkets(now,true);draw(now);if(mode==='live')loadHistory();}});
   window.addEventListener('pagehide',()=>{stopped=true;disconnect();clearTimeout(frameId);});
+  window.addEventListener('pageshow',event=>{
+    if(!event.persisted||!stopped)return;
+    stopped=false;lastDraw=0;setMode(mode,historical?hour:undefined);
+    frameId=setTimeout(()=>frame(performance.now()),1000);
+  });
   /** Switch instrument, persist its category preference, and reset feed/history state. */ function selectCoin(symbol){
     coin=window.PredictCoins.getCoin(symbol);model.coin=coin;
     document.querySelectorAll('[data-coin]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.coin===coin.symbol)));

@@ -25,9 +25,9 @@
     if(!snapshot)return;
     const wallet=snapshot.wallet;
     $('contest-wallet').textContent=credits(wallet.remaining_cents)+' credits';
-    $('contest-reset').textContent=wallet.reset_pending?'Waiting for prior winner':utc(wallet.resets_at);
+    $('contest-reset').textContent=utc(wallet.resets_at);
     $('contest-tally').textContent=signed(wallet.net_cents)+' credits';
-    $('contest-reset-note').textContent=wallet.reset_pending?`The ${utc(wallet.awaiting_hour)} contest is awaiting settlement. Your next 1,000 credits unlock after final winners are saved.`:'Settled winnings are added to your available credits and can be used again this hour. Final score is ending credits minus 1,000. Each new hour starts with 1,000 credits after prior results are finalized.';
+    $('contest-reset-note').textContent='Settled winnings can be used again this hour. Final score is ending credits minus 1,000. Every player starts each new GMT hour with 1,000 credits, even while earlier results await settlement.';
     const period=snapshot.contests.find(p=>String(p.id)===$('contest-period').value);
     $('contest-leaders').replaceChildren();
     $('contest-title').textContent=period?`${utc(period.starts_at)} – ${utc(period.ends_at)}`:'No recorded contest for this hour';

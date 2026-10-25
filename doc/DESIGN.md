@@ -77,10 +77,10 @@ The terminal lists unsettled predictions with countdowns and marks account wager
 | `account.js`, `auth.js`, `password.js` | Session/account API, authentication UI, and password changes |
 | `portfolio.js`, `portfolio-model.js` | Account history, filters, summary calculations |
 | `theme.js`, shared CSS | Persisted theme and responsive presentation |
-| `server.py` | Static serving, catalog/account API, orders, settlements |
+| `src/backend/server.py` | Static serving, catalog/account API, orders, settlements |
 | `scripts/database.py` | Explicit initialization, status, backup, reset |
 
-SQLite stores users, hashed sessions, predictions, settlements, coins, and migration versions. Each account starts with 10,000 credits. Passwords use salted scrypt; sessions use HttpOnly/SameSite cookies and CSRF tokens. Account data persists across browser sessions and server restarts. Local storage holds presentation preferences rather than balances or saved orders.
+SQLite stores users, hashed sessions, predictions, settlements, coins, and migration versions. Each player receives 1,000 contest credits per hour, with a fresh balance at each GMT hour boundary independently of prior settlements. Passwords use salted scrypt; sessions use HttpOnly/SameSite cookies and CSRF tokens. Account data persists across browser sessions and server restarts. Local storage holds presentation preferences rather than balances or saved orders.
 
 Authenticated `POST /api/change-password` requires the session CSRF token and
 `currentPassword`, `newPassword`, and `confirmPassword` fields. It verifies the

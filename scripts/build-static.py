@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / 'src/backend'))
 from server import PUBLIC_ASSETS, PUBLIC_FILES
 
 
@@ -17,8 +17,8 @@ def main():
     """Stage public files before refreshing output and removing obsolete build artifacts."""
     destination = ROOT / 'dist'
     public = PUBLIC_FILES | PUBLIC_ASSETS | {
-        path.relative_to(ROOT).as_posix()
-        for path in (ROOT / 'assets' / 'coins').glob('*.svg')
+        path.relative_to(ROOT / "src/frontend").as_posix()
+        for path in (ROOT / 'src/frontend/assets' / 'coins').glob('*.svg')
         if path.is_file()
     }
     # A missing source must not destroy the last successful build.
@@ -27,7 +27,7 @@ def main():
         for name in sorted(public):
             target = staging / name
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(ROOT / name, target)
+            shutil.copy2(ROOT / "src/frontend" / name, target)
         destination.mkdir(exist_ok=True)
         shutil.copytree(staging, destination, dirs_exist_ok=True)
         for path in sorted(destination.rglob('*'), reverse=True):

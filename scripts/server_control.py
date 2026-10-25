@@ -1,5 +1,6 @@
 """Shared Linux process discovery and shutdown for this checkout."""
 import os
+import fcntl
 from pathlib import Path
 import signal
 import time
@@ -42,7 +43,7 @@ def stop_server():
     DATA.mkdir(parents=True, exist_ok=True)
     STOP.touch(mode=0o600)
     # Disable supervision before stopping its child, including during retry delays.
-    for script in ('scripts/watchdog-server.py', 'server.py'):
+    for script in ('scripts/watchdog-server.py', 'src/backend/server.py'):
         for pid in project_processes(script):
             try:
                 os.kill(pid, signal.SIGTERM)
@@ -51,7 +52,20 @@ def stop_server():
     deadline = time.monotonic() + 15
     # Wait for both supervisor and child to exit, but keep a bounded shutdown deadline.
     while any(list(project_processes(script)) for script in
-              ('scripts/watchdog-server.py', 'server.py')):
+              ('scripts/watchdog-server.py', 'src/backend/server.py')):
         if time.monotonic() >= deadline:
             raise SystemExit('Predict60 did not stop within 15 seconds; stop marker retained.')
         time.sleep(0.1)
+
+
+def main():
+    """Stop the checkout server and watchdog intentionally, preserving the stop marker."""
+    DATA.mkdir(parents=True, exist_ok=True)
+    with (DATA / 'server-control.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        stop_server()
+    print('Predict60 server and watchdog stopped. Run scripts/restart-server.py to start again.')
+
+
+if __name__ == '__main__':
+    main()

@@ -18,7 +18,7 @@ python3 scripts/database.py backup
 python3 scripts/database.py reset --confirm-reset
 ```
 
-Stop `server.py` and any other SQLite clients before `init` or `reset`; restart with `python3 server.py` afterward. Server and maintenance commands use an exclusive lock to prevent resetting an active server. Servers started before this maintenance update must also be stopped—the old process does not know about the lock.
+Stop `src/backend/server.py` and any other SQLite clients before `init` or `reset`; restart with `python3 src/backend/server.py` afterward. Server and maintenance commands use an exclusive lock to prevent resetting an active server. Servers started before this maintenance update must also be stopped—the old process does not know about the lock.
 
 By default the database is `data/p60.sqlite3`, and backups go under `data/backups/`. Both are excluded from Git. Backup files have owner-only read/write permissions and UTC timestamps. The reset command always creates a backup when the target already exists, builds a fresh database first, and uses SQLite's backup API to replace it without manual WAL-file deletion.
 

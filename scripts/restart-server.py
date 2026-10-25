@@ -10,8 +10,9 @@ import time
 import urllib.request
 
 from server_control import ROOT, DATA, STOP, stop_server
+from docker_control import stop_docker
 
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / 'src/backend'))
 from p60_logging import LOG_PATH, write_or_rotate
 
 
@@ -41,8 +42,10 @@ def main():
             stream.write(args.log_level + '\n')
 
 
+
 def start_server(args):
     """Stop checkout processes, import legacy logs, and launch the watchdog with the requested configuration."""
+    stop_docker()
     stop_server()
     # Import the old log only after its writers have stopped.
     legacy_log = DATA / 'server.log'

@@ -19,7 +19,7 @@ scripts.
 ```bash
 python3 scripts/restart-server.py
 python3 scripts/restart-server.py --port 8080 --log-level debug
-python3 scripts/stop-server.py
+scripts/stop-server.sh
 ```
 
 `restart-server.py` stops the existing watchdog and server, clears the intentional
@@ -43,7 +43,7 @@ saved level file alone does not change a running watchdog; use the restart scrip
 An explicit level overrides the saved selection. Failed starts do not save a new
 selection.
 
-`stop-server.py` creates `data/server.stopped` before stopping both processes.
+`stop-server.sh` creates `data/server.stopped` before stopping both processes.
 The marker prevents automatic restarts, including during the three-second retry
 pause. Running stop repeatedly is supported. If shutdown times out, the command
 fails and retains the marker. Use `restart-server.py` to resume operation.
@@ -127,12 +127,22 @@ process is running. Do not remove lock files to bypass a running process.
 `server_control.py` supplies shared process discovery and shutdown functions;
 it is an internal module rather than an administrator command.
 
+To stop all Predict60 runtimes, use `scripts/stop.sh` (or
+`sudo bash scripts/stop.sh` when required). This stops Docker containers, the
+installed systemd service, and the checkout watchdog, preserving data volumes.
+
 ## Database maintenance
+
+For deployed databases, use `sudo scripts/reset-database.sh --service --confirm-reset`
+or `scripts/reset-database.sh --docker --confirm-reset`. Each stops the selected
+app, backs up and resets its database, and leaves the app stopped. Docker supports
+`--container NAME` when multiple app containers exist. See
+[deployment reset options](../deploy/LOCAL.md#reset-a-deployed-database).
 
 ```bash
 python3 scripts/database.py status
 python3 scripts/database.py backup
-python3 scripts/stop-server.py
+scripts/stop-server.sh
 python3 scripts/database.py init
 python3 scripts/restart-server.py
 ```
@@ -145,7 +155,10 @@ the database without deleting existing account data and requires a stopped serve
 Options include `--db PATH` and, for backup, `--backup-dir PATH`. Use the same
 database path in maintenance commands and `PREDICT60_DB` for server startup.
 
-`database.py reset --confirm-reset` is destructive: it backs up an existing
+`scripts/reset-database.sh --confirm-reset` resets Docker by default. Use
+`--service` for systemd or `--local` for the checkout database. The local form
+is also available as `python3 scripts/database.py reset --confirm-reset`. Reset
+is destructive: it backs up an existing
 database, clears accounts, sessions, predictions, and settlements, and restores
 seed catalogs. Stop the server first. See
 [Database maintenance](DATABASE_MAINTENANCE.md) for the detailed procedure.
@@ -176,16 +189,47 @@ while correcting the problem. If stop reports a timeout, check the remaining
 processes before running maintenance. A running watchdog responds to process
 exit; an unresponsive but live server requires a manual restart.
 
-For foreground development, `python3 server.py --port 8000 --log-level debug`
+For foreground development, `python3 src/backend/server.py --port 8000 --log-level debug`
 logs to the console without supervision or file rotation. Stop the supervised
 server before using the same port/database.
 
 ```bash
-python3 -m unittest server_test.py logging_test.py
-python3 -m unittest discover -s scripts -p '*_test.py'
+PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest server_test.py logging_test.py
+PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest discover -s test/scripts -p '*_test.py'
 ```
 
 The scripts suite covers database operations and isolated watchdog lifecycle,
 including log-level retention across crashes and manual restarts. Integration
 tests require permission to bind local loopback sockets. Any command's `--help`
 prints its supported parameters.
+
+## List usernames and password storage
+
+```bash
+scripts/list-usernames.py  # Docker by default
+scripts/list-usernames.py --local --db /path/to/p60.sqlite3
+sudo scripts/list-usernames.py --service
+scripts/list-usernames.py --docker
+scripts/list-usernames.py --docker --container p60-local
+# For a running Docker app (replace the container name if needed):
+docker exec p60-local python3 scripts/database.py usernames
+```
+
+The command prints account display names, one per line, using a read-only
+connection. Login uses email addresses; display names are not unique login IDs.
+It does not print emails, hashes, salts, or session tokens. An empty database
+prints no names. A missing database produces an error without creating a file.
+`--service` reads the service configuration and runs as its user. `--docker`
+uses the app container image and volumes; select `--container NAME` if multiple
+app containers exist. Both flags leave the app running (or stopped) as it was.
+Use sudo when needed for Docker or service configuration access. Docker images must be rebuilt to include the new
+`database.py usernames` command. Docker is the default when no deployment flag
+is supplied. Use `--local` for the checkout database and current environment;
+`--db` alone still selects a path inside Docker. `--service`, `--docker`, and
+`--local` are mutually exclusive. Docker supports stopped containers as well as running ones.
+
+Passwords are stored as scrypt hashes (`n=16384`, `r=8`, `p=1`) with a unique
+random 16-byte salt per password. Signup and password changes store the hash
+and salt; login verifies the derived hash with a constant-time comparison.
+Original passwords cannot be retrieved by these tools. This protects password
+values; it does not encrypt the whole SQLite database.
