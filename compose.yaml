@@ -7,6 +7,7 @@ services:
     stop_grace_period: 30s
     environment:
       PREDICT60_DB: /app/data/p60.sqlite3
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-572697973282-e17b6uqatr36toqi48sohg6vigkarvai.apps.googleusercontent.com}
       P60_SIGNUP_CODE: ${P60_SIGNUP_CODE:-}
       P60_HOST: https://${P60_DOMAIN:?Set P60_DOMAIN in .env}
       P60_TRUSTED_PROXIES: 172.30.60.2

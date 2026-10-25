@@ -1,17 +1,23 @@
 # Local operation
 
 Run commands from the repository root. Python 3.10+ and internet access are
-required for live feeds; the app runtime has no pip or npm dependencies. Node.js
+required for live feeds. Google sign-in needs the Python packages in `requirements.txt`. Node.js
 is needed for JavaScript tests. The full test runner and watchdog target Linux.
 
 ## Python
 
 ```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+
 # Read a signup code without storing it in shell history (Bash).
 read -rs -p 'Local signup code: ' P60_SIGNUP_CODE
 export P60_SIGNUP_CODE
-python3 src/backend/server.py --bind 127.0.0.1 --port 8000
+.venv/bin/python src/backend/server.py --bind 127.0.0.1 --port 8000
 ```
+
+The restart helper automatically uses `.venv/bin/python` when it exists.
+For Google testing, use `http://localhost:8000` and register that origin in Google.
 
 Open http://127.0.0.1:8000. Stop with Ctrl-C; restart after Python changes.
 Refresh the browser after HTML/CSS/JS changes. An empty signup code disables new
@@ -226,3 +232,13 @@ random 16-byte salt per password. Signup and password changes store the hash
 and salt; login verifies the derived hash with a constant-time comparison.
 Original passwords cannot be retrieved by these tools. This protects password
 values; it does not encrypt the whole SQLite database.
+
+### Keep the local signup code across restarts
+
+Run `python3 scripts/restart-server.py --signup-code` to enter the organizer code
+privately. The restart helper saves it in ignored `data/local-signup-code` with
+owner-only permissions and loads it on later restarts. A nonempty exported
+`P60_SIGNUP_CODE` updates that saved value; explicitly exporting an empty value
+disables signup for that run. Direct local `server.py` and VS Code launches also load the saved code when
+`P60_SIGNUP_CODE` is unset. Explicit environment settings take precedence, and
+production origins continue to require deployment environment configuration.

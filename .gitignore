@@ -7,3 +7,5 @@ __pycache__/
 doc/_build/
 doc/_generated/
 doc/node_modules/
+
+.venv/

@@ -68,7 +68,7 @@ sessions. See the [user guide](doc/USER_GUIDE.md#change-your-password).
 See [local operation](deploy/LOCAL.md) for Python/Docker lifecycle commands and
 [deployment modes](deploy/README.md#choose-an-operating-mode) for VPS setup.
 
-Requires Python 3.10+ on Linux/macOS; no Python packages or frontend build are needed.
+Requires Python 3.10+ on Linux/macOS. Google sign-in requires the packages in `requirements.txt`; no frontend build is needed.
 
 ```bash
 python3 src/backend/server.py
@@ -414,3 +414,52 @@ existing prediction source snapshots and account data.
 
 Run all tests with `python3 scripts/run_tests.py`. Start the application with
 `python3 src/backend/server.py`.
+
+### Google sign-in
+
+The login page uses Google Identity Services. The Python backend verifies tokens
+with `google-auth`, checks the configured audience and verified email, and maps
+Google's stable `sub` to `google_identities.user_id`. Google sign-in creates the
+same SQLite session and HttpOnly cookie as password login. The supplied public
+web client ID is the default; `GOOGLE_CLIENT_ID` overrides the backend setting
+(and must match `data-client_id` in `src/frontend/login.html`). No Google client
+secret is used in this ID-token flow.
+
+Install the runtime dependencies in the Python environment that runs the server:
+
+```sh
+python3 -m pip install -r requirements.txt
+```
+
+Docker installs these dependencies during its build. Rebuild/restart the app to
+activate backend changes. For a system service, install dependencies into that
+service's Python environment, rather than an unrelated interactive environment.
+Keep `P60_HOST` set to the exact public HTTPS origin and authorize that same
+origin in the Google web client settings. Local testing uses an authorized
+`http://localhost:<port>` origin.
+
+`GET /api/auth/google/csrf` returns a short-lived login CSRF token and sets a
+matching HttpOnly cookie. The login callback sends that token in `X-CSRF-Token`
+with its same-origin JSON `POST /api/auth/google`. Both endpoints require
+`X-Requested-With: XMLHttpRequest`; login also requires the exact allowed Origin.
+Invalid Google credentials never issue sessions. Unavailable Google verification
+fails closed with a retryable error. Tokens and client secrets are not logged.
+
+An unknown Google subject returns `LINK_REQUIRED` when the email already exists,
+or `SIGNUP_REQUIRED` otherwise. Neither response creates or links an account.
+The login page routes new Google users to `signup.html?google=1`. Google signup
+requires selecting a Google account, a display name, and the organizer's existing
+signup code. `POST /api/auth/google/signup` verifies Google's token again and
+atomically creates the user and subject mapping only after validating the code.
+Google-only users have no local password; they return using Google. Existing
+password registration remains available.
+
+Existing password users are routed to `login.html?google=link`. A successful
+normal login opens `google-link.html`, where the user explicitly selects the
+matching Google account. `POST /api/auth/google/link` requires the existing
+session and account CSRF token, exact origin, and matching verified email.
+The page also links from the standard login screen. Linking rotates the session
+and stores only the Google subject association; it never recreates the user,
+resets credits, transfers predictions, or rewrites contest results. Matching
+emails alone never merge accounts. Returning Google users resolve by subject,
+even when their Google email changes.

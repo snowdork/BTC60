@@ -15,6 +15,10 @@ class AccountsTest(unittest.TestCase):
         server.DB = Path(self.temp.name) / f'{self._testMethodName}.sqlite3'
         server.initialize()
         server.AUTH_ATTEMPTS.clear()
+        # Never let a developer's saved organizer code influence account tests.
+        local_config = patch.object(server, 'ROOT', Path(self.temp.name) / 'checkout')
+        local_config.start()
+        self.addCleanup(local_config.stop)
         self.signup_environment = patch.dict(server.os.environ, {'P60_SIGNUP_CODE': '777'})
         self.signup_environment.start()
         self.addCleanup(self.signup_environment.stop)
