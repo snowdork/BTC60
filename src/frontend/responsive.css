@@ -437,3 +437,10 @@ button,a,input{touch-action:manipulation}
 .terminal-page .tier .tier-label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding-top:0;text-align:center;font-size:16px;line-height:1.3}
 .terminal-page .tier-coin-icon{display:block;width:24px;height:24px;object-fit:contain;flex-shrink:0}
 @media(max-width:600px){.terminal-page .tier .tier-label{margin-bottom:10px}}
+
+/* Keep the instrument grid and live price visible as markets scroll. */
+body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.terminal-page>.topbar{position:relative;top:auto;flex-shrink:0}
+.terminal-page>main{flex:1;min-height:0;width:100%;overflow-y:auto;scrollbar-gutter:stable}
+.terminal-page .terminal-overview.overview{position:sticky;top:0;z-index:19;background:var(--surface);box-shadow:0 4px 12px #0002}
+.terminal-page:has(dialog[open])>main{overflow:hidden}

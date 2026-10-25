@@ -32,20 +32,6 @@
     $('notification').textContent=message;$('notification').classList.add('visible');
     clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('notification').classList.remove('visible'),4500);
   }
-  /** Render status line from the latest account, market, and interface state. */ function renderStatusLine(){
-    const open=market.status==='open',queued=market.status==='queued',model=window.PredictModel;
-    $('selected-bet').textContent=`${model.coin.symbol} · ${market.minutes} MIN · ${side==='up'?'↗ Up':side==='down'?'↘ Down':'Pick Up or Down'}`;
-    $('selected-bet').style.color=side==='up'?'var(--green)':side==='down'?'#ff6a84':'#3b82f6';
-    $('selected-time').textContent=`${market.start}–${market.end} UTC`;
-    $('selected-state').textContent=open?'OPEN':queued?'UPCOMING':'SETTLED';
-    $('selected-state').className='badge '+(open?'green':queued?'amber':'neutral');
-    let label=open?`${market.remaining} left`:queued?`Opens ${market.start}`:'Interval complete';
-    if(queued&&Number.isFinite(market.startsAt)&&Number.isFinite(model.now)){
-      const seconds=Math.max(0,Math.ceil((market.startsAt-model.now)/1000));
-      label=`Opens in ${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s`;
-    }
-    $('selected-countdown').textContent=label;
-  }
   /** Read the market model readiness checks used to block invalid order submission. */ function health(){return window.PredictModel.dataStatus(window.PredictModel,market);}
   /** Show insufficient credit state only for a loaded, signed-in open-market ticket. */ function renderCreditState(){
     const exhausted=account.ready&&!!account.user&&market.status==='open'&&balance()<=0;
@@ -106,7 +92,6 @@
   }
   /** Refresh segment probabilities and benchmark movement without rebuilding cards. */ function renderChances() {
     const model=window.PredictModel;
-    renderStatusLine();
     renderExecutionState();
     renderReviewChance();
     const assessment=model.coin.feed==='oilpriceapi'&&model.feedMode==='live'&&!model.isHistorical;
@@ -248,7 +233,6 @@
     const nextBudgetKey=predictionKey(window.PredictModel.coin.symbol,market.id,market.startsAt);
     // A new instrument or interval requires a fresh budget, including on initial load.
     if(nextBudgetKey!==budgetMarketKey){$('stake').value='';budgetMarketKey=nextBudgetKey;}
-    renderStatusLine();
     const open=market.status==='open',queued=market.status==='queued';
     $('ticket-heading').textContent=open?'Make a prediction':queued?'Upcoming interval':'Settlement details';
     $('prediction-popup-title').textContent=open?'Predict':queued?'Segment details':'Result';
