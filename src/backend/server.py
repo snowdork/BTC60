@@ -377,14 +377,22 @@ def candle_close(coin, boundary, source=None):
         return candle[4]
     if record['feed']=='simulated':
         return simulated_prices.price(coin, record['demo_base'], boundary-1)
+    # Reuse only the exact completed minute for the same provider product.
+    with HISTORY_LOCK:
+        snapshots = [candles for key, candles in sorted(HISTORY_CACHE.items(), reverse=True)
+                     if key[0] == record['product']]
+    for candles in snapshots:
+        for candle in candles:
+            if candle[0] == boundary - 60 and math.isfinite(float(candle[4])) and float(candle[4]) > 0:
+                return float(candle[4])
     product = urllib.parse.quote(record['product'], safe='')
-    start = datetime.fromtimestamp(boundary - 60, timezone.utc).isoformat()
-    end = datetime.fromtimestamp(boundary, timezone.utc).isoformat()
-    query = urllib.parse.urlencode({'granularity': 60, 'start': start, 'end': end})
-    request = urllib.request.Request(f'https://api.exchange.coinbase.com/products/{product}/candles?{query}', headers={'User-Agent': 'Predict60-local-demo/1.0'})
-    # A newly published candle or an interrupted provider connection can recover
-    # without replacing the user's session. Retry only this read, never the order.
-    for attempt in range(3):
+    # Widen retries to bypass a cached empty narrow response, retaining the exact minute.
+    for attempt, padding in enumerate((0, 120, 300)):
+        start = datetime.fromtimestamp(boundary - 60 - padding, timezone.utc).isoformat()
+        end = datetime.fromtimestamp(boundary, timezone.utc).isoformat()
+        query = urllib.parse.urlencode({'granularity': 60, 'start': start, 'end': end})
+        request = urllib.request.Request(f'https://api.exchange.coinbase.com/products/{product}/candles?{query}',
+                                        headers={'User-Agent': 'Predict60-local-demo/1.0', 'Cache-Control': 'no-cache'})
         try:
             with urllib.request.urlopen(request, timeout=3) as response:
                 candles = json.load(response)
@@ -398,6 +406,7 @@ def candle_close(coin, boundary, source=None):
             pass
         if attempt < 2:
             time.sleep(0.5 * (attempt + 1))
+    LOG.warning('Benchmark unavailable coin=%s product=%s minute=%s after 3 attempts', coin, record['product'], boundary - 60)
     raise ValueError('Benchmark history is unavailable. Try again shortly.')
 
 

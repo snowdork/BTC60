@@ -502,6 +502,24 @@ class AccountsTest(unittest.TestCase):
                 self.assertEqual(network.call_count, 2)
                 sleep.assert_called_once_with(0.5)
 
+    def test_benchmark_reuses_exact_cached_product_minute(self):
+        cached = {('BTC-USD', 3660): [[3540, 0, 0, 0, 100], [2640, 0, 0, 0, 99]],
+                  ('ETH-USD', 3660): [[3540, 0, 0, 0, 200]]}
+        with patch.dict(server.HISTORY_CACHE, cached, clear=True), patch('server.urllib.request.urlopen') as network:
+            self.assertEqual(server.candle_close('BTC', 3600, {'feed': 'coinbase', 'product': 'BTC-USD'}), 100)
+            self.assertEqual(server.candle_close('BTC', 2700, {'feed': 'coinbase', 'product': 'BTC-USD'}), 99)
+            network.assert_not_called()
+
+    def test_benchmark_retry_changes_window_preserving_target(self):
+        from io import BytesIO
+        with patch.dict(server.HISTORY_CACHE, {}, clear=True), patch('server.time.sleep'), patch(
+                'server.urllib.request.urlopen', side_effect=[BytesIO(b'[]'), BytesIO(b'[[840,0,0,0,101]]')]) as network:
+            self.assertEqual(server.candle_close('BTC', 900, {'feed': 'coinbase', 'product': 'BTC-USD'}), 101)
+            queries = [server.urllib.parse.parse_qs(server.urllib.parse.urlsplit(call.args[0].full_url).query)
+                       for call in network.call_args_list]
+            self.assertNotEqual(queries[0]['start'], queries[1]['start'])
+            self.assertEqual(queries[0]['end'], queries[1]['end'])
+
     def test_benchmark_retry_is_bounded_and_never_uses_another_minute(self):
         from io import BytesIO
         with patch('server.time.sleep'), patch('server.urllib.request.urlopen',
