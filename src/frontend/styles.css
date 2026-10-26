@@ -210,19 +210,19 @@ body:not(.auth-page) main{padding:10px 20px 0}
 @media(max-width:850px){.chart-coin-icon{top:35px}}
 
 /* Sixty compact cells turn the hour's completed minute candles into a direction heat map. */
-.minute-heatmap-wrap{padding:7px 6px 2px;background:#0b0f0c;border-top:1px solid #ffffff0b}
-.minute-heatmap-label{display:flex;align-items:center;justify-content:space-between;margin:0 1px 6px;color:var(--muted);font:7px 'JetBrains Mono',monospace;letter-spacing:.6px}
+.minute-heatmap-wrap{padding:7px 0 2px;background:#0b0f0c;border-top:1px solid #ffffff0b}
+.minute-heatmap-label{display:flex;align-items:center;justify-content:space-between;margin:0 7px 6px;color:var(--muted);font:7px 'JetBrains Mono',monospace;letter-spacing:.6px}
 .minute-heatmap-legend{display:flex;align-items:center;gap:4px;letter-spacing:0}
 .minute-heatmap-legend i{width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 5px #00e67680}
 .minute-heatmap-legend i.down{margin-left:4px;background:var(--red);box-shadow:0 0 5px #ff174480}
-.minute-heatmap{display:grid;grid-template-columns:repeat(60,minmax(0,1fr));align-items:center;gap:2px;height:10px}
-.minute-dot{display:block;width:min(8px,100%);aspect-ratio:1;justify-self:center;border-radius:50%;background:#59615c30;box-shadow:inset 0 0 0 1px #ffffff0b;opacity:.65}
+.minute-heatmap{position:relative;height:10px}
+.minute-dot{position:absolute;top:50%;transform:translate(-50%,-50%);display:block;width:min(8px,1.2%);aspect-ratio:1;border-radius:50%;background:#59615c30;box-shadow:inset 0 0 0 1px #ffffff0b;opacity:.65}
 .minute-dot.up{background:var(--green);box-shadow:0 0 var(--heat-glow,3px) #00e676;opacity:var(--heat-opacity,.7)}
 .minute-dot.down{background:var(--red);box-shadow:0 0 var(--heat-glow,3px) #ff1744;opacity:var(--heat-opacity,.7)}
 .minute-dot.current{background:transparent;box-shadow:0 0 0 1px var(--amber),0 0 5px #ffb30080;opacity:1;animation:minute-pulse 1.8s ease-in-out infinite}
 @keyframes minute-pulse{50%{opacity:.4}}
 @media(prefers-reduced-motion:reduce){.minute-dot.current{animation:none}}
-@media(max-height:820px){.minute-heatmap-wrap{padding-top:5px}.minute-heatmap-label{margin-bottom:4px}.minute-heatmap{height:8px}.minute-dot{width:min(6px,100%)}}
+@media(max-height:820px){.minute-heatmap-wrap{padding-top:5px}.minute-heatmap-label{margin-bottom:4px}.minute-heatmap{height:8px}.minute-dot{width:min(6px,1.2%)}}
 .time-cursor>span{top:calc(var(--chart-height) + 45px)}
 
 /* Live wall-clock times remain readable alongside the spot price. */
@@ -352,22 +352,6 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .segment-results .segment-result[data-direction="down"]{color:var(--red)}
 .segment-results .segment-result[data-direction="down"]::after{transform:rotate(180deg)}
 
-/* Initial and final settlement prices share a theme-aware, high-contrast row. */
-.market-card.settled .card-context,.market-card.settled .card-benchmark{padding-right:0}
-.market-card.settled .segment-price{justify-content:flex-start;gap:5px;padding:5px 7px;border-radius:5px;background:var(--surface);font-size:15px;font-weight:700;line-height:1.4;font-variant-numeric:tabular-nums}
-.market-card.settled .initial-price,.market-card.settled .settlement-separator{color:#fff}
-.market-card.settled .settlement-price{font-size:inherit;font-weight:800;color:#fff}
-.market-card.settled .settlement-price.up{color:#00e676}
-.market-card.settled .settlement-price.down{color:#ff5275}
-[data-theme="light"] .market-card.settled .initial-price,[data-theme="light"] .market-card.settled .settlement-separator,[data-theme="light"] .market-card.settled .settlement-price{color:#000}
-[data-theme="light"] .market-card.settled .settlement-price.up{color:#007c40}
-[data-theme="light"] .market-card.settled .settlement-price.down{color:#c9153e}
-
-/* Settlement arrows belong beside the bottom-left Up/Down result row. */
-.market-card.settled .chance-block{margin-top:auto}
-.market-card .chance-row .segment-result{position:static;transform:none;flex-shrink:0;font-size:42px;line-height:1}
-.market-card.settled .chance-row{gap:6px;flex-wrap:wrap}
-
 /* Completed segments show the player's result beside the direction arrow. */
 .market-card .chance-row .settled-stamp{position:static;transform:none;display:inline;padding:0;border:0;font:800 13px/1.3 Arial,sans-serif;letter-spacing:0;color:#26342d;user-select:auto}
 .market-card .chance-row .settled-stamp.won{color:var(--green)}
@@ -398,5 +382,3 @@ body:not(.auth-page) main{padding:10px 20px 0}
 .segment-direction.down .segment-direction-arrow{flex-direction:column-reverse}
 .segment-direction.down .segment-direction-arrow::after{transform:rotate(180deg)}
 .segment-direction-change{font:600 10px/1.4 'JetBrains Mono',monospace;white-space:nowrap}
-.market-card .initial-price[data-direction="up"]{color:var(--green)}
-.market-card .initial-price[data-direction="down"]{color:var(--red)}

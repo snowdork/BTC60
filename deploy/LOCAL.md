@@ -1,17 +1,23 @@
 # Local operation
 
 Run commands from the repository root. Python 3.10+ and internet access are
-required for live feeds; the app runtime has no pip or npm dependencies. Node.js
+required for live feeds. Google sign-in needs the Python packages in `requirements.txt`. Node.js
 is needed for JavaScript tests. The full test runner and watchdog target Linux.
 
 ## Python
 
 ```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+
 # Read a signup code without storing it in shell history (Bash).
 read -rs -p 'Local signup code: ' P60_SIGNUP_CODE
 export P60_SIGNUP_CODE
-python3 src/backend/server.py --bind 127.0.0.1 --port 8000
+.venv/bin/python src/backend/server.py --bind 127.0.0.1 --port 8000
 ```
+
+The restart helper automatically uses `.venv/bin/python` when it exists.
+For Google testing, use `http://localhost:8000` and register that origin in Google.
 
 Open http://127.0.0.1:8000. Stop with Ctrl-C; restart after Python changes.
 Refresh the browser after HTML/CSS/JS changes. An empty signup code disables new
@@ -43,7 +49,7 @@ levels. For startup at boot on a VPS use systemd or Docker.
 
 `python3 scripts/restart-server.py` stops the `p60-local` container and all
 containers in the `p60` and `p60-local` Compose projects before starting Python.
-This includes the VPS stack's Caddy container. It preserves containers and data
+The shared host Caddy proxy continues running. It preserves containers and data
 volumes, leaves unrelated Docker applications running, and does not stop the
 Docker daemon. No Compose plugin or `.env` file is needed for this shutdown.
 
@@ -80,7 +86,7 @@ does not disable its boot startup; use `sudo systemctl disable predict60` if
 Docker will permanently replace the host service.
 
 
-Open **http://localhost:8080** (use this hostname to match the configured origin).
+Open **http://localhost:8085** (use this hostname to match the configured origin).
 This path needs Docker Engine but not Compose. It builds before replacing the
 container, keeps accounts in `p60-local-data`, limits logs, and uses a read-only
 root filesystem with a writable data volume and 64 MiB temporary filesystem.
@@ -149,7 +155,7 @@ not read `.env` files, and does not reset a Docker volume's database. Run
 
 ```bash
 curl --fail http://127.0.0.1:8000/healthz  # Python
-curl --fail http://localhost:8080/healthz # Docker
+curl --fail http://localhost:8085/healthz # Docker
 python3 scripts/run_tests.py
 ```
 
@@ -226,3 +232,13 @@ random 16-byte salt per password. Signup and password changes store the hash
 and salt; login verifies the derived hash with a constant-time comparison.
 Original passwords cannot be retrieved by these tools. This protects password
 values; it does not encrypt the whole SQLite database.
+
+### Keep the local signup code across restarts
+
+Run `python3 scripts/restart-server.py --signup-code` to enter the organizer code
+privately. The restart helper saves it in ignored `data/local-signup-code` with
+owner-only permissions and loads it on later restarts. A nonempty exported
+`P60_SIGNUP_CODE` updates that saved value; explicitly exporting an empty value
+disables signup for that run. Direct local `server.py` and VS Code launches also load the saved code when
+`P60_SIGNUP_CODE` is unset. Explicit environment settings take precedence, and
+production origins continue to require deployment environment configuration.

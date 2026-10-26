@@ -29,6 +29,19 @@ orders again, including the thirty-second cutoff, CSRF, budget and authoritative
 provider quote. Database transactions protect balance changes and duplicate
 request IDs. Prediction-source snapshots preserve original settlement semantics.
 
+``app.js`` renders compact upcoming/pending cards without unavailable data.
+Its segment node index supports in-place updates; unchanged refreshes do not
+rewrite price text, direction classes or accessible movement labels.
+``responsive.css`` owns the final segment layout and phone touch sizes.
+
+``candle_close`` reuses exact same-product minute history before making a
+provider request. ``exact_candle_close`` validates cache and provider rows through
+one shared path. Three cold-read attempts widen the requested history window
+without changing the exact target minute. Missing or malformed history remains
+retryable; permanent provider errors are not repeatedly requested. Recovery never
+replays an order or changes session credentials. Exhausted retries log product
+and target minute, without account credentials.
+
 The settlement loop retries missing benchmarks. A nonblocking lock prevents
 concurrent settlement passes; persisted settlement rows prevent duplicate credits.
 No synthetic preview price can execute a new order. OilPriceAPI physical spot
@@ -48,7 +61,10 @@ The API pages list each named procedure's own branches and loops with source
 lines. Nested helpers have separate entries. Validation guards reject unsupported
 providers, stale data, invalid money and unknown instruments. Polling guards skip
 hidden documents and overlapping requests; transport errors preserve retry paths.
-Catalog migrations seed only missing data to preserve administrator edits.
+Catalog migrations seed missing data and record one-time selection changes.
+Migration 6 adds/enables LINK, AVAX and SUI within the ten-instrument category
+limit, preserving saved sources and custom coins. Later administrator edits are
+not reapplied on subsequent startups.
 
 Operations
 ----------

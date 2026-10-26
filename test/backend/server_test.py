@@ -15,6 +15,10 @@ class AccountsTest(unittest.TestCase):
         server.DB = Path(self.temp.name) / f'{self._testMethodName}.sqlite3'
         server.initialize()
         server.AUTH_ATTEMPTS.clear()
+        # Never let a developer's saved organizer code influence account tests.
+        local_config = patch.object(server, 'ROOT', Path(self.temp.name) / 'checkout')
+        local_config.start()
+        self.addCleanup(local_config.stop)
         self.signup_environment = patch.dict(server.os.environ, {'P60_SIGNUP_CODE': '777'})
         self.signup_environment.start()
         self.addCleanup(self.signup_environment.stop)
@@ -50,6 +54,20 @@ class AccountsTest(unittest.TestCase):
         result = response.status, payload, response.getheader('Set-Cookie', '').split(';')[0]
         conn.close()
         return result
+
+    def test_google_state_cookie_does_not_hide_predict60_session(self):
+        status, _, cookie = self.request('POST', '/api/signup', {
+            'name': 'Cookie test', 'email': 'cookie@example.com', 'password': 'test-password',
+            'confirmPassword': 'test-password', 'signupCode': '777'})
+        self.assertEqual(status, 200)
+        combined = 'g_state={"i_l":0,"i_ll":123}; ' + cookie
+        self.assertEqual(self.request('GET', '/api/account', cookie=combined)[0], 200)
+        self.assertEqual(self.request('GET', '/categories.html', cookie=combined)[0], 200)
+        status, _, replacement = self.request('POST', '/api/login', {
+            'email': 'cookie@example.com', 'password': 'test-password'}, cookie=combined)
+        self.assertEqual(status, 200)
+        self.assertEqual(self.request('GET', '/api/account', cookie=cookie)[0], 401)
+        self.assertEqual(self.request('GET', '/api/account', cookie=replacement)[0], 200)
 
     def test_password_storage_uses_unique_salted_scrypt_hashes(self):
         password = 'same-password'
@@ -315,6 +333,26 @@ class AccountsTest(unittest.TestCase):
                         })
                         self.assertEqual(status, expected)
 
+    def test_additional_public_origin_accepts_alias_and_rejects_lookalikes(self):
+        with patch.dict('os.environ', {
+            'P60_HOST': 'https://predict60.com',
+            'P60_ADDITIONAL_ORIGINS': 'https://predict60.free-vibe.com',
+        }):
+            for origin, expected in (
+                ('https://predict60.com', 415),
+                ('https://predict60.free-vibe.com', 415),
+                ('http://predict60.free-vibe.com', 403),
+                ('https://predict60.free-vibe.com.evil.example', 403),
+            ):
+                with self.subTest(origin=origin):
+                    status, _, _ = self.request('POST', '/api/login', {}, extra_headers={
+                        'Origin': origin, 'Content-Type': 'text/plain',
+                    })
+                    self.assertEqual(status, expected)
+            with patch.dict('os.environ', {'P60_ADDITIONAL_ORIGINS': 'https://alias.example/path'}):
+                with self.assertRaises(ValueError):
+                    server.validate_environment()
+
     def test_origin_default_and_absent_origin_preserve_existing_behavior(self):
         for configuration in (None, ''):
             with patch.dict('os.environ'):
@@ -459,8 +497,7 @@ class AccountsTest(unittest.TestCase):
 
     def test_database_coin_catalog(self):
         with server.connect() as conn:
-            conn.execute("UPDATE coins SET enabled=1 WHERE symbol='AVAX'")
-            self.assertEqual(conn.execute('SELECT count(*) FROM coins WHERE enabled=1 AND category="crypto"').fetchone()[0], 8)
+            self.assertEqual(conn.execute('SELECT count(*) FROM coins WHERE enabled=1 AND category="crypto"').fetchone()[0], 10)
             with self.assertRaises(sqlite3.IntegrityError):
                 conn.execute("UPDATE coins SET enabled=1 WHERE symbol='TRUMP'")
             conn.execute("UPDATE coins SET enabled=0 WHERE symbol='AVAX'")
@@ -519,6 +556,24 @@ class AccountsTest(unittest.TestCase):
                        for call in network.call_args_list]
             self.assertNotEqual(queries[0]['start'], queries[1]['start'])
             self.assertEqual(queries[0]['end'], queries[1]['end'])
+
+    def test_benchmark_recovers_from_malformed_or_truncated_provider_data(self):
+        from io import BytesIO
+        bad_responses = [b'{', b'{"message":"unavailable"}', b'[null, [], [60], [60,0,0,0,"bad"], [60,0,0,0,true]]']
+        for payload in bad_responses:
+            with self.subTest(payload=payload), patch.dict(server.HISTORY_CACHE, {}, clear=True), patch('server.time.sleep'), patch(
+                    'server.urllib.request.urlopen', side_effect=[BytesIO(payload), BytesIO(b'[[60,0,0,0,101]]')]) as network:
+                self.assertEqual(server.candle_close('BTC', 120, {'feed': 'coinbase', 'product': 'BTC-USD'}), 101)
+                self.assertEqual(network.call_count, 2)
+
+    def test_benchmark_does_not_retry_permanent_provider_rejection(self):
+        error = server.urllib.error.HTTPError('https://example.invalid', 404, 'Not found', {}, None)
+        with patch.dict(server.HISTORY_CACHE, {}, clear=True), patch('server.time.sleep') as sleep, patch(
+                'server.urllib.request.urlopen', side_effect=error) as network:
+            with self.assertRaises(server.urllib.error.HTTPError):
+                server.candle_close('BTC', 120, {'feed': 'coinbase', 'product': 'BTC-USD'})
+            self.assertEqual(network.call_count, 1)
+            sleep.assert_not_called()
 
     def test_benchmark_retry_is_bounded_and_never_uses_another_minute(self):
         from io import BytesIO

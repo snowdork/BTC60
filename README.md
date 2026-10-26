@@ -9,6 +9,7 @@ Predict60 is a buildless web app for exploring hourly direction predictions with
 ## Overview
 
 - **Complete-hour workspace:** inspect open, upcoming, and completed intervals without hiding duration tiers; navigate previous hours and return to the current hour.
+- **Readable segment cards:** time and bold Up/Down probabilities lead, benchmark → current/closing price follows, and controls stay grouped. Phone layouts wrap the header; pending/upcoming cards omit unavailable values.
 - **Live market context:** Coinbase Exchange ticker updates and minute-candle history, with separate spot freshness, history, and order-readiness indicators.
 - **Points predictions:** choose Up or Down, set a budget, and review fractional shares, cost, possible return, and potential profit. Model percentages determine simulated contract prices.
 - **Live confirmation:** review follows the market; the server executes at its current model price within your budget. Final quantity and return can differ from review.
@@ -26,9 +27,12 @@ Predict60 is a buildless web app for exploring hourly direction predictions with
   <img src="src/frontend/assets/coins/doge.svg" width="32" height="32" alt="Dogecoin (DOGE)">
   <img src="src/frontend/assets/coins/ada.svg" width="32" height="32" alt="Cardano (ADA)">
   <img src="src/frontend/assets/coins/ltc.svg" width="32" height="32" alt="Litecoin (LTC)">
+  <img src="src/frontend/assets/coins/link.svg" width="32" height="32" alt="Chainlink (LINK)">
+  <img src="src/frontend/assets/coins/avax.svg" width="32" height="32" alt="Avalanche (AVAX)">
+  <img src="src/frontend/assets/coins/sui.svg" width="32" height="32" alt="Sui (SUI)">
 </p>
 
-BTC · ETH · SOL · XRP · DOGE · ADA · LTC. The database catalog controls availability; all coins share the same account balance.
+BTC · ETH · SOL · XRP · DOGE · ADA · LTC · LINK · AVAX · SUI. This is a curated Coinbase-supported selection, not a continuously re-ranked global top ten. The database catalog controls availability; all coins share the same account balance.
 
 ### Prediction rules
 
@@ -45,6 +49,14 @@ Live advertising networks and automatic prize delivery are not connected.
 
 Up wins when the closing benchmark is greater than or equal to the opening benchmark; Down wins when it is lower. Each benchmark uses the minute candle close immediately before its interval boundary. A winning contract returns 1 credit; a losing contract returns 0 credits, with zero demo fees. Missing history leaves orders awaiting settlement for retry.
 
+Benchmark reads first reuse the exact product/minute from server history. On a
+cache miss, Coinbase reads retry up to three times with wider history windows;
+invalid/missing minutes still block an order. A successful 60-minute prediction
+does not supply the benchmark for a later 15-minute interval. A history failure
+is a provider-data problem, not a reason to log out. See the
+[user guide](doc/USER_GUIDE.md#troubleshooting) and
+[performance review](doc/VPS_PERFORMANCE.md#october-25-2026-segment-and-benchmark-maintenance).
+
 These are uncalibrated model estimates, simulated prices, and Coinbase minute-close proxy results. Predict60 does not trade real money or claim official Kalshi or CF Benchmarks settlement. Synthetic preview and historical views cannot place orders.
 
 Signed-in users can open **Change password** from Markets, the terminal, or the
@@ -56,7 +68,7 @@ sessions. See the [user guide](doc/USER_GUIDE.md#change-your-password).
 See [local operation](deploy/LOCAL.md) for Python/Docker lifecycle commands and
 [deployment modes](deploy/README.md#choose-an-operating-mode) for VPS setup.
 
-Requires Python 3.10+ on Linux/macOS; no Python packages or frontend build are needed.
+Requires Python 3.10+ on Linux/macOS. Google sign-in requires the packages in `requirements.txt`; no frontend build is needed.
 
 ```bash
 python3 src/backend/server.py
@@ -75,7 +87,7 @@ sudo bash scripts/restart-docker.sh --local
 ```
 
 Repeat the last command after edits. It builds first, replaces `p60-local`,
-preserves `p60-local-data`, and checks readiness at http://localhost:8080.
+preserves `p60-local-data`, and checks readiness at http://localhost:8085.
 Edit `.env.local` to change the signup code (the example uses `777`).
 
 Requires Docker Engine and the Docker Compose plugin. From the project root:
@@ -86,7 +98,7 @@ chmod 600 .env.local
 sudo docker compose -f compose.local.yaml --env-file .env.local up -d --build
 ```
 
-Open **http://localhost:8080**. The example signup code is `777`; change it in
+Open **http://localhost:8085**. The example signup code is `777`; change it in
 `.env.local` if preferred. An empty code disables signup. Repeat the last command
 after code changes to rebuild and recreate the app, then refresh your browser.
 Local Docker uses its own persistent `p60-local-data` volume and leaves the
@@ -102,7 +114,8 @@ sudo docker compose -f compose.local.yaml --env-file .env.local down
 ```
 
 `down` keeps account data; adding `--volumes` deletes it. The separate
-`compose.yaml` remains the domain-based HTTPS deployment.
+`compose.yaml` runs the VPS app behind the shared host Caddy proxy. See
+[the shared VPS plan](deploy/VPS.md) for both BTC60 and Phunky addresses.
 
 Behind an HTTPS reverse proxy, set `P60_HOST` to the exact public origin
 (scheme and hostname, optional port, no path or trailing slash):
@@ -150,7 +163,7 @@ Before starting, the restart script stops the `p60-local` Docker container and
 containers in the `p60` and `p60-local` Compose projects. Volumes are preserved.
 If Docker is installed but cannot be checked or stopped, the script aborts
 before starting the host server; restore Docker access and retry.
-This also stops the VPS stack's Caddy proxy. Direct Python and systemd starts
+The shared host Caddy proxy continues running. Direct Python and systemd starts
 require manually stopping Docker first. Before switching back to Docker, stop
 the watchdog with `scripts/stop-server.sh`. Switching does not transfer
 accounts between the host database and Docker volumes. See
@@ -260,14 +273,14 @@ Tests cover market calculations, catalog/bootstrap behavior, portfolio summaries
 
 New installations use `data/p60.sqlite3`; `PREDICT60_DB` or `P60_DB` selects another path. Existing `data/btc60.sqlite3` databases remain in use when the new default does not exist. Legacy `BTC60_*` environment variables remain fallbacks after `PREDICT60_*` and `P60_*`. Session cookies and browser theme storage now use the `p60_` prefix; users must sign in again and reselect their theme after upgrading. Startup creates missing tables and applies catalog migrations. Players receive 1,000 contest credits per hour, resetting independently at each GMT hour boundary. Browser-only positions are not imported. Database files and backups are excluded from Git.
 
-The database `coins` table is authoritative. The crypto seed has ten records: BTC, ETH, SOL, XRP, DOGE, ADA, and LTC enabled; LINK, TRUMP, and AVAX disabled. Existing databases can have administrator edits. Triggers allow at most eight enabled instruments per category. Disabling a coin blocks new orders while preserving history and settlement. Keep referenced symbols and product mappings stable.
+The database `coins` table is authoritative. The crypto seed has eleven records: BTC, ETH, SOL, XRP, DOGE, ADA, LTC, LINK, AVAX and SUI enabled; TRUMP remains disabled. Existing databases can have administrator edits. Triggers allow at most ten enabled instruments per category. Disabling a coin blocks new orders while preserving history and settlement. Keep referenced symbols and product mappings stable.
 
-`src/seeds/coins.seed.json` seeds new databases; editing it does not overwrite existing catalog rows. One-time migrations add catalog entries and replace LINK selection with LTC while retaining LINK history. Refresh the terminal after database catalog edits.
+`src/seeds/coins.seed.json` seeds new databases; editing it does not overwrite existing catalog rows. One-time migration 6 expands the default selection to ten with LINK, AVAX and SUI. It preserves saved bets/provider mappings and respects capacity when custom coins are enabled; later administrator edits remain intact on restart. Earlier migrations retain their historical catalog behavior. Refresh the terminal after database catalog edits.
 
 ```sql
 BEGIN;
 UPDATE coins SET enabled=0 WHERE symbol='DOGE';
-UPDATE coins SET enabled=1 WHERE symbol='AVAX';
+UPDATE coins SET enabled=1 WHERE symbol='TRUMP';
 COMMIT;
 ```
 
@@ -402,3 +415,52 @@ existing prediction source snapshots and account data.
 
 Run all tests with `python3 scripts/run_tests.py`. Start the application with
 `python3 src/backend/server.py`.
+
+### Google sign-in
+
+The login page uses Google Identity Services. The Python backend verifies tokens
+with `google-auth`, checks the configured audience and verified email, and maps
+Google's stable `sub` to `google_identities.user_id`. Google sign-in creates the
+same SQLite session and HttpOnly cookie as password login. The supplied public
+web client ID is the default; `GOOGLE_CLIENT_ID` overrides the backend setting
+(and must match `data-client_id` in `src/frontend/login.html`). No Google client
+secret is used in this ID-token flow.
+
+Install the runtime dependencies in the Python environment that runs the server:
+
+```sh
+python3 -m pip install -r requirements.txt
+```
+
+Docker installs these dependencies during its build. Rebuild/restart the app to
+activate backend changes. For a system service, install dependencies into that
+service's Python environment, rather than an unrelated interactive environment.
+Keep `P60_HOST` set to the exact public HTTPS origin and authorize that same
+origin in the Google web client settings. Local testing uses an authorized
+`http://localhost:<port>` origin.
+
+`GET /api/auth/google/csrf` returns a short-lived login CSRF token and sets a
+matching HttpOnly cookie. The login callback sends that token in `X-CSRF-Token`
+with its same-origin JSON `POST /api/auth/google`. Both endpoints require
+`X-Requested-With: XMLHttpRequest`; login also requires the exact allowed Origin.
+Invalid Google credentials never issue sessions. Unavailable Google verification
+fails closed with a retryable error. Tokens and client secrets are not logged.
+
+An unknown Google subject returns `LINK_REQUIRED` when the email already exists,
+or `SIGNUP_REQUIRED` otherwise. Neither response creates or links an account.
+The login page routes new Google users to `signup.html?google=1`. Google signup
+requires selecting a Google account, a display name, and the organizer's existing
+signup code. `POST /api/auth/google/signup` verifies Google's token again and
+atomically creates the user and subject mapping only after validating the code.
+Google-only users have no local password; they return using Google. Existing
+password registration remains available.
+
+Existing password users are routed to `login.html?google=link`. A successful
+normal login opens `google-link.html`, where the user explicitly selects the
+matching Google account. `POST /api/auth/google/link` requires the existing
+session and account CSRF token, exact origin, and matching verified email.
+The page also links from the standard login screen. Linking rotates the session
+and stores only the Google subject association; it never recreates the user,
+resets credits, transfers predictions, or rewrites contest results. Matching
+emails alone never merge accounts. Returning Google users resolve by subject,
+even when their Google email changes.

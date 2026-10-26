@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Link Google · Predict60</title>
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="auth.css">
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="responsive.css">
+    <link rel="stylesheet" href="brand.css">
+  </head>
+  <body class="auth-page">
+    <header class="auth-nav">
+      <a class="brand" href="categories.html">Predict60</a>
+      <nav>
+        <a href="categories.html">Markets</a><a href="portfolio.html">Prediction history</a>
+      </nav>
+    </header>
+    <main class="panel auth-card" data-google-onboarding="link">
+      <h1>Link your Google account</h1>
+      <p>Choose the Google account matching your Predict60 email. Your credits, predictions, and contest history stay with this account.</p>
+      <p id="google-account-email" role="status">Checking your signed-in account…</p>
+      <div id="g_id_onload" data-client_id="572697973282-e17b6uqatr36toqi48sohg6vigkarvai.apps.googleusercontent.com" data-callback="handleGoogleOnboarding" data-auto_prompt="false"></div>
+      <div class="g_id_signin" data-type="standard" data-theme="outline" data-size="large" data-text="continue_with"></div>
+      <p id="google-onboarding-status" role="status"></p>
+      <p id="google-onboarding-error" class="form-error" role="alert"></p>
+      <a id="google-link-login" href="login.html?google=link" hidden>Log in to continue →</a><a class="primary-link" href="categories.html">Back to markets →</a>
+    </main>
+    <script src="google-onboarding.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+  </body>
+</html>

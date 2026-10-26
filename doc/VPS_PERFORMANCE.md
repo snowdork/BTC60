@@ -202,3 +202,37 @@ No VPS rollout or live-provider load test was performed.
 Remaining growth limits are full account-history responses, complete live or
 provisional standings, and potentially large lists when many players tie for
 first. Pagination requires an API/UI change; it was not introduced in this review.
+
+
+## October 25, 2026 segment and benchmark maintenance
+
+Reviewed the current Phase-9 worktree based on `c76c6a7`. Consolidated the final
+segment stylesheet into one state/viewport section, removing superseded header,
+price and action rules. Pending/upcoming rows are omitted at render time instead
+of building hidden price/odds/countdown nodes. Shared node references avoid
+re-querying those elements during the live refresh. Quote freshness is computed
+once per refresh, and unchanged direction classes, attributes, text and accessible
+labels are not written again. A regression verifies zero tracked DOM writes on
+an identical refresh; it does not claim a browser-frame-time improvement.
+
+Benchmark cache candidates are filtered by product under the history lock,
+then sorted/validated after releasing it. A shared validator handles both cached
+and fetched candles; malformed rows and partial JSON are recoverable misses.
+Thirty-two concurrent benchmark reads across four cached interval boundaries
+issue **zero provider requests** in the mocked regression. Existing eight-way
+history-load coalescing still requires six provider batches on a cold load.
+No separate unbounded benchmark cache or extra background polling was added.
+
+Cold benchmark recovery remains at most three requests, each with a three-second
+socket timeout, and 0.5/1-second backoff delays. Wider start windows change the
+request while preserving the exact minute. Socket timeouts are not a hard total
+order deadline: spot/history requests and slow provider reads can still consume
+handler slots, so these checks are not a production latency or capacity claim.
+Failures are never cached as successful history; orders still require exact data.
+
+Validation: **235 tests passed** (117 JavaScript, 86 application, 32 script), no
+failures/skips, 25.91 seconds. See [latest test results](TEST_RESULTS.md) for the
+committed log and browser-fixture limits. Source references and static export were
+regenerated. No live feed, deployment or production load test was performed.
+Account-history response size and live standings remain growth considerations;
+retain the existing single-process model and measure before changing concurrency.

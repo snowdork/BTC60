@@ -1,0 +1,658 @@
+Predict60 unit-test run
+Log: /tmp/test_results/test_result_2026-10-25_12-28-33_909994.log
+
+▶ JavaScript
+$ node --test test/frontend/account.test.js test/frontend/app.test.js test/frontend/auth.test.js test/frontend/bootstrap.test.js test/frontend/btc-chart.test.js test/frontend/categories.test.js test/frontend/coins.test.js test/frontend/community.test.js test/frontend/contests.test.js test/frontend/market-model.test.js test/frontend/orientation.test.js test/frontend/password.test.js test/frontend/portfolio-model.test.js test/frontend/sponsor.test.js
+TAP version 13
+# Subtest: restored session renders a plain-text name and skips welcome
+ok 1 - restored session renders a plain-text name and skips welcome
+  ---
+  duration_ms: 9.728156
+  ...
+# Subtest: expired session hides protected controls and redirects to welcome
+ok 2 - expired session hides protected controls and redirects to welcome
+  ---
+  duration_ms: 3.215848
+  ...
+# Subtest: logout sends CSRF token and clears user, predictions, and name
+ok 3 - logout sends CSRF token and clears user, predictions, and name
+  ---
+  duration_ms: 3.519574
+  ...
+# Subtest: failed logout preserves the session and permits retry
+ok 4 - failed logout preserves the session and permits retry
+  ---
+  duration_ms: 4.322309
+  ...
+# Subtest: settlement ignores overlapping requests and resumes after failure
+ok 5 - settlement ignores overlapping requests and resumes after failure
+  ---
+  duration_ms: 4.562165
+  ...
+# Subtest: background sync does not settle while the document is hidden
+ok 6 - background sync does not settle while the document is hidden
+  ---
+  duration_ms: 5.710896
+  ...
+# Subtest: a stalled settlement releases its request guard after timeout and can retry
+ok 7 - a stalled settlement releases its request guard after timeout and can retry
+  ---
+  duration_ms: 4.722569
+  ...
+# Subtest: a timed out prediction is not automatically submitted twice
+ok 8 - a timed out prediction is not automatically submitted twice
+  ---
+  duration_ms: 5.312179
+  ...
+# Subtest: response body timeouts are reported as timeouts rather than invalid server data
+ok 9 - response body timeouts are reported as timeouts rather than invalid server data
+  ---
+  duration_ms: 27.889838
+  ...
+# Subtest: a settlement response arriving after logout cannot restore the account
+ok 10 - a settlement response arriving after logout cannot restore the account
+  ---
+  duration_ms: 4.903723
+  ...
+# Subtest: logout succeeds locally when another tab has already ended the session
+ok 11 - logout succeeds locally when another tab has already ended the session
+  ---
+  duration_ms: 4.45929
+  ...
+# Subtest: stale prediction token refreshes the same account and retries the identical order once
+ok 12 - stale prediction token refreshes the same account and retries the identical order once
+  ---
+  duration_ms: 4.052417
+  ...
+# Subtest: background settlement recovers a stale token without reloading the page
+ok 13 - background settlement recovers a stale token without reloading the page
+  ---
+  duration_ms: 4.19152
+  ...
+# Subtest: CSRF recovery never retries an order for a different account
+ok 14 - CSRF recovery never retries an order for a different account
+  ---
+  duration_ms: 3.860853
+  ...
+# Subtest: CSRF retries are bounded and other errors never replay predictions
+ok 15 - CSRF retries are bounded and other errors never replay predictions
+  ---
+  duration_ms: 7.463455
+  ...
+# Subtest: segments expose prediction, result, and upcoming details actions without nested buttons
+ok 16 - segments expose prediction, result, and upcoming details actions without nested buttons
+  ---
+  duration_ms: 6.598472
+  ...
+# Subtest: segment action selects its market and opens the popup
+ok 17 - segment action selects its market and opens the popup
+  ---
+  duration_ms: 2.119315
+  ...
+# Subtest: last-hour winner badge requires a finalized first-place result and clears on other states
+ok 18 - last-hour winner badge requires a finalized first-place result and clears on other states
+  ---
+  duration_ms: 29.194866
+  ...
+# Subtest: reused hourly winnings allow further orders in an interval up to the per-prediction cap
+ok 19 - reused hourly winnings allow further orders in an interval up to the per-prediction cap
+  ---
+  duration_ms: 2.015438
+  ...
+# Subtest: countdown updates visit pending predictions without scanning settled history
+ok 20 - countdown updates visit pending predictions without scanning settled history
+  ---
+  duration_ms: 25.758509
+  ...
+# Subtest: account updates refresh pending countdowns and remove settled or signed-out predictions
+ok 21 - account updates refresh pending countdowns and remove settled or signed-out predictions
+  ---
+  duration_ms: 2.154131
+  ...
+# Subtest: pending and upcoming cards omit unavailable prices, movement, odds and countdowns
+ok 22 - pending and upcoming cards omit unavailable prices, movement, odds and countdowns
+  ---
+  duration_ms: 2.963919
+  ...
+# Subtest: segment refresh preserves stable DOM values and clears stale live movement
+ok 23 - segment refresh preserves stable DOM values and clears stale live movement
+  ---
+  duration_ms: 4.321537
+  ...
+# Subtest: mixed completed results style win and loss separately and clear on pending state
+ok 24 - mixed completed results style win and loss separately and clear on pending state
+  ---
+  duration_ms: 3.467365
+  ...
+# Subtest: NO CREDITS banner follows the signed-in balance and hides on read-only intervals
+ok 25 - NO CREDITS banner follows the signed-in balance and hides on read-only intervals
+  ---
+  duration_ms: 2.121199
+  ...
+# Subtest: login and signup post form fields and navigate to categories
+ok 26 - login and signup post form fields and navigate to categories
+  ---
+  duration_ms: 9.864294
+  ...
+# Subtest: rejected credentials remain on the form with a retryable error
+ok 27 - rejected credentials remain on the form with a retryable error
+  ---
+  duration_ms: 2.149201
+  ...
+# Subtest: submission is disabled while pending and recovers from non-JSON responses
+ok 28 - submission is disabled while pending and recovers from non-JSON responses
+  ---
+  duration_ms: 3.243299
+  ...
+# Subtest: invalid signup code stays on signup with a retryable error
+ok 29 - invalid signup code stays on signup with a retryable error
+  ---
+  duration_ms: 2.208525
+  ...
+# Subtest: signup confirmation mismatch prevents the request
+ok 30 - signup confirmation mismatch prevents the request
+  ---
+  duration_ms: 2.247659
+  ...
+# Subtest: show controls toggle password and signup-code visibility without submitting
+ok 31 - show controls toggle password and signup-code visibility without submitting
+  ---
+  duration_ms: 4.915426
+  ...
+# Subtest: login change-password action authenticates before opening the protected form
+ok 32 - login change-password action authenticates before opening the protected form
+  ---
+  duration_ms: 2.688837
+  ...
+# Subtest: file preview shows actionable offline state instead of Connecting
+ok 33 - file preview shows actionable offline state instead of Connecting
+  ---
+  duration_ms: 5.611979
+  ...
+# Subtest: network errors and static-server HTML stop startup clearly
+ok 34 - network errors and static-server HTML stop startup clearly
+  ---
+  duration_ms: 9.250809
+  ...
+# Subtest: database catalog loads before terminal scripts
+ok 35 - database catalog loads before terminal scripts
+  ---
+  duration_ms: 9.741832
+  ...
+# Subtest: oil category configures the same framework with only oil instruments
+ok 36 - oil category configures the same framework with only oil instruments
+  ---
+  duration_ms: 4.780509
+  ...
+# Subtest: hourly coin rings retain settled directions and reset with the displayed hour
+ok 37 - hourly coin rings retain settled directions and reset with the displayed hour
+  ---
+  duration_ms: 6.496358
+  ...
+# Subtest: coin position markers refresh after an order, settlement, and logout
+ok 38 - coin position markers refresh after an order, settlement, and logout
+  ---
+  duration_ms: 4.558648
+  ...
+# Subtest: returning through the browser page cache restarts live quotes and the chart clock
+ok 39 - returning through the browser page cache restarts live quotes and the chart clock
+  ---
+  duration_ms: 74.421541
+  ...
+# Subtest: initial selection loads a validated price without waiting for a WebSocket trade
+ok 40 - initial selection loads a validated price without waiting for a WebSocket trade
+  ---
+  duration_ms: 15.339703
+  ...
+# Subtest: one click on a different coin loads its own price without refreshing
+ok 41 - one click on a different coin loads its own price without refreshing
+  ---
+  duration_ms: 14.217641
+  ...
+# Subtest: late quote responses cannot overwrite a newly selected coin
+ok 42 - late quote responses cannot overwrite a newly selected coin
+  ---
+  duration_ms: 14.718273
+  ...
+# Subtest: an unavailable quote is labelled and retried automatically without a refresh
+ok 43 - an unavailable quote is labelled and retried automatically without a refresh
+  ---
+  duration_ms: 12.734014
+  ...
+# Subtest: invalid and stale provider quotes never become current prices
+ok 44 - invalid and stale provider quotes never become current prices
+  ---
+  duration_ms: 47.408347
+  ...
+# Subtest: a REST error cannot hide a newer valid live trade
+ok 45 - a REST error cannot hide a newer valid live trade
+  ---
+  duration_ms: 6.948156
+  ...
+# Subtest: an older REST quote cannot replace a newer live trade
+ok 46 - an older REST quote cannot replace a newer live trade
+  ---
+  duration_ms: 6.325984
+  ...
+# Subtest: an expired price is replaced by unavailable until a fresh quote arrives
+ok 47 - an expired price is replaced by unavailable until a fresh quote arrives
+  ---
+  duration_ms: 10.076447
+  ...
+# Subtest: a fresh quote just before the hour is displayed without inventing a chart point
+ok 48 - a fresh quote just before the hour is displayed without inventing a chart point
+  ---
+  duration_ms: 5.420194
+  ...
+# Subtest: initial current hour backfills to its start before pricing history completes
+ok 49 - initial current hour backfills to its start before pricing history completes
+  ---
+  duration_ms: 6.879025
+  ...
+# Subtest: minute heat map renders sixty time-aligned candle directions
+ok 50 - minute heat map renders sixty time-aligned candle directions
+  ---
+  duration_ms: 6.991077
+  ...
+# Subtest: returning to current hour restores history and ignores old pricing responses
+ok 51 - returning to current hour restores history and ignores old pricing responses
+  ---
+  duration_ms: 10.401945
+  ...
+# Subtest: banner fractional digits follow price moves and reset on navigation
+ok 52 - banner fractional digits follow price moves and reset on navigation
+  ---
+  duration_ms: 11.79479
+  ...
+# Subtest: live banner prices update every two seconds while clocks keep ticking each second
+ok 53 - live banner prices update every two seconds while clocks keep ticking each second
+  ---
+  duration_ms: 7.255199
+  ...
+# Subtest: oil uses server simulated prices and history through the shared chart
+ok 54 - oil uses server simulated prices and history through the shared chart
+  ---
+  duration_ms: 11.506803
+  ...
+# Subtest: live oil uses provider timestamps and its minute quote freshness limit
+ok 55 - live oil uses provider timestamps and its minute quote freshness limit
+  ---
+  duration_ms: 7.860939
+  ...
+# Subtest: missing oil credentials show an actionable error without simulated substitution
+ok 56 - missing oil credentials show an actionable error without simulated substitution
+  ---
+  duration_ms: 9.206825
+  ...
+# Subtest: completed quarters show a green direction arrow with an outcome-colored dot
+ok 57 - completed quarters show a green direction arrow with an outcome-colored dot
+  ---
+  duration_ms: 5.975538
+  ...
+# Subtest: falling quarter points down and ties resolve Up
+ok 58 - falling quarter points down and ties resolve Up
+  ---
+  duration_ms: 11.892145
+  ...
+# Subtest: missing boundary candle leaves completed segment without an invented winner
+ok 59 - missing boundary candle leaves completed segment without an invented winner
+  ---
+  duration_ms: 5.739371
+  ...
+# Subtest: smooth plot refreshes every five seconds while live prices remain current
+ok 60 - smooth plot refreshes every five seconds while live prices remain current
+  ---
+  duration_ms: 7.847604
+  ...
+# Subtest: smooth curve control points stay between neighboring prices at peaks and troughs
+ok 61 - smooth curve control points stay between neighboring prices at peaks and troughs
+  ---
+  duration_ms: 6.536414
+  ...
+# Subtest: category screen shows pending connection and unavailable grades without fake quotes
+ok 62 - category screen shows pending connection and unavailable grades without fake quotes
+  ---
+  duration_ms: 21.455949
+  ...
+# Subtest: configured category shows a real quote and preserves its source timestamp
+ok 63 - configured category shows a real quote and preserves its source timestamp
+  ---
+  duration_ms: 33.846671
+  ...
+# Subtest: stale category quote is displayed as unavailable
+ok 64 - stale category quote is displayed as unavailable
+  ---
+  duration_ms: 5.382282
+  ...
+# Subtest: dated spot assessments remain visible without being labeled live ticks
+ok 65 - dated spot assessments remain visible without being labeled live ticks
+  ---
+  duration_ms: 4.937367
+  ...
+# Subtest: guests cannot load market choices or quotes
+ok 66 - guests cannot load market choices or quotes
+  ---
+  duration_ms: 2.799808
+  ...
+# Subtest: weather coming soon card has no market link or quote requests
+ok 67 - weather coming soon card has no market link or quote requests
+  ---
+  duration_ms: 4.686571
+  ...
+# Subtest: oil coming soon card has no market link or quote requests
+ok 68 - oil coming soon card has no market link or quote requests
+  ---
+  duration_ms: 3.259901
+  ...
+# Subtest: catalog uses supplied database records without a fixed coin list
+ok 69 - catalog uses supplied database records without a fixed coin list
+  ---
+  duration_ms: 4.592532
+  ...
+# Subtest: formatting uses each database precision
+ok 70 - formatting uses each database precision
+  ---
+  duration_ms: 26.223493
+  ...
+# Subtest: empty and invalid catalogs are handled
+ok 71 - empty and invalid catalogs are handled
+  ---
+  duration_ms: 0.964953
+  ...
+# Subtest: category selection isolates instruments without truncating another category
+ok 72 - category selection isolates instruments without truncating another category
+  ---
+  duration_ms: 1.020067
+  ...
+# Subtest: default catalog contains ten tradable coins with local icons
+ok 73 - default catalog contains ten tradable coins with local icons
+  ---
+  duration_ms: 6.480507
+  ...
+# Subtest: shows actual counts including zero without caching
+ok 74 - shows actual counts including zero without caching
+  ---
+  duration_ms: 29.340363
+  ...
+# Subtest: malformed and unavailable responses show unknown instead of invented counts
+ok 75 - malformed and unavailable responses show unknown instead of invented counts
+  ---
+  duration_ms: 13.572617
+  ...
+# Subtest: hidden tabs pause polling and visibility resumes it
+ok 76 - hidden tabs pause polling and visibility resumes it
+  ---
+  duration_ms: 2.634623
+  ...
+# Subtest: concurrent refresh events share one in-flight request
+ok 77 - concurrent refresh events share one in-flight request
+  ---
+  duration_ms: 4.264199
+  ...
+# Subtest: recovers on the next refresh after a network error
+ok 78 - recovers on the next refresh after a network error
+  ---
+  duration_ms: 3.545584
+  ...
+# Subtest: last hour shows signed loss and final winner as text
+ok 79 - last hour shows signed loss and final winner as text
+  ---
+  duration_ms: 33.894091
+  ...
+# Subtest: older history uses the server cursor and GMT lookup selects an exact hour
+ok 80 - older history uses the server cursor and GMT lookup selects an exact hour
+  ---
+  duration_ms: 6.884045
+  ...
+# Subtest: new hour credits remain available while the previous winner awaits settlement
+ok 81 - new hour credits remain available while the previous winner awaits settlement
+  ---
+  duration_ms: 5.323089
+  ...
+# Subtest: lookup with no recorded hour clears stale results
+ok 82 - lookup with no recorded hour clears stale results
+  ---
+  duration_ms: 6.620253
+  ...
+# Subtest: one hour contains exactly 60, 30 and 15 minute markets
+ok 83 - one hour contains exactly 60, 30 and 15 minute markets
+  ---
+  duration_ms: 5.333459
+  ...
+# Subtest: binary outcome includes equal prices on Up
+ok 84 - binary outcome includes equal prices on Up
+  ---
+  duration_ms: 0.243502
+  ...
+# Subtest: fractional shares use the full budget with upward penny payout rounding
+ok 85 - fractional shares use the full budget with upward penny payout rounding
+  ---
+  duration_ms: 0.719987
+  ...
+# Subtest: closed and upcoming markets cannot be traded
+ok 86 - closed and upcoming markets cannot be traded
+  ---
+  duration_ms: 0.304098
+  ...
+# Subtest: invalid budgets and insufficient balances cannot be quoted
+ok 87 - invalid budgets and insufficient balances cannot be quoted
+  ---
+  duration_ms: 0.314087
+  ...
+# Subtest: all quotes preserve funds and settle to one credit per contract
+ok 88 - all quotes preserve funds and settle to one credit per contract
+  ---
+  duration_ms: 1.086363
+  ...
+# Subtest: market without a loaded benchmark cannot accept a prediction
+ok 89 - market without a loaded benchmark cannot accept a prediction
+  ---
+  duration_ms: 0.303797
+  ...
+# Subtest: chance model is centered on the benchmark and complements to 100
+ok 90 - chance model is centered on the benchmark and complements to 100
+  ---
+  duration_ms: 0.748802
+  ...
+# Subtest: less time or lower volatility makes a price displacement more decisive
+ok 91 - less time or lower volatility makes a price displacement more decisive
+  ---
+  duration_ms: 0.32115
+  ...
+# Subtest: chance model is independent of coin price units
+ok 92 - chance model is independent of coin price units
+  ---
+  duration_ms: 0.518875
+  ...
+# Subtest: queued baseline and completed outcomes are distinguished from estimates
+ok 93 - queued baseline and completed outcomes are distinguished from estimates
+  ---
+  duration_ms: 0.4371
+  ...
+# Subtest: volatility uses only completed consecutive minute candles
+ok 94 - volatility uses only completed consecutive minute candles
+  ---
+  duration_ms: 0.555235
+  ...
+# Subtest: opening probability responds immediately to price movement
+ok 95 - opening probability responds immediately to price movement
+  ---
+  duration_ms: 0.311141
+  ...
+# Subtest: prediction gate requires fresh connected data, benchmark and server quote
+ok 96 - prediction gate requires fresh connected data, benchmark and server quote
+  ---
+  duration_ms: 0.914046
+  ...
+# Subtest: purchase prices are configured by server, independently of model chances
+ok 97 - purchase prices are configured by server, independently of model chances
+  ---
+  duration_ms: 1.290621
+  ...
+# Subtest: betting closes exactly 30 seconds before every interval ends
+ok 98 - betting closes exactly 30 seconds before every interval ends
+  ---
+  duration_ms: 0.769892
+  ...
+# Subtest: pricing backfill failures are distinct from benchmark failures
+ok 99 - pricing backfill failures are distinct from benchmark failures
+  ---
+  duration_ms: 0.493668
+  ...
+# Subtest: prediction cap accepts 1000 credits and rejects larger budgets even with sufficient balance
+ok 100 - prediction cap accepts 1000 credits and rejects larger budgets even with sufficient balance
+  ---
+  duration_ms: 0.530838
+  ...
+# Subtest: landscape request enters fullscreen, locks orientation, and is reversible
+ok 101 - landscape request enters fullscreen, locks orientation, and is reversible
+  ---
+  duration_ms: 8.810373
+  ...
+# Subtest: unsupported browsers receive physical rotation guidance without entering fullscreen
+ok 102 - unsupported browsers receive physical rotation guidance without entering fullscreen
+  ---
+  duration_ms: 2.205378
+  ...
+# Subtest: failed locking restores fullscreen and leaves a working fallback
+ok 103 - failed locking restores fullscreen and leaves a working fallback
+  ---
+  duration_ms: 2.881713
+  ...
+# Subtest: denied fullscreen displays guidance without attempting a lock
+ok 104 - denied fullscreen displays guidance without attempting a lock
+  ---
+  duration_ms: 2.139654
+  ...
+# Subtest: an existing landscape view is reflected without forcing rotation
+ok 105 - an existing landscape view is reflected without forcing rotation
+  ---
+  duration_ms: 1.580802
+  ...
+# Subtest: exiting fullscreen through browser controls clears the requested orientation
+ok 106 - exiting fullscreen through browser controls clears the requested orientation
+  ---
+  duration_ms: 1.667006
+  ...
+# Subtest: restoring rotation preserves fullscreen entered by another control
+ok 107 - restoring rotation preserves fullscreen entered by another control
+  ---
+  duration_ms: 1.811029
+  ...
+# Subtest: orientation can be requested without fullscreen when the browser permits it
+ok 108 - orientation can be requested without fullscreen when the browser permits it
+  ---
+  duration_ms: 1.444403
+  ...
+# Subtest: leaving the page releases rotation before a restored page is used again
+ok 109 - leaving the page releases rotation before a restored page is used again
+  ---
+  duration_ms: 1.75358
+  ...
+# Subtest: password change sends CSRF and clears secrets after success
+ok 110 - password change sends CSRF and clears secrets after success
+  ---
+  duration_ms: 8.55077
+  ...
+# Subtest: confirmation mismatch prevents submission
+ok 111 - confirmation mismatch prevents submission
+  ---
+  duration_ms: 2.140585
+  ...
+# Subtest: incorrect current password permits retry without clearing fields
+ok 112 - incorrect current password permits retry without clearing fields
+  ---
+  duration_ms: 2.225146
+  ...
+# Subtest: wins and losses use settlement outcome, never current spot
+ok 113 - wins and losses use settlement outcome, never current spot
+  ---
+  duration_ms: 2.623823
+  ...
+# Subtest: realized P/L excludes pending spend and win rate excludes pending orders
+ok 114 - realized P/L excludes pending spend and win rate excludes pending orders
+  ---
+  duration_ms: 1.935246
+  ...
+# Subtest: zero payout is a settled loss, not a pending prediction
+ok 115 - zero payout is a settled loss, not a pending prediction
+  ---
+  duration_ms: 0.286504
+  ...
+# Subtest: history sorts amounts numerically without mutating account order
+ok 116 - history sorts amounts numerically without mutating account order
+  ---
+  duration_ms: 0.802033
+  ...
+# Subtest: history keeps pending returns last in both directions and includes zero payouts
+ok 117 - history keeps pending returns last in both directions and includes zero payouts
+  ---
+  duration_ms: 0.418445
+  ...
+# Subtest: history sorts dates, market intervals, direction, status, and benchmarks
+ok 118 - history sorts dates, market intervals, direction, status, and benchmarks
+  ---
+  duration_ms: 13.831619
+  ...
+# Subtest: sponsor strip is absent when disabled, unavailable, or unsafe
+ok 119 - sponsor strip is absent when disabled, unavailable, or unsafe
+  ---
+  duration_ms: 10.987357
+  ...
+# Subtest: sponsor content stays plain text and outbound link has safe sponsored attributes
+ok 120 - sponsor content stays plain text and outbound link has safe sponsored attributes
+  ---
+  duration_ms: 1.236909
+  ...
+1..120
+# tests 120
+# suites 0
+# pass 120
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 539.118636
+PASS JavaScript · 120 tests · 0.64s
+
+▶ Python application
+$ /usr/bin/python3 -m unittest discover -s test/backend -p *_test.py
+.................................Downloading 1970-02-01T16:00:00+00:00 · 0.0%
+Downloading 1970-02-01T20:00:00+00:00 · 1.7%
+Resuming saved download.
+Downloading 1970-02-01T20:00:00+00:00 · 99.6%
+Saved 2 candles to /tmp/tmpehsc1w69/candles.json.
+.....................Benchmark unavailable coin=BTC product=BTC-USD minute=60 after 3 attempts
+........HTTP failure method=GET path=/healthz status=503
+...HTTP failure method=GET path=/api/spot status=503
+HTTP failure method=GET path=/api/spot status=503
+.......................
+----------------------------------------------------------------------
+Ran 88 tests in 7.898s
+
+OK
+PASS Python application · 88 tests · 8.01s
+
+▶ Python scripts
+$ /usr/bin/python3 -m unittest discover -s test/scripts -p *_test.py
+......usage: reset [-h] [--service | --docker | --local] [--container CONTAINER]
+             [--db DB] [--confirm-reset]
+reset: error: Reset clears account and prediction data; pass --confirm-reset.
+.....................Docker database reset. App remains stopped; start it with docker start p60-local
+Service database reset. Service remains stopped; start with sudo systemctl start predict60.
+Stopping Predict60 Docker containers...
+.Stopping Predict60 Docker containers...
+....
+----------------------------------------------------------------------
+Ran 32 tests in 17.285s
+
+OK
+PASS Python scripts · 32 tests · 17.38s
+
+════════════ Test summary ════════════
+PASS  JavaScript               120 tests    0.64s
+PASS  Python application        88 tests    8.01s
+PASS  Python scripts            32 tests   17.38s
+ALL TESTS PASSED
+Tests: 240 · Passed: 240 · Failed: 0 · Skipped: 0
+Duration: 26.04s · Started: 2026-10-25T12:28:33-06:00

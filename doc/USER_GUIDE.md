@@ -93,7 +93,7 @@ The sun/moon button switches themes and saves your preference across tabs. On sm
 | Coins unavailable / terminal offline | On a hosted site, refresh and contact the administrator if it persists. For local use, start `python3 src/backend/server.py` and open the localhost URL. |
 | Price feed disconnected or stale | Check internet access and use Reconnect; wait for a fresh live update. |
 | Data Not Available | No valid current quote was received. Automatic retries continue; check internet access if it persists. Available chart history can still be viewed. |
-| History or opening benchmark unavailable | Wait for Coinbase candle history, then reconnect if needed. Orders stay blocked until required data is available. |
+| History or opening benchmark unavailable | The server automatically retries the exact minute using wider history windows and reuses matching cached history. If it still fails, wait for provider recovery and review a new prediction. Logging out does not repair missing provider data; orders stay blocked until the exact benchmark is available. |
 | Chart paused / synthetic preview / historical market | Resume, reconnect to live data, or select Current hour. |
 | Too late to place | Select an open interval and review a new prediction. |
 | Insufficient credits | Reduce the budget and check pending commitments in your portfolio. |
@@ -128,18 +128,36 @@ OilPriceAPI mode shows dated physical spot assessments for all five crudes. Thes
 
 ## Laptop and phone displays
 
+Duration tiers are labeled **60m**, **30m** and **15m**, each with the selected
+coin icon centered underneath. The icons update when you switch coins.
+
 On a laptop, the chart and the 60-, 30-, and 15-minute segment rows share one
 hourly timeline. Compact navigation and cards leave more room for predictions.
 On phone screens up to 600 pixels wide, the chart fits the screen and segments
 stack by duration. Choose coins from the five-column icon grid in the live price
-panel. Each icon shows its ticker; the inner highlight marks the selected coin,
+panel. Use **← Categories** in the top bar to switch market categories; the coin grid has no separate heading row. The default ten coins are BTC, ETH, SOL, XRP, DOGE, ADA, LTC, LINK, AVAX and SUI, arranged in two rows of five. Each icon shows its ticker; the inner highlight marks the selected coin,
 and the outer ring shows your hourly prediction direction.
+
+Each card starts with a bold UTC time range, Up/Down model percentages and status.
+The next row reads **benchmark → current price** (closing price for a completed
+interval). The benchmark stays neutral; current prices are green above or equal
+to it and red below it. **Open** is blue. At the lower right, a signed percentage
+above a direction arrow shows the actual price movement from the benchmark;
+this is different from the model probabilities. The dot sits above an Up arrow
+or below a Down arrow. Stale, paused or disconnected live data clears that live
+comparison instead of leaving a misleading price.
+
+On narrow phones, model percentages wrap below the time range and status;
+buttons retain a 44-pixel minimum touch height. Upcoming intervals and completed
+intervals still missing an exact benchmark show only time, status and their
+read-only action. Available completed intervals show the closing price and final
+100%/0% result, rather than a live forecast.
 
 Tap **Predict** on an open segment to open the prediction popup, select Up or
 Down, enter a budget, and review before confirming. Tap **Result** on a closed
 segment to see its outcome and your returns. **Details** describes an upcoming
 segment. Popups scroll on short screens; use the close button or Escape to close
-them. The hourly balance and last-hour results remain in the header.
+them. The hourly balance and last-hour results remain in the header. The top navigation bar stays visible while scrolling so credits and navigation remain accessible on phones and laptops.
 
 On a phone, tap **Rotate** in the top title bar to request landscape view.
 If the browser permits it, the page enters full screen and rotates. Tap

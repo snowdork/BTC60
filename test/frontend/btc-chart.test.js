@@ -171,6 +171,10 @@ test('minute heat map renders sixty time-aligned candle directions',async()=>{
  const h=chartHarness();await flush();
  const map=h.element('minute-heatmap'),dots=map.children;
  assert.equal(dots.length,60);
+ assert.equal(dots[14].style.left,'25%');
+ assert.equal(dots[29].style.left,'50%');
+ assert.equal(dots[44].style.left,'75%');
+ assert.equal(dots[59].style.left,'100%');
  assert.equal(dots.filter(dot=>dot.className.includes(' up')).length,25);
  assert.equal(dots[25].className,'minute-dot current');
  assert.match(dots[0].title,/17:00–17:01 UTC · Up/);
@@ -301,4 +305,14 @@ test('smooth curve control points stay between neighboring prices at peaks and t
   assert.ok(y2>=Math.min(previous[1],y)&&y2<=Math.max(previous[1],y));
   previous=[x,y];
  }
+});
+
+test('segment countdown shows Locked exactly in the final thirty seconds',async()=>{
+ const h=chartHarness({startTime:Date.UTC(2026,9,12,17,59,29)});await flush();
+ const market=h.model.markets.find(m=>m.id==='60-0');
+ assert.equal(market.remaining,'0m 31s');
+ h.step();assert.equal(market.remaining,'0m 30s - Locked');
+ for(let i=0;i<29;i++)h.step();
+ assert.equal(market.remaining,'0m 01s - Locked');
+ h.step();assert.equal(market.remaining.includes('Locked'),false);
 });

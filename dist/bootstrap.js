@@ -81,9 +81,6 @@
     document.getElementById('chart-empty').textContent=connectionError?'Cannot reach the coin database. Run python3 src/backend/server.py, then open http://127.0.0.1:8000/index.html.':error.message;
     document.getElementById('btc-change').textContent='Database connection unavailable';
     document.getElementById('workspace-clock').textContent='Terminal offline';
-    document.getElementById('selected-state').textContent='OFFLINE';
-    document.getElementById('selected-state').className='badge amber';
-    document.getElementById('selected-countdown').textContent='Coin catalog unavailable';
     document.getElementById('chart-source').textContent='Database API required';
     document.getElementById('submit-prediction').textContent='Terminal unavailable';
     document.getElementById('startup-help').hidden=false;

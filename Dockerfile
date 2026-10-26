@@ -10,6 +10,9 @@ RUN groupadd --gid 10001 p60 \
     && mkdir /app/data \
     && chown p60:p60 /app/data
 
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY src/ ./src/
 COPY scripts/database.py scripts/contest-admin.py ./scripts/
 

@@ -3,7 +3,7 @@ predict60.com {
 
 	header {
 		Strict-Transport-Security "max-age=31536000"
-		Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src 'self' https://api.exchange.coinbase.com wss://ws-feed.exchange.coinbase.com; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+		Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src 'self' https://accounts.google.com/gsi/ https://api.exchange.coinbase.com wss://ws-feed.exchange.coinbase.com; form-action 'self'; frame-ancestors 'none'; frame-src https://accounts.google.com/gsi/; img-src 'self' data:; object-src 'none'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style"
 		Permissions-Policy "camera=(), geolocation=(), microphone=()"
 		-Server
 	}

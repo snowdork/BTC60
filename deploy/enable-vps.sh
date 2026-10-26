@@ -12,6 +12,13 @@ if [[ $owner == root || ! $root =~ ^/[a-zA-Z0-9_./-]+$ ]]; then
   exit 1
 fi
 
+# This legacy installer replaces the entire proxy configuration. Shared VPS
+# deployments must merge site blocks manually instead of running this helper.
+if [[ -f /etc/caddy/Caddyfile ]] && ! cmp -s "$root/deploy/Caddyfile" /etc/caddy/Caddyfile; then
+  echo 'Existing Caddy configuration detected; refusing to replace shared sites. Follow deploy/VPS.md.' >&2
+  exit 1
+fi
+
 apt-get update
 apt-get install -y caddy
 install -d -m 700 /etc/predict60

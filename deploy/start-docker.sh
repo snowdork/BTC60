@@ -26,7 +26,7 @@ fi
 # A failed readiness check leaves containers available for log inspection.
 if ! docker compose up -d --build --wait --wait-timeout 120; then
   docker compose ps >&2
-  echo 'Startup failed. Inspect: docker compose logs --tail=100 app caddy' >&2
+  echo 'Startup failed. Inspect: docker compose logs --tail=100 app' >&2
   exit 1
 fi
 docker compose ps

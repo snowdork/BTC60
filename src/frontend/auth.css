@@ -18,3 +18,12 @@
 #account-status:empty{display:none}
 
 .auth-secret-field{position:relative}.auth-card .auth-secret-field input{padding-right:74px}.auth-card .auth-secret-field .secret-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:auto;margin:0;padding:7px 9px;border:0;border-radius:4px;background:transparent;color:var(--green);font-size:12px}.secret-toggle:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
+
+.google-signin{display:flex;justify-content:center;margin:20px 0;min-height:40px}
+
+.google-onboarding{margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+.google-onboarding h2{font-size:20px;margin:0 0 10px}
+.google-onboarding p{font-size:13px;line-height:1.6}
+#google-signup-form{margin-top:18px;display:flex;flex-direction:column;gap:10px}
+#google-signup-form[hidden],#auth-form[hidden]{display:none}
+#google-link-login[hidden]{display:none}

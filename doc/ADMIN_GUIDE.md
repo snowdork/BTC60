@@ -183,6 +183,20 @@ See [Design](DESIGN.md) for model assumptions.
 
 ## Troubleshooting and validation
 
+For `Benchmark history is unavailable`, check provider availability rather than
+resetting the database or asking users to sign in again. The server reuses exact
+same-product cached candles and retries cold reads up to three times, widening
+the window each time while preserving the required minute. If recovery fails,
+logs include `Benchmark unavailable coin=... product=... minute=... after 3 attempts`.
+The minute is the candle's Unix timestamp in seconds, immediately before the
+interval boundary. Each 15/30/60-minute segment needs its own opening minute.
+A missing exact candle blocks a new order and defers settlement; a nearby candle
+or current ticker is never substituted. Look for rate limits, upstream failures,
+and missing history for that product/minute. Restart/rebuild the backend after
+installing benchmark code changes; refreshing browser assets alone cannot apply
+them. See [deployment modes](../deploy/README.md#choose-an-operating-mode).
+
+
 If the server repeatedly exits, inspect `server.log` for a port conflict,
 database lock, or startup exception. Use the stop script to pause the retry loop
 while correcting the problem. If stop reports a timeout, check the remaining

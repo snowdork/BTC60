@@ -37,6 +37,18 @@ if [[ ${1:-} == --local ]]; then
     echo 'Cannot access Docker. Start the daemon and check Docker permissions.' >&2
     exit 1
   fi
+  # Read only the port; never execute the environment file as shell code.
+  local_port=${P60_PORT:-$(sed -n 's/^P60_PORT=//p' .env.local | tail -n 1)}
+  local_port=${local_port:-8085}
+  local_port=${local_port%$'\r'}
+  local_port=${local_port#\"}
+  local_port=${local_port%\"}
+  local_port=${local_port#\'}
+  local_port=${local_port%\'}
+  if [[ ! $local_port =~ ^[0-9]{1,5}$ ]] || (( 10#$local_port < 1 || 10#$local_port > 65535 )); then
+    echo 'P60_PORT must be a port number from 1 to 65535.' >&2
+    exit 1
+  fi
   # Build first so a failed build leaves the existing local app available.
   docker build -t p60:local .
   stop_host_service
@@ -55,16 +67,16 @@ if [[ ${1:-} == --local ]]; then
     --log-driver local \
     --log-opt max-size=10m \
     --log-opt max-file=5 \
-    -p 127.0.0.1:8080:8000 \
+    -p "127.0.0.1:${local_port}:8000" \
     --env-file .env.local \
-    -e P60_HOST=http://localhost:8080 \
+    -e "P60_HOST=http://localhost:${local_port}" \
     -e PREDICT60_DB=/app/data/p60.sqlite3 \
     -v p60-local-data:/app/data \
     p60:local
   for attempt in {1..30}; do
     if docker exec p60-local python3 -c \
       "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).read()" >/dev/null 2>&1; then
-      echo 'Local app ready: http://localhost:8080'
+      echo "Local app ready: http://localhost:${local_port}"
       exit 0
     fi
     sleep 2
@@ -97,10 +109,10 @@ fi
 
 stop_host_service
 
-echo 'Starting the app and HTTPS proxy...'
+echo 'Starting the app behind the shared VPS proxy...'
 if ! "${compose[@]}" up -d --no-build --wait --wait-timeout 120; then
   "${compose[@]}" ps -a >&2
-  echo 'Startup failed. Inspect: sudo docker compose logs --tail=100 app caddy' >&2
+  echo 'Startup failed. Inspect: sudo docker compose logs --tail=100 app' >&2
   exit 1
 fi
 "${compose[@]}" ps

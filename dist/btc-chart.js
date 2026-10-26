@@ -247,6 +247,7 @@
     const dots=Array.from({length:60},(_,minute)=>{
       const dot=document.createElement('span'),candle=minuteCandles.get(minute),start=hour+minute*60000;
       dot.className='minute-dot';
+      dot.style.left=`${(minute+1)/60*100}%`;
       if(candle&&start+60000<=displayTime){
         const open=Number(candle[3]),close=Number(candle[4]),move=(close-open)/open,direction=move>=0?'up':'down';
         const heat=Math.max(.15,Math.min(1,Math.abs(move)/scale));

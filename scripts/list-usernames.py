@@ -8,6 +8,7 @@ from reset_database import ROOT, reset_service, reset_docker, deployment_options
 
 
 def main():
+    """List account display names in the selected deployment without stopping its service."""
     parser = argparse.ArgumentParser(description=__doc__)
     deployment_options(parser)
     args = parser.parse_args()

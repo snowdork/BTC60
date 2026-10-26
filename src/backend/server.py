@@ -6,6 +6,7 @@ import argparse
 import ipaddress
 import odds
 import contests
+from google_login import verify_google_login
 import simulated_prices
 import live_oil
 import oilprice_api
@@ -26,6 +27,7 @@ import threading
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+from http.client import IncompleteRead
 from http import cookies
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -66,7 +68,7 @@ PUBLIC_FILES = {
     'account.js',
     'app.js',
     'auth.css',
-    'auth.js',
+    'auth.js', 'google-onboarding.js', 'google-link.html',
     'bootstrap.js',
     'btc-chart.js',
     'categories.css',
@@ -92,9 +94,9 @@ PUBLIC_FILES = {
 }
 
 
-def configured_public_origin():
+def configured_public_origin(value=None):
     """Return and validate the optional exact browser origin used behind a proxy."""
-    origin = os.environ.get('P60_HOST', '').strip()
+    origin = (os.environ.get('P60_HOST', '') if value is None else value).strip()
     if not origin:
         return ''
     try:
@@ -116,6 +118,30 @@ def configured_public_origin():
     return origin
 
 
+def configured_public_origins():
+    """Explicit browser origins accepted for this deployment."""
+    primary = configured_public_origin()
+    aliases = os.environ.get('P60_ADDITIONAL_ORIGINS', '')
+    return {origin for origin in [primary, *(
+        configured_public_origin(value) for value in aliases.split(',') if value.strip()
+    )] if origin}
+
+
+def configured_signup_code():
+    """Honor explicit environment settings; support saved codes for local Python runs."""
+    if 'P60_SIGNUP_CODE' in os.environ:
+        return os.environ['P60_SIGNUP_CODE']
+    # A production origin must continue to use its deployment's environment.
+    origin = configured_public_origin()
+    hostname = urllib.parse.urlsplit(origin).hostname if origin else None
+    if hostname not in (None, 'localhost', '127.0.0.1', '::1'):
+        return ''
+    try:
+        return (ROOT / 'data' / 'local-signup-code').read_text()
+    except FileNotFoundError:
+        return ''
+
+
 def trusted_proxies():
     """Parse explicitly trusted reverse-proxy addresses from the environment."""
     configured = os.environ.get('P60_TRUSTED_PROXIES', '').strip()
@@ -135,6 +161,21 @@ def secure_session_cookies():
     return configured_public_origin().startswith('https://') or override in ('1', 'true', 'yes')
 
 
+def request_cookie(header, name):
+    """Read an application cookie without parsing unrelated providers' cookie values."""
+    for part in header.split(';'):
+        key, separator, _ = part.strip().partition('=')
+        if not separator or key != name:
+            continue
+        jar = cookies.SimpleCookie()
+        try:
+            jar.load(part.strip())
+            return jar[name].value
+        except (cookies.CookieError, KeyError):
+            return None
+    return None
+
+
 def session_cookie(value, max_age):
     """Build matching login/logout cookie attributes for the current deployment."""
     attributes = [f'p60_session={value}', 'HttpOnly', 'SameSite=Lax', 'Path=/', f'Max-Age={max_age}']
@@ -145,9 +186,27 @@ def session_cookie(value, max_age):
 
 def validate_environment():
     """Fail startup before binding when deployment security settings are malformed."""
-    configured_public_origin()
+    configured_public_origins()
     trusted_proxies()
     secure_session_cookies()
+
+
+class AuthenticationError(ValueError):
+    """An expected authentication rejection safe to present to the user."""
+
+    def __init__(self, message, status=400):
+        """Attach the HTTP status for an expected, user-facing rejection."""
+        super().__init__(message)
+        self.status = status
+
+
+def validate_signup_code(provided):
+    """Apply the same organizer-code gate to password and Google registration."""
+    expected = configured_signup_code()
+    if not expected:
+        raise AuthenticationError('Signup is currently unavailable.', status=503)
+    if not isinstance(provided, str) or not secrets.compare_digest(provided.encode(), expected.encode()):
+        raise AuthenticationError('Invalid signup code.', status=403)
 
 
 class Predict60HTTPServer(ThreadingHTTPServer):
@@ -216,15 +275,18 @@ def initialize():
           enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)), sort_order INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS catalog_migrations (version INTEGER PRIMARY KEY);
         CREATE TRIGGER IF NOT EXISTS max_enabled_coins_insert BEFORE INSERT ON coins
-        WHEN NEW.enabled=1 AND (SELECT count(*) FROM coins WHERE enabled=1)>=8
-        BEGIN SELECT RAISE(ABORT,'Maximum 8 enabled prediction coins'); END;
+        WHEN NEW.enabled=1 AND (SELECT count(*) FROM coins WHERE enabled=1)>=10
+        BEGIN SELECT RAISE(ABORT,'Maximum 10 enabled prediction coins'); END;
         CREATE TRIGGER IF NOT EXISTS max_enabled_coins_update BEFORE UPDATE OF enabled ON coins
-        WHEN NEW.enabled=1 AND OLD.enabled=0 AND (SELECT count(*) FROM coins WHERE enabled=1)>=8
-        BEGIN SELECT RAISE(ABORT,'Maximum 8 enabled prediction coins'); END;
+        WHEN NEW.enabled=1 AND OLD.enabled=0 AND (SELECT count(*) FROM coins WHERE enabled=1)>=10
+        BEGIN SELECT RAISE(ABORT,'Maximum 10 enabled prediction coins'); END;
         CREATE TABLE IF NOT EXISTS users (
           id INTEGER PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL,
           password_hash TEXT NOT NULL, salt TEXT NOT NULL,
           balance_cents INTEGER NOT NULL DEFAULT 1000000 CHECK(balance_cents>=0), created_at INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS google_identities (
+          google_sub TEXT PRIMARY KEY, user_id INTEGER UNIQUE NOT NULL REFERENCES users(id),
+          created_at INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS sessions (
           token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
           csrf TEXT NOT NULL, expires_at INTEGER NOT NULL);
@@ -289,12 +351,12 @@ def initialize():
         DROP TRIGGER IF EXISTS max_enabled_coins_insert;
         DROP TRIGGER IF EXISTS max_enabled_coins_update;
         CREATE TRIGGER max_enabled_coins_insert BEFORE INSERT ON coins
-        WHEN NEW.enabled=1 AND (SELECT count(*) FROM coins WHERE enabled=1 AND category=NEW.category)>=8
-        BEGIN SELECT RAISE(ABORT,'Maximum 8 enabled instruments per category'); END;
+        WHEN NEW.enabled=1 AND (SELECT count(*) FROM coins WHERE enabled=1 AND category=NEW.category)>=10
+        BEGIN SELECT RAISE(ABORT,'Maximum 10 enabled instruments per category'); END;
         CREATE TRIGGER max_enabled_coins_update BEFORE UPDATE OF enabled,category ON coins
         WHEN NEW.enabled=1 AND (OLD.enabled=0 OR OLD.category<>NEW.category)
-          AND (SELECT count(*) FROM coins WHERE enabled=1 AND category=NEW.category)>=8
-        BEGIN SELECT RAISE(ABORT,'Maximum 8 enabled instruments per category'); END;
+          AND (SELECT count(*) FROM coins WHERE enabled=1 AND category=NEW.category)>=10
+        BEGIN SELECT RAISE(ABORT,'Maximum 10 enabled instruments per category'); END;
         CREATE TRIGGER IF NOT EXISTS preserve_prediction_feed BEFORE UPDATE OF product,feed,category,demo_base ON coins
         WHEN (NEW.product<>OLD.product OR NEW.feed<>OLD.feed OR NEW.category<>OLD.category OR NEW.demo_base<>OLD.demo_base)
           AND EXISTS(SELECT 1 FROM predictions WHERE coin=OLD.symbol)
@@ -345,6 +407,19 @@ def initialize():
             DROP TABLE instrument_sources_v4;
             INSERT INTO catalog_migrations VALUES(5);
             """)
+        # Expand the curated crypto set once, preserving saved sources and later admin edits.
+        if not conn.execute('SELECT 1 FROM catalog_migrations WHERE version=6').fetchone():
+            additions = [coin for coin in json.loads((SEEDS / 'coins.seed.json').read_text())
+                         if coin['symbol'] in ('LINK', 'AVAX', 'SUI')]
+            for coin in additions:
+                conn.execute('INSERT OR IGNORE INTO coins(symbol,name,product,precision,demo_base,icon,enabled,sort_order) VALUES(?,?,?,?,?,?,0,?)',
+                             (coin['symbol'], coin['name'], coin['product'], coin['precision'], coin['demoBase'], coin['icon'], coin['sortOrder']))
+                room = conn.execute("SELECT count(*) FROM coins WHERE enabled=1 AND category='crypto'").fetchone()[0] < 10
+                if room:
+                    conn.execute("UPDATE coins SET enabled=1,sort_order=? WHERE symbol=? AND category='crypto' AND feed='coinbase' AND product=?",
+                                 (coin['sortOrder'], coin['symbol'], coin['product']))
+            conn.execute('INSERT INTO catalog_migrations VALUES(6)')
+
         if oilprice_api.configured():
             for symbol,product in oilprice_api.SYMBOLS.items():
                 conn.execute("UPDATE instrument_sources SET provider='oilpriceapi',product=? WHERE coin=?",(product,symbol))
@@ -365,6 +440,18 @@ def instrument_source(coin, legacy=False):
     return source
 
 
+def exact_candle_close(candles, boundary):
+    """Return a positive numeric close for the exact preceding minute, ignoring malformed rows."""
+    if not isinstance(candles, (list, tuple)):
+        return None
+    for candle in candles:
+        if (isinstance(candle, (list, tuple)) and len(candle) >= 5
+                and type(candle[0]) in (int, float) and candle[0] == boundary - 60
+                and type(candle[4]) in (int, float) and math.isfinite(candle[4]) and candle[4] > 0):
+            return float(candle[4])
+    return None
+
+
 def candle_close(coin, boundary, source=None):
     """Fetch the exact closing benchmark immediately before a UTC interval boundary; fail if it is unavailable."""
     record=source or instrument_source(coin)
@@ -379,12 +466,11 @@ def candle_close(coin, boundary, source=None):
         return simulated_prices.price(coin, record['demo_base'], boundary-1)
     # Reuse only the exact completed minute for the same provider product.
     with HISTORY_LOCK:
-        snapshots = [candles for key, candles in sorted(HISTORY_CACHE.items(), reverse=True)
-                     if key[0] == record['product']]
-    for candles in snapshots:
-        for candle in candles:
-            if candle[0] == boundary - 60 and math.isfinite(float(candle[4])) and float(candle[4]) > 0:
-                return float(candle[4])
+        snapshots = [(key[1], candles) for key, candles in HISTORY_CACHE.items() if key[0] == record['product']]
+    for _, candles in sorted(snapshots, key=lambda item: item[0], reverse=True):
+        close = exact_candle_close(candles, boundary)
+        if close is not None:
+            return close
     product = urllib.parse.quote(record['product'], safe='')
     # Widen retries to bypass a cached empty narrow response, retaining the exact minute.
     for attempt, padding in enumerate((0, 120, 300)):
@@ -396,13 +482,13 @@ def candle_close(coin, boundary, source=None):
         try:
             with urllib.request.urlopen(request, timeout=3) as response:
                 candles = json.load(response)
-            for candle in candles:
-                if candle[0] == boundary - 60 and math.isfinite(float(candle[4])) and float(candle[4]) > 0:
-                    return float(candle[4])
+            close = exact_candle_close(candles, boundary)
+            if close is not None:
+                return close
         except urllib.error.HTTPError as error:
             if error.code != 429 and error.code < 500:
                 raise
-        except (urllib.error.URLError, TimeoutError, ConnectionError):
+        except (urllib.error.URLError, TimeoutError, ConnectionError, IncompleteRead, json.JSONDecodeError):
             pass
         if attempt < 2:
             time.sleep(0.5 * (attempt + 1))
@@ -645,11 +731,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def session(self):
         """Validate the session cookie and expiry, then periodically refresh its activity timestamp."""
-        jar = cookies.SimpleCookie()
-        try:
-            jar.load(self.headers.get('Cookie', ''))
-            token = jar['p60_session'].value
-        except (KeyError, cookies.CookieError):
+        token = request_cookie(self.headers.get('Cookie', ''), 'p60_session')
+        if not token:
             return None
         with connect() as conn:
             session = conn.execute('SELECT s.*,u.name,u.email,u.balance_cents FROM sessions s JOIN users u ON u.id=s.user_id WHERE token_hash=? AND expires_at>?', (hashlib.sha256(token.encode()).hexdigest(), int(time.time()))).fetchone()
@@ -685,6 +768,17 @@ class Handler(SimpleHTTPRequestHandler):
             with connect() as conn:
                 dashboard = contests.dashboard(conn, session['user_id'], before=before)
             return self.reply(200, dashboard)
+        if path == '/api/auth/google/csrf':
+            # A cross-origin page cannot read this JSON or set our custom header.
+            allowed = configured_public_origins() or {f'http://{self.headers.get("Host")}'}
+            if (self.headers.get('X-Requested-With') != 'XMLHttpRequest'
+                    or self.headers.get('Origin', next(iter(allowed))) not in allowed):
+                return self.reply(403, {'error': 'Invalid request origin.'})
+            csrf = secrets.token_urlsafe(32)
+            cookie = f'p60_google_csrf={csrf}; HttpOnly; SameSite=Strict; Path=/api/auth/google; Max-Age=600'
+            if secure_session_cookies():
+                cookie += '; Secure'
+            return self.reply(200, {'csrf': csrf}, cookie)
         if path == '/healthz':
             try:
                 with connect() as conn:
@@ -802,6 +896,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.redirect('/categories.html')
         if relative == 'index.html' and set(urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('category', [])) & COMING_SOON_CATEGORIES:
             return self.redirect('/welcome.html')
+        if relative == 'google-link.html' and not self.session():
+            return self.redirect('/login.html?google=link')
         # Protect direct terminal/category URLs independently of client-side navigation.
         if relative in {'index.html', 'categories.html', 'contests.html', 'password.html'} and not self.session():
             return self.redirect('/welcome.html')
@@ -850,8 +946,8 @@ class Handler(SimpleHTTPRequestHandler):
         """Validate request origin, JSON size, session, and CSRF token before routing account mutations."""
         origin = self.headers.get('Origin')
         # Pin the public origin behind HTTPS proxies; retain local behavior without an override.
-        allowed_origin = configured_public_origin() or f'http://{self.headers.get("Host")}'
-        if origin and origin != allowed_origin:
+        allowed_origin = configured_public_origins() or {f'http://{self.headers.get("Host")}'}
+        if origin and origin not in allowed_origin:
             return self.reply(403, {'error': 'Invalid request origin.'})
         if self.headers.get('Content-Type', '').split(';')[0] != 'application/json':
             return self.reply(415, {'error': 'JSON required.'})
@@ -864,6 +960,8 @@ class Handler(SimpleHTTPRequestHandler):
                 raise ValueError('Invalid request.')
             path = urllib.parse.urlsplit(self.path).path
             # Authentication creates a session; all later mutations require that session and its CSRF token.
+            if path in ('/api/auth/google', '/api/auth/google/signup'):
+                return self.authenticate_google(data, signup=path.endswith('/signup'))
             if path in ('/api/signup', '/api/login'):
                 return self.authenticate(path, data)
             session = self.session()
@@ -871,6 +969,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(401, {'error': 'Log in to save your predictions.'})
             if not secrets.compare_digest(self.headers.get('X-CSRF-Token', ''), session['csrf']):
                 return self.reply(403, {'error': 'Refresh the page and try again.', 'code': 'csrf_mismatch'})
+            if path == '/api/auth/google/link':
+                return self.authenticate_google(data, link_session=session)
             if path == '/api/logout':
                 with connect() as conn:
                     conn.execute('DELETE FROM sessions WHERE token_hash=?', (session['token_hash'],))
@@ -883,6 +983,8 @@ class Handler(SimpleHTTPRequestHandler):
             if path == '/api/predictions':
                 return self.predict(session, data)
             return self.reply(404, {'error': 'Unknown endpoint.'})
+        except AuthenticationError as exc:
+            return self.reply(exc.status, {'error': str(exc)})
         except (ValueError, TypeError, KeyError, OverflowError) as exc:
             return self.reply(400, {'error': str(exc) or 'Invalid request.'})
         except sqlite3.IntegrityError:
@@ -948,12 +1050,7 @@ class Handler(SimpleHTTPRequestHandler):
         if self.auth_rate_limited():
             return self.reply(429, {'error': 'Too many attempts. Try again in a minute.'})
         if path == '/api/signup':
-            expected_code = os.environ.get('P60_SIGNUP_CODE', '')
-            if not expected_code:
-                return self.reply(503, {'error': 'Signup is currently unavailable.'})
-            signup_code = data.get('signupCode')
-            if not isinstance(signup_code, str) or not secrets.compare_digest(signup_code.encode('utf-8'), expected_code.encode('utf-8')):
-                return self.reply(403, {'error': 'Invalid signup code.'})
+            validate_signup_code(data.get('signupCode'))
         email, password = data.get('email', ''), data.get('password', '')
         if not isinstance(email, str) or not isinstance(password, str):
             raise ValueError('Enter a valid email and password.')
@@ -983,11 +1080,93 @@ class Handler(SimpleHTTPRequestHandler):
                 if not user or not secrets.compare_digest(digest, user['password_hash']):
                     return self.reply(401, {'error': 'Email or password is incorrect.'})
                 user_id = user['id']
-            token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
-            conn.execute('DELETE FROM sessions WHERE expires_at<=?', (int(time.time()),))
-            conn.execute('INSERT INTO sessions(token_hash,user_id,csrf,expires_at,last_seen_at) VALUES(?,?,?,?,?)', (hashlib.sha256(token.encode()).hexdigest(), user_id, csrf, int(time.time()) + 604800, int(time.time())))
+            token = self.create_session(conn, user_id)
         LOG.info('Authentication action=%s user=%s', path.rsplit('/', 1)[-1], user_id)
         return self.reply(200, {'ok': True}, session_cookie(token, 604800))
+
+    def create_session(self, conn, user_id):
+        """Rotate a caller's session and reuse the normal SQLite session store."""
+        previous = request_cookie(self.headers.get('Cookie', ''), 'p60_session')
+        if previous:
+            conn.execute('DELETE FROM sessions WHERE token_hash=?',
+                         (hashlib.sha256(previous.encode()).hexdigest(),))
+        now = int(time.time())
+        token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
+        conn.execute('DELETE FROM sessions WHERE expires_at<=?', (now,))
+        conn.execute('INSERT INTO sessions(token_hash,user_id,csrf,expires_at,last_seen_at) VALUES(?,?,?,?,?)',
+                     (hashlib.sha256(token.encode()).hexdigest(), user_id, csrf, now + 604800, now))
+        return token
+
+    def link_google_identity(self, conn, identity, session, linked):
+        """Associate an identity only with a valid session and matching account email."""
+        if not conn.execute('SELECT 1 FROM sessions WHERE token_hash=? AND expires_at>?',
+                            (session['token_hash'], int(time.time()))).fetchone():
+            raise AuthenticationError('Sign in again before linking Google.', status=401)
+        user = conn.execute('SELECT email FROM users WHERE id=?', (session['user_id'],)).fetchone()
+        if not user or user['email'].lower() != identity['email']:
+            raise AuthenticationError('Use the Google account matching your Predict60 email.', status=409)
+        if linked and linked['user_id'] != session['user_id']:
+            raise AuthenticationError('This Google account is already linked.', status=409)
+        existing = conn.execute('SELECT google_sub FROM google_identities WHERE user_id=?',
+                                (session['user_id'],)).fetchone()
+        if existing and existing['google_sub'] != identity['googleSub']:
+            raise AuthenticationError('A different Google account is already linked.', status=409)
+        conn.execute('INSERT OR IGNORE INTO google_identities VALUES(?,?,?)',
+                     (identity['googleSub'], session['user_id'], int(time.time())))
+        return session['user_id']
+
+    def authenticate_google(self, data, link_session=None, signup=False):
+        """Verify Google credentials, resolve stable subjects, and issue normal sessions."""
+        allowed = configured_public_origins() or {f'http://{self.headers.get("Host")}'}
+        if (self.headers.get('Origin') not in allowed
+                or self.headers.get('X-Requested-With') != 'XMLHttpRequest'):
+            return self.reply(403, {'error': 'Invalid request origin.'})
+        if link_session is None:
+            expected = request_cookie(self.headers.get('Cookie', ''), 'p60_google_csrf')
+            supplied = self.headers.get('X-CSRF-Token', '')
+            if not expected or not secrets.compare_digest(expected.encode(), supplied.encode()):
+                return self.reply(403, {'error': 'Refresh the page and try again.', 'code': 'csrf_mismatch'})
+        if self.auth_rate_limited():
+            return self.reply(429, {'error': 'Too many attempts. Try again in a minute.'})
+        try:
+            identity = verify_google_login(data.get('credential'))
+        except ValueError:
+            return self.reply(401, {'error': 'Google credential is invalid or expired.'})
+        except Exception:
+            # Never log credentials, decoded claims, or upstream response bodies.
+            LOG.warning('Google sign-in verification unavailable')
+            return self.reply(503, {'error': 'Google sign-in is temporarily unavailable.'})
+        with connect() as conn:
+            conn.execute('BEGIN IMMEDIATE')
+            linked = conn.execute('SELECT user_id FROM google_identities WHERE google_sub=?',
+                                  (identity['googleSub'],)).fetchone()
+            if link_session is not None:
+                user_id = self.link_google_identity(conn, identity, link_session, linked)
+            elif linked:
+                user_id = linked['user_id']
+            else:
+                exists = conn.execute('SELECT id FROM users WHERE email=? COLLATE NOCASE',
+                                      (identity['email'],)).fetchone()
+                if exists or not signup:
+                    code = 'LINK_REQUIRED' if exists else 'SIGNUP_REQUIRED'
+                    return self.reply(409, {'code': code, 'error': 'Link your existing account.' if exists
+                                           else 'Register with your organizer signup code first.'})
+                # Registration and identity association commit together; a code never links an existing user.
+                validate_signup_code(data.get('signupCode'))
+                name = data.get('name', '')
+                if not isinstance(name, str) or not 1 <= len(name.strip()) <= 60:
+                    raise ValueError('Enter your name (up to 60 characters).')
+                email = identity['email']
+                if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', email) or len(email) > 254:
+                    raise ValueError('Enter a valid email address.')
+                # Google-only users have no password credential. Empty hashes never match scrypt.
+                user_id = conn.execute(
+                    'INSERT INTO users(name,email,password_hash,salt,created_at,balance_cents) VALUES(?,?,?,?,?,?)',
+                    (name.strip(), email, '', secrets.token_hex(16), int(time.time()), 1000000)).lastrowid
+                conn.execute('INSERT INTO google_identities VALUES(?,?,?)',
+                             (identity['googleSub'], user_id, int(time.time())))
+            token = self.create_session(conn, user_id)
+        return self.reply(200, {'ok': True, 'redirect': '/categories.html'}, session_cookie(token, 604800))
 
     def predict(self, session, data):
         """Validate order timing and budget, freeze the provider quote, and atomically debit and save an idempotent order."""

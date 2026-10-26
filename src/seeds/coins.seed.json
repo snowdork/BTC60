@@ -66,8 +66,8 @@
     "precision": 3,
     "demoBase": 13.4,
     "icon": "assets/coins/link.svg",
-    "enabled": false,
-    "sortOrder": 6
+    "enabled": true,
+    "sortOrder": 7
   },
   {
     "symbol": "TRUMP",
@@ -77,7 +77,7 @@
     "demoBase": 4.5,
     "icon": "assets/coins/trump.svg",
     "enabled": false,
-    "sortOrder": 7
+    "sortOrder": 10
   },
   {
     "symbol": "AVAX",
@@ -86,7 +86,7 @@
     "precision": 3,
     "demoBase": 10.8,
     "icon": "assets/coins/avax.svg",
-    "enabled": false,
+    "enabled": true,
     "sortOrder": 8
   },
   {
@@ -98,5 +98,15 @@
     "icon": "assets/coins/ltc.svg",
     "enabled": true,
     "sortOrder": 6
+  },
+  {
+    "symbol": "SUI",
+    "name": "Sui",
+    "product": "SUI-USD",
+    "precision": 4,
+    "demoBase": 1.0,
+    "icon": "assets/coins/sui.svg",
+    "enabled": true,
+    "sortOrder": 9
   }
 ]

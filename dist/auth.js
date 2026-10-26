@@ -3,6 +3,8 @@
  */
 (() => {
   const form=document.getElementById('auth-form'),error=document.getElementById('auth-error');
+  const linking=form.dataset.mode==='login'&&location.search==='?google=link';
+  if(linking)error.textContent='Sign in with your existing email and password to link your Google account.';
   document.querySelectorAll('[data-toggle-password]').forEach(toggle=>{
     const field=document.getElementById(toggle.dataset.togglePassword),label=toggle.getAttribute('aria-label');
     toggle.addEventListener('click',()=>{
@@ -12,7 +14,7 @@
     });
   });
   form.addEventListener('submit',async event=>{
-    event.preventDefault();const next=form.dataset.mode==='login'&&event.submitter?.dataset?.next==='password.html'?'password.html':'categories.html';const button=form.querySelector('[type="submit"]');button.disabled=true;error.textContent='';
+    event.preventDefault();const next=form.dataset.mode==='login'&&event.submitter?.dataset?.next==='password.html'?'password.html':linking?'google-link.html':'categories.html';const button=form.querySelector('[type="submit"]');button.disabled=true;error.textContent='';
     try {
       const fields=Object.fromEntries(new FormData(form));
       if(form.dataset.mode==='signup'&&fields.password!==fields.confirmPassword)throw Error('Passwords do not match.');

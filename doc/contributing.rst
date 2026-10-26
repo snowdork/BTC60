@@ -22,6 +22,13 @@ branches and loops should explain the invariant or policy being protected.
 Update the architecture page when cross-module behavior changes. Anonymous event
 callbacks and comprehensions remain visible in each module's complete source.
 
+Keep segment state and viewport styles together in the final segment section
+of ``src/frontend/responsive.css``. Shared arrow geometry belongs in
+``styles.css``. Do not edit ``dist/`` directly; rebuild it from source after
+changes. Reuse indexed segment nodes and update only changed values in the live
+refresh path. Add behavior tests for freshness, pending/completed states and
+exact-minute benchmark recovery; avoid tests that merely repeat CSS declarations.
+
 The generated branch/iteration reference records conditions rather than claiming
 they are exercised. Run the regression suites separately::
 
