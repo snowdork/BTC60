@@ -9,10 +9,16 @@ predict60.com, predict60.free-vibe.com {
 	}
 
 	reverse_proxy 127.0.0.1:{$P60_PORT:8085} {
-		# Send one canonical address; the app trusts this only from loopback.
+		# Docker sees the host through gateway 172.30.60.1 (compose.yaml).
 		header_up X-Forwarded-For {remote_host}
 		health_uri /healthz
 		health_interval 30s
 		health_timeout 5s
 	}
+}
+
+# Shared host proxy: Phunky publishes only on loopback port 8086.
+phunk.free-vibe.com {
+	reverse_proxy 127.0.0.1:{$PHUNK_PORT:8086}
+	log
 }

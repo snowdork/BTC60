@@ -10,6 +10,10 @@ Predict60 keeps its existing `p60` project and data volume.
 Point both `predict60.com` and `predict60.free-vibe.com` DNS records at the VPS.
 Merge `deploy/Caddyfile.vps` into the **host's shared Caddy configuration**, then
 validate and reload Caddy. It serves HTTPS for both domains and proxies to 8085.
+See [shared HTTPS installation and verification](VPS.md#shared-https-configuration)
+for the backup, install, and reload commands. Rebuilding the app does not update
+the host proxy. Run `bash deploy/check-vps.sh` after deployment to verify both
+Predict60 domains and Phunky through public HTTPS.
 When changing `P60_PORT`, update the proxy upstream too: Compose's `.env` does
 not set the host Caddy service environment. Set that service's `P60_PORT` or edit
 the upstream in its configuration. Keep the existing shared site's blocks.

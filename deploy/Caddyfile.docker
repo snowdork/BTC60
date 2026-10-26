@@ -16,3 +16,10 @@
 		health_timeout 5s
 	}
 }
+
+# Legacy Docker proxy only; the shared host setup uses Caddyfile.vps.
+# Caddy and Phunky must share CADDY_NETWORK from .env.vps.
+phunk.free-vibe.com {
+	reverse_proxy phunky-game:8086
+	log
+}
