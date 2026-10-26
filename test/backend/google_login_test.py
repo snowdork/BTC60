@@ -64,6 +64,15 @@ class GoogleLoginHTTPTest(unittest.TestCase):
             self.assertEqual(conn.execute('SELECT count(*) FROM users').fetchone()[0], 1)
             self.assertEqual(conn.execute('SELECT count(*) FROM google_identities').fetchone()[0], 0)
 
+    def test_google_state_cookie_does_not_hide_login_csrf_cookie(self):
+        headers = {'Origin': f'http://127.0.0.1:{self.http.server_port}', 'X-Requested-With': 'XMLHttpRequest'}
+        _, data, cookie = self.request('GET', '/api/auth/google/csrf', extra_headers=headers)
+        cookie = 'g_state={"i_l":0}; ' + cookie
+        with patch('server.verify_google_login', return_value={'googleSub': 'new-google', 'email': 'new@example.com'}):
+            status, response, _ = self.request('POST', '/api/auth/google', {'credential': 'token'}, cookie, data['csrf'], headers)
+        self.assertEqual(status, 409)
+        self.assertEqual(response['code'], 'SIGNUP_REQUIRED')
+
     def test_google_origin_and_csrf_fail_before_verification(self):
         allowed = f'http://127.0.0.1:{self.http.server_port}'
         for headers in [{}, {'Origin': allowed, 'X-Requested-With': 'XMLHttpRequest'},

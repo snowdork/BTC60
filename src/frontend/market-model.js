@@ -58,7 +58,7 @@
     const up=Math.max(1,Math.min(99,Math.round(100*calibratedProbability(normalCDF(z),calibration))));
     return {up,down:100-up,label:'ESTIMATE'};
   }
-  /** Explain whether current feed, history, quote, and interval state permit placing a prediction. */ function dataStatus(model,market,now=Date.now()) {
+  /** Explain whether current feed, history, quote, and interval state permit placing a prediction. */ function dataStatus(model,market,now=Date.now(),{allowLocked=false}={}) {
     if(model.isHistorical)return {ready:false,reason:'Historical market',age:null};
     if(model.coin?.feed==='oilpriceapi'&&model.feedMode!=='demo')return {ready:false,reason:'Spot assessments lack hourly benchmarks',age:Number.isFinite(model.priceUpdatedAt)?Math.max(0,Math.floor((now-model.priceUpdatedAt)/1000)):null};
     // Synthetic preview values are never eligible for executable predictions.
@@ -75,7 +75,7 @@
     if(!model.quoteReady||!Number.isInteger(market.up))return {ready:false,reason:'Purchase quote unavailable',age};
     // Reject invalid order state before any monetary arithmetic.
     if(market.status!=='open'||!Number.isFinite(market.endsAt)||now>=market.endsAt)return {ready:false,reason:'Market closed',age};
-    if(now>=market.endsAt-30000)return {ready:false,reason:'Betting closed · final 30 seconds',age};
+    if(!allowLocked&&now>=market.endsAt-30000)return {ready:false,reason:'Betting closed · final 30 seconds',age};
     return {ready:true,reason:'Ready',age};
   }
   /** Validate server purchase quote configuration before enabling model quotes. */ function configure(config){

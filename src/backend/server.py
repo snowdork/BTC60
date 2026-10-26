@@ -152,6 +152,21 @@ def secure_session_cookies():
     return configured_public_origin().startswith('https://') or override in ('1', 'true', 'yes')
 
 
+def request_cookie(header, name):
+    """Read an application cookie without parsing unrelated providers' cookie values."""
+    for part in header.split(';'):
+        key, separator, _ = part.strip().partition('=')
+        if not separator or key != name:
+            continue
+        jar = cookies.SimpleCookie()
+        try:
+            jar.load(part.strip())
+            return jar[name].value
+        except (cookies.CookieError, KeyError):
+            return None
+    return None
+
+
 def session_cookie(value, max_age):
     """Build matching login/logout cookie attributes for the current deployment."""
     attributes = [f'p60_session={value}', 'HttpOnly', 'SameSite=Lax', 'Path=/', f'Max-Age={max_age}']
@@ -707,11 +722,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def session(self):
         """Validate the session cookie and expiry, then periodically refresh its activity timestamp."""
-        jar = cookies.SimpleCookie()
-        try:
-            jar.load(self.headers.get('Cookie', ''))
-            token = jar['p60_session'].value
-        except (KeyError, cookies.CookieError):
+        token = request_cookie(self.headers.get('Cookie', ''), 'p60_session')
+        if not token:
             return None
         with connect() as conn:
             session = conn.execute('SELECT s.*,u.name,u.email,u.balance_cents FROM sessions s JOIN users u ON u.id=s.user_id WHERE token_hash=? AND expires_at>?', (hashlib.sha256(token.encode()).hexdigest(), int(time.time()))).fetchone()
@@ -1065,14 +1077,10 @@ class Handler(SimpleHTTPRequestHandler):
 
     def create_session(self, conn, user_id):
         """Rotate a caller's session and reuse the normal SQLite session store."""
-        jar = cookies.SimpleCookie()
-        try:
-            jar.load(self.headers.get('Cookie', ''))
-            if 'p60_session' in jar:
-                conn.execute('DELETE FROM sessions WHERE token_hash=?',
-                             (hashlib.sha256(jar['p60_session'].value.encode()).hexdigest(),))
-        except cookies.CookieError:
-            pass
+        previous = request_cookie(self.headers.get('Cookie', ''), 'p60_session')
+        if previous:
+            conn.execute('DELETE FROM sessions WHERE token_hash=?',
+                         (hashlib.sha256(previous.encode()).hexdigest(),))
         now = int(time.time())
         token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         conn.execute('DELETE FROM sessions WHERE expires_at<=?', (now,))
@@ -1105,12 +1113,7 @@ class Handler(SimpleHTTPRequestHandler):
                 or self.headers.get('X-Requested-With') != 'XMLHttpRequest'):
             return self.reply(403, {'error': 'Invalid request origin.'})
         if link_session is None:
-            jar = cookies.SimpleCookie()
-            try:
-                jar.load(self.headers.get('Cookie', ''))
-                expected = jar['p60_google_csrf'].value
-            except (cookies.CookieError, KeyError):
-                expected = ''
+            expected = request_cookie(self.headers.get('Cookie', ''), 'p60_google_csrf')
             supplied = self.headers.get('X-CSRF-Token', '')
             if not expected or not secrets.compare_digest(expected.encode(), supplied.encode()):
                 return self.reply(403, {'error': 'Refresh the page and try again.', 'code': 'csrf_mismatch'})

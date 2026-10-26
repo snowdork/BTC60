@@ -81,7 +81,7 @@
       review.strike=m.strike;
       $('review-detail').textContent=`${review.start} – ${review.end} UTC · Benchmark ${price(m.strike)} · Live ${price(model.spot)}`;
     }
-    const chance=m&&model.dataStatus(model,m).ready?model.estimateChances(m,model.spot,model.now,model.volatility):null;
+    const chance=m&&model.dataStatus(model,m,Date.now(),{allowLocked:true}).ready?model.estimateChances(m,model.spot,model.now,model.volatility):null;
     $('review-chance').textContent=submitting?`${review.cents}% ${review.side==='up'?'Up':'Down'}`:chance?`${chance[review.side]}% ${review.side==='up'?'Up':'Down'}`:'—';
     $('review-chance').title='Heuristic model estimate and prediction credit cost. Updates with the selected price feed.';
     if(chance&&!submitting){
@@ -104,7 +104,7 @@
         if(nodes.reference.hidden===assessment)nodes.reference.hidden=!assessment;
         setText(nodes.reference,assessment&&Number.isFinite(model.spot)?price(model.spot):'—');
       }
-      const ready=!assessment&&(m.status!=='open'||model.feedMode!=='live'||model.dataStatus(model,m).ready);
+      const ready=!assessment&&(m.status!=='open'||model.feedMode!=='live'||model.dataStatus(model,m,Date.now(),{allowLocked:true}).ready);
       const chances=ready?model.estimateChances(m,model.spot,model.now,model.volatility):null;
       setText(nodes.up,`Up ${chances?chances.up+'%':'—'}`);
       setText(nodes.down,`Down ${chances?chances.down+'%':'—'}`);

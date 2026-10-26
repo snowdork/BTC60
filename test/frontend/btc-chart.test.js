@@ -306,3 +306,13 @@ test('smooth curve control points stay between neighboring prices at peaks and t
   previous=[x,y];
  }
 });
+
+test('segment countdown shows Locked exactly in the final thirty seconds',async()=>{
+ const h=chartHarness({startTime:Date.UTC(2026,9,12,17,59,29)});await flush();
+ const market=h.model.markets.find(m=>m.id==='60-0');
+ assert.equal(market.remaining,'0m 31s');
+ h.step();assert.equal(market.remaining,'0m 30s - Locked');
+ for(let i=0;i<29;i++)h.step();
+ assert.equal(market.remaining,'0m 01s - Locked');
+ h.step();assert.equal(market.remaining.includes('Locked'),false);
+});

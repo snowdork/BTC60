@@ -72,7 +72,7 @@
       const strike=marketStatus==='queued'?null:opening?Number(opening[4]):null;
       const close=marketStatus==='settled'&&closing?Number(closing[4]):null;
       const changed=m.status!==marketStatus||m.strike!==strike||m.close!==close||m.start!==time(start);
-      Object.assign(m,{start:time(start),end:time(end),status:marketStatus,strike,close,startsAt:start,endsAt:end,remaining:remaining(end-now)});
+      Object.assign(m,{start:time(start),end:time(end),status:marketStatus,strike,close,startsAt:start,endsAt:end,remaining:remaining(end-now)+(marketStatus==='open'&&now>=end-30000?' - Locked':'')});
       if(m.up===null)m.up=50;
       state.push(changed);
       const label=document.querySelector(`[data-remaining="${m.id}"]`);if(label)label.textContent=m.remaining;

@@ -55,6 +55,20 @@ class AccountsTest(unittest.TestCase):
         conn.close()
         return result
 
+    def test_google_state_cookie_does_not_hide_predict60_session(self):
+        status, _, cookie = self.request('POST', '/api/signup', {
+            'name': 'Cookie test', 'email': 'cookie@example.com', 'password': 'test-password',
+            'confirmPassword': 'test-password', 'signupCode': '777'})
+        self.assertEqual(status, 200)
+        combined = 'g_state={"i_l":0,"i_ll":123}; ' + cookie
+        self.assertEqual(self.request('GET', '/api/account', cookie=combined)[0], 200)
+        self.assertEqual(self.request('GET', '/categories.html', cookie=combined)[0], 200)
+        status, _, replacement = self.request('POST', '/api/login', {
+            'email': 'cookie@example.com', 'password': 'test-password'}, cookie=combined)
+        self.assertEqual(status, 200)
+        self.assertEqual(self.request('GET', '/api/account', cookie=cookie)[0], 401)
+        self.assertEqual(self.request('GET', '/api/account', cookie=replacement)[0], 200)
+
     def test_password_storage_uses_unique_salted_scrypt_hashes(self):
         password = 'same-password'
         for index in range(2):

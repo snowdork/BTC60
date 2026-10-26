@@ -60,3 +60,13 @@ test('prediction cap accepts 1000 credits and rejects larger budgets even with s
  for(const budget of [1000.001,1000.01,1001,14250])assert.equal(quote(m,'up',budget,14250),null);
  assert.equal(quote(m,'up',1000,999),null);
 });
+
+test('locked segments retain display probabilities without allowing bets',()=>{
+ const now=100000,market={status:'open',strike:100,up:62,endsAt:now+30000};
+ const model={feedMode:'live',feedConnection:'connected',spot:101,priceUpdatedAt:now,historyStatus:'ready',quoteReady:true};
+ assert.equal(dataStatus(model,market,now).ready,false);
+ assert.equal(dataStatus(model,market,now,{allowLocked:true}).ready,true);
+ assert.equal(estimateChances(market,101,now).up+estimateChances(market,101,now).down,100);
+ assert.equal(dataStatus({...model,feedConnection:'disconnected'},market,now,{allowLocked:true}).ready,false);
+ assert.equal(dataStatus({...model,priceUpdatedAt:now+30000},market,now+30000,{allowLocked:true}).ready,false);
+});
