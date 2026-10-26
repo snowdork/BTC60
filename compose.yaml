@@ -5,12 +5,15 @@ services:
     image: p60:${P60_IMAGE_TAG:-local}
     restart: unless-stopped
     stop_grace_period: 30s
+    ports:
+      - "127.0.0.1:${P60_PORT:-8085}:8000"
     environment:
       PREDICT60_DB: /app/data/p60.sqlite3
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-572697973282-e17b6uqatr36toqi48sohg6vigkarvai.apps.googleusercontent.com}
       P60_SIGNUP_CODE: ${P60_SIGNUP_CODE:-}
       P60_HOST: https://${P60_DOMAIN:?Set P60_DOMAIN in .env}
-      P60_TRUSTED_PROXIES: 172.30.60.2
+      P60_ADDITIONAL_ORIGINS: ${P60_ADDITIONAL_ORIGINS:-https://predict60.free-vibe.com}
+      P60_TRUSTED_PROXIES: 172.30.60.1
       P60_MAX_REQUESTS: ${P60_MAX_REQUESTS:-32}
       PREDICT60_LOG_LEVEL: ${PREDICT60_LOG_LEVEL:-normal}
       P60_SPONSOR_NAME: ${P60_SPONSOR_NAME:-}
@@ -36,29 +39,6 @@ services:
         max-size: 10m
         max-file: '5'
 
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    environment:
-      P60_DOMAIN: ${P60_DOMAIN:?Set P60_DOMAIN in .env}
-    ports:
-      - '80:80'
-      - '443:443'
-    volumes:
-      - ./deploy/Caddyfile.docker:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    networks:
-      p60:
-        ipv4_address: 172.30.60.2
-    depends_on:
-      app:
-        condition: service_healthy
-    logging:
-      driver: local
-      options:
-        max-size: 10m
-        max-file: '5'
 
 networks:
   p60:

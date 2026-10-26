@@ -1,5 +1,8 @@
 # VPS and local operation
 
+The current shared VPS runs BTC60 (Predict60) and Phunky at separate hostnames
+and private ports. Start with [the shared VPS address plan](VPS.md).
+
 ## Choose an operating mode
 
 | Environment | Start/update | Persistent data | Logs |
@@ -36,12 +39,13 @@ and [current validation](../doc/TEST_RESULTS.md).
 ## Google sign-in buttons missing
 
 The Caddy Content Security Policy must allow the Google Identity Services script,
-styles, connections, and button iframe. Both supplied Caddyfiles include these
+styles, connections, and button iframe. The supplied Caddyfiles include these
 permissions. After updating an existing Docker deployment's checkout, apply the
 policy without rebuilding the app:
 
 ```bash
-docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
 ```
 
 For a systemd deployment, copy `deploy/Caddyfile` to `/etc/caddy/Caddyfile`
@@ -61,7 +65,7 @@ The existing server is a bounded Python HTTP server behind Caddy, not a measured
 high-traffic platform; see the [performance review](../doc/VPS_PERFORMANCE.md).
 
 Keep Python, Docker, Caddy, and the OS patched. For container base-image updates,
-use `docker compose build --pull app` and `docker compose pull caddy`, then
+use `docker compose build --pull app` and `docker compose pull app`, then
 `docker compose up -d --no-build --wait --wait-timeout 120`, with a database backup
 and retained image tag first. Health checks verify the app/database, not provider
 freshness or successful settlement: check those in the UI after each deployment.
@@ -71,9 +75,9 @@ freshness or successful settlement: check those in the UI after each deployment.
 ## Docker Compose deployment
 
 Use [Docker deployment](DOCKER.md) for the supplied container setup. It includes
-an app image, Caddy HTTPS, persistent SQLite and certificate volumes, bounded
+an app image, a private configurable host port, persistent SQLite volumes, bounded
 logs, and `unless-stopped` crash recovery. Run one app instance. The app binds to
-`0.0.0.0:8000` inside Docker, but Compose does not publish that port on the VPS.
+`0.0.0.0:8000` inside Docker, and Compose publishes it at `127.0.0.1:${P60_PORT:-8085}` on the VPS.
 
 From the repository root, after installing Docker Engine and Compose:
 
@@ -85,15 +89,15 @@ sudo systemctl enable --now docker
 bash deploy/start-docker.sh
 ```
 
-Point DNS at the VPS and make ports 80/443 available to Caddy. If Apache or a host
-Caddy already uses those ports, resolve that conflict before starting this stack.
+Point both domains at the VPS. Use the shared host reverse proxy on ports
+80/443; add the site block from `deploy/Caddyfile.vps` to its configuration.
 The Docker network must not overlap existing networks. Follow the Docker guide
 for importing existing accounts **before first startup**; the image does not
 include the checkout's local database. The Docker app explicitly uses
 `/app/data/p60.sqlite3`, so an old filename must be imported under this name.
 
-The `.env` configuration becomes the app environment; Caddy's fixed private IP
-is the only trusted proxy. Do not copy the systemd loopback proxy setting into
+The `.env` configuration becomes the app environment; the Docker network gateway
+is the trusted host proxy. Do not copy the systemd loopback proxy setting into
 Docker. Docker recovers exited processes; health checks report availability but
 do not restart an unhealthy process that is still running. Enable Docker at boot
 and verify recovery using the [test guide](../doc/TEST_GUIDE.md).
@@ -166,7 +170,8 @@ VPS and make ports 80/443 available before running it. For another domain, adapt
 both `deploy/Caddyfile` and the helper’s `P60_HOST` and HTTPS health-check URL
 first. Resolve existing services using ports 80/443.
 
-The helper replaces `/etc/caddy/Caddyfile`, saving its first existing version as
+**Dedicated-host legacy helper:** do not run this on the shared Phunky/BTC60 VPS.
+Use [the shared VPS plan](VPS.md) instead. The helper replaces `/etc/caddy/Caddyfile`, saving its first existing version as
 `/etc/caddy/Caddyfile.before-predict60`, and writes
 `/etc/systemd/system/predict60.service`. The service runs as the checkout owner,
 binds to `127.0.0.1:8000`, uses normal logging, and restarts on failure. It stops

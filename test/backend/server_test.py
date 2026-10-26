@@ -333,6 +333,26 @@ class AccountsTest(unittest.TestCase):
                         })
                         self.assertEqual(status, expected)
 
+    def test_additional_public_origin_accepts_alias_and_rejects_lookalikes(self):
+        with patch.dict('os.environ', {
+            'P60_HOST': 'https://predict60.com',
+            'P60_ADDITIONAL_ORIGINS': 'https://predict60.free-vibe.com',
+        }):
+            for origin, expected in (
+                ('https://predict60.com', 415),
+                ('https://predict60.free-vibe.com', 415),
+                ('http://predict60.free-vibe.com', 403),
+                ('https://predict60.free-vibe.com.evil.example', 403),
+            ):
+                with self.subTest(origin=origin):
+                    status, _, _ = self.request('POST', '/api/login', {}, extra_headers={
+                        'Origin': origin, 'Content-Type': 'text/plain',
+                    })
+                    self.assertEqual(status, expected)
+            with patch.dict('os.environ', {'P60_ADDITIONAL_ORIGINS': 'https://alias.example/path'}):
+                with self.assertRaises(ValueError):
+                    server.validate_environment()
+
     def test_origin_default_and_absent_origin_preserve_existing_behavior(self):
         for configuration in (None, ''):
             with patch.dict('os.environ'):

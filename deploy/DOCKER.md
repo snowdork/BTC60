@@ -1,12 +1,26 @@
 # Docker deployment
 
-Run these commands from the repository root. Install Docker Engine and the
-Compose plugin first. Point your domain at the VPS and allow inbound TCP 80/443
-plus your SSH port. Stop any existing service using ports 80/443 before starting
-Caddy. The Docker subnet 172.30.60.0/24 must not overlap an existing network;
-if changed, update both container addresses and P60_TRUSTED_PROXIES together.
-The app uses 172.30.60.3 and Caddy uses 172.30.60.2. Both are explicit so the
-app cannot automatically receive Caddy's address when it starts first.
+Run one shared reverse proxy on the VPS for all projects. Predict60 publishes
+HTTP only on `127.0.0.1:8085`; set `P60_PORT` in the project's `.env` to change it.
+Phunky uses `127.0.0.1:8086` and `https://phunk.free-vibe.com`.
+For now these are the two applications on this VPS; see [the shared address plan](VPS.md).
+Each project needs a distinct Compose project name and non-overlapping network.
+Predict60 keeps its existing `p60` project and data volume.
+
+Point both `predict60.com` and `predict60.free-vibe.com` DNS records at the VPS.
+Merge `deploy/Caddyfile.vps` into the **host's shared Caddy configuration**, then
+validate and reload Caddy. It serves HTTPS for both domains and proxies to 8085.
+When changing `P60_PORT`, update the proxy upstream too: Compose's `.env` does
+not set the host Caddy service environment. Set that service's `P60_PORT` or edit
+the upstream in its configuration. Keep the existing shared site's blocks.
+Google OAuth Authorized JavaScript origins must include both HTTPS origins.
+Accounts share the database; browser login cookies are separate per hostname.
+
+Existing deployments: stop the old stack's Caddy with `docker compose stop caddy`
+**before updating the checkout**, then let the shared host proxy own 80/443.
+After updating, remove the stopped old proxy with `docker compose up -d --remove-orphans`.
+Do not remove volumes. Existing app data and old certificate volumes are retained.
+The app trusts the host via Docker gateway `172.30.60.1`; keep that subnet free.
 
 ```bash
 cp deploy/docker.env.example .env
@@ -14,23 +28,22 @@ chmod 600 .env
 # Edit .env and set P60_DOMAIN to your real domain.
 sudo systemctl enable --now docker
 bash deploy/start-docker.sh
-docker compose logs --tail=100 app caddy
+docker compose logs --tail=100 app
 ```
 
 `start-docker.sh` can be called from any directory. It requires the repository’s
 `.env`, validates Compose without printing secrets, checks daemon access, builds
 the images, and waits up to 120 seconds for service readiness. Use a recent
 Compose plugin supporting `up --wait`. If startup fails, containers remain
-available for log inspection; correct the problem and rerun the command. Caddy
+available for log inspection; correct the problem and rerun the command. App
 startup does not verify public DNS or certificate issuance, so check the public
 HTTPS endpoint separately. The helper does not stop host services or import an
 existing database; complete the data import below before first startup if needed.
 
-Caddy provides HTTPS and forwards to the private app port 8000. No app port is
-published on the host. The image runs Python directly as user 10001; Docker
-restarts exited containers with `unless-stopped`. Intentional stops remain
-stopped, including after reboot. Do not run the development watchdog or the
-existing predict60 systemd app service alongside this stack. Keep one app replica.
+The shared host proxy provides HTTPS and sends a single `X-Forwarded-For`
+address. The app port stays on loopback. The image runs as user 10001; Docker
+restarts exited containers with `unless-stopped`. Keep one app replica and do
+not run the host app service against the same database.
 
 The image health check probes `/healthz`. An unhealthy status alone does not
 restart a running container; monitor public HTTP availability separately.
@@ -55,7 +68,7 @@ Docker will permanently replace the host service.
 
 For the development watchdog, run `python3 scripts/restart-server.py` from the
 checkout. It stops the `p60-local` container and all containers in the `p60` and
-`p60-local` Compose projects, including Caddy, before starting Python. Containers
+`p60-local` Compose projects before starting Python. Containers
 and volumes are retained; unrelated containers and the Docker daemon keep
 running. If Docker cannot be checked or stopped, host startup aborts. See
 [local switching instructions](LOCAL.md#switching-between-python-and-docker)
@@ -71,8 +84,7 @@ sudo systemctl start predict60
 Use `sudo` for Docker commands if your installation requires it. Stop any local
 Docker deployment as well (`docker stop p60-local`). Systemd startup and direct
 Python startup do not call the restart script's Docker shutdown. Docker data is
-not automatically imported into the host database. Stopping the stack also stops
-its HTTPS proxy; configure the host's HTTPS proxy before serving public traffic.
+not automatically imported into the host database. The shared host proxy continues serving other projects.
 
 ### Rebuild behavior and persistent data
 
@@ -83,8 +95,7 @@ before building, and retains all database and certificate volumes. Existing
 containers continue serving during the build. If the build fails, they remain
 untouched. After a successful build, Compose recreates changed services and waits
 for readiness. Expect a brief interruption while the single app instance is
-replaced; this is not a zero-downtime deployment. Caddy is left running unless its
-configuration changed. It does not restart the Docker daemon or
+replaced; this is not a zero-downtime deployment. The shared host proxy continues running. It does not restart the Docker daemon or
 stop unrelated containers. This command does not use `compose.local.yaml`.
 
 The `p60-data` named volume persists `/app/data`, including SQLite and optional
@@ -174,7 +185,7 @@ Run from the checkout containing `.env`. Use `sudo` if Docker requires it.
 ```bash
 # Status and bounded log inspection
 docker compose ps
-docker compose logs --tail=100 app caddy
+docker compose logs --tail=100 app
 docker stats --no-stream
 
 # Apply application code changes after taking a backup

@@ -8,9 +8,9 @@ services:
     restart: unless-stopped
     stop_grace_period: 30s
     ports:
-      - "127.0.0.1:8080:8000"
+      - "127.0.0.1:${P60_PORT:-8085}:8000"
     environment:
-      P60_HOST: http://localhost:8080
+      P60_HOST: http://localhost:${P60_PORT:-8085}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-572697973282-e17b6uqatr36toqi48sohg6vigkarvai.apps.googleusercontent.com}
       P60_SIGNUP_CODE: ${P60_SIGNUP_CODE:-}
       PREDICT60_DB: /app/data/p60.sqlite3

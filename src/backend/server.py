@@ -94,9 +94,9 @@ PUBLIC_FILES = {
 }
 
 
-def configured_public_origin():
+def configured_public_origin(value=None):
     """Return and validate the optional exact browser origin used behind a proxy."""
-    origin = os.environ.get('P60_HOST', '').strip()
+    origin = (os.environ.get('P60_HOST', '') if value is None else value).strip()
     if not origin:
         return ''
     try:
@@ -116,6 +116,15 @@ def configured_public_origin():
     if origin != normalized:
         raise ValueError(f'P60_HOST must use its normalized form: {normalized}')
     return origin
+
+
+def configured_public_origins():
+    """Explicit browser origins accepted for this deployment."""
+    primary = configured_public_origin()
+    aliases = os.environ.get('P60_ADDITIONAL_ORIGINS', '')
+    return {origin for origin in [primary, *(
+        configured_public_origin(value) for value in aliases.split(',') if value.strip()
+    )] if origin}
 
 
 def configured_signup_code():
@@ -177,7 +186,7 @@ def session_cookie(value, max_age):
 
 def validate_environment():
     """Fail startup before binding when deployment security settings are malformed."""
-    configured_public_origin()
+    configured_public_origins()
     trusted_proxies()
     secure_session_cookies()
 
@@ -761,9 +770,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(200, dashboard)
         if path == '/api/auth/google/csrf':
             # A cross-origin page cannot read this JSON or set our custom header.
-            allowed = configured_public_origin() or f'http://{self.headers.get("Host")}'
+            allowed = configured_public_origins() or {f'http://{self.headers.get("Host")}'}
             if (self.headers.get('X-Requested-With') != 'XMLHttpRequest'
-                    or self.headers.get('Origin', allowed) != allowed):
+                    or self.headers.get('Origin', next(iter(allowed))) not in allowed):
                 return self.reply(403, {'error': 'Invalid request origin.'})
             csrf = secrets.token_urlsafe(32)
             cookie = f'p60_google_csrf={csrf}; HttpOnly; SameSite=Strict; Path=/api/auth/google; Max-Age=600'
@@ -937,8 +946,8 @@ class Handler(SimpleHTTPRequestHandler):
         """Validate request origin, JSON size, session, and CSRF token before routing account mutations."""
         origin = self.headers.get('Origin')
         # Pin the public origin behind HTTPS proxies; retain local behavior without an override.
-        allowed_origin = configured_public_origin() or f'http://{self.headers.get("Host")}'
-        if origin and origin != allowed_origin:
+        allowed_origin = configured_public_origins() or {f'http://{self.headers.get("Host")}'}
+        if origin and origin not in allowed_origin:
             return self.reply(403, {'error': 'Invalid request origin.'})
         if self.headers.get('Content-Type', '').split(';')[0] != 'application/json':
             return self.reply(415, {'error': 'JSON required.'})
@@ -1108,8 +1117,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def authenticate_google(self, data, link_session=None, signup=False):
         """Verify Google credentials, resolve stable subjects, and issue normal sessions."""
-        allowed = configured_public_origin() or f'http://{self.headers.get("Host")}'
-        if (self.headers.get('Origin') != allowed
+        allowed = configured_public_origins() or {f'http://{self.headers.get("Host")}'}
+        if (self.headers.get('Origin') not in allowed
                 or self.headers.get('X-Requested-With') != 'XMLHttpRequest'):
             return self.reply(403, {'error': 'Invalid request origin.'})
         if link_session is None:

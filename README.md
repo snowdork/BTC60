@@ -87,7 +87,7 @@ sudo bash scripts/restart-docker.sh --local
 ```
 
 Repeat the last command after edits. It builds first, replaces `p60-local`,
-preserves `p60-local-data`, and checks readiness at http://localhost:8080.
+preserves `p60-local-data`, and checks readiness at http://localhost:8085.
 Edit `.env.local` to change the signup code (the example uses `777`).
 
 Requires Docker Engine and the Docker Compose plugin. From the project root:
@@ -98,7 +98,7 @@ chmod 600 .env.local
 sudo docker compose -f compose.local.yaml --env-file .env.local up -d --build
 ```
 
-Open **http://localhost:8080**. The example signup code is `777`; change it in
+Open **http://localhost:8085**. The example signup code is `777`; change it in
 `.env.local` if preferred. An empty code disables signup. Repeat the last command
 after code changes to rebuild and recreate the app, then refresh your browser.
 Local Docker uses its own persistent `p60-local-data` volume and leaves the
@@ -114,7 +114,8 @@ sudo docker compose -f compose.local.yaml --env-file .env.local down
 ```
 
 `down` keeps account data; adding `--volumes` deletes it. The separate
-`compose.yaml` remains the domain-based HTTPS deployment.
+`compose.yaml` runs the VPS app behind the shared host Caddy proxy. See
+[the shared VPS plan](deploy/VPS.md) for both BTC60 and Phunky addresses.
 
 Behind an HTTPS reverse proxy, set `P60_HOST` to the exact public origin
 (scheme and hostname, optional port, no path or trailing slash):
@@ -162,7 +163,7 @@ Before starting, the restart script stops the `p60-local` Docker container and
 containers in the `p60` and `p60-local` Compose projects. Volumes are preserved.
 If Docker is installed but cannot be checked or stopped, the script aborts
 before starting the host server; restore Docker access and retry.
-This also stops the VPS stack's Caddy proxy. Direct Python and systemd starts
+The shared host Caddy proxy continues running. Direct Python and systemd starts
 require manually stopping Docker first. Before switching back to Docker, stop
 the watchdog with `scripts/stop-server.sh`. Switching does not transfer
 accounts between the host database and Docker volumes. See

@@ -49,7 +49,7 @@ levels. For startup at boot on a VPS use systemd or Docker.
 
 `python3 scripts/restart-server.py` stops the `p60-local` container and all
 containers in the `p60` and `p60-local` Compose projects before starting Python.
-This includes the VPS stack's Caddy container. It preserves containers and data
+The shared host Caddy proxy continues running. It preserves containers and data
 volumes, leaves unrelated Docker applications running, and does not stop the
 Docker daemon. No Compose plugin or `.env` file is needed for this shutdown.
 
@@ -86,7 +86,7 @@ does not disable its boot startup; use `sudo systemctl disable predict60` if
 Docker will permanently replace the host service.
 
 
-Open **http://localhost:8080** (use this hostname to match the configured origin).
+Open **http://localhost:8085** (use this hostname to match the configured origin).
 This path needs Docker Engine but not Compose. It builds before replacing the
 container, keeps accounts in `p60-local-data`, limits logs, and uses a read-only
 root filesystem with a writable data volume and 64 MiB temporary filesystem.
@@ -155,7 +155,7 @@ not read `.env` files, and does not reset a Docker volume's database. Run
 
 ```bash
 curl --fail http://127.0.0.1:8000/healthz  # Python
-curl --fail http://localhost:8080/healthz # Docker
+curl --fail http://localhost:8085/healthz # Docker
 python3 scripts/run_tests.py
 ```
 
