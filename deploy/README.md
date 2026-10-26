@@ -33,6 +33,24 @@ benchmark remains a provider-data failure even after recovery retries; logging
 out does not repair it. See [troubleshooting](../doc/ADMIN_GUIDE.md#troubleshooting-and-validation)
 and [current validation](../doc/TEST_RESULTS.md).
 
+## Google sign-in buttons missing
+
+The Caddy Content Security Policy must allow the Google Identity Services script,
+styles, connections, and button iframe. Both supplied Caddyfiles include these
+permissions. After updating an existing Docker deployment's checkout, apply the
+policy without rebuilding the app:
+
+```bash
+docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+```
+
+For a systemd deployment, copy `deploy/Caddyfile` to `/etc/caddy/Caddyfile`
+(preserving any deployment-specific settings), validate it with
+`sudo caddy validate --config /etc/caddy/Caddyfile`, then run
+`sudo systemctl reload caddy`. Refresh the sign-in page after the reload.
+Google's OAuth client must also list the site's exact origin under Authorized
+JavaScript origins, and its client ID must match the frontend and backend.
+
 ## VPS capacity and upkeep
 
 Keep the default 32 request handlers initially. Measure memory, CPU, HTTP 503s,
