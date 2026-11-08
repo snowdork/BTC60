@@ -43,6 +43,8 @@ if not DEFAULT_DB.exists() and LEGACY_DB.exists():
 DB = Path(os.environ.get('PREDICT60_DB') or os.environ.get('P60_DB')
           or os.environ.get('BTC60_DB') or DEFAULT_DB)
 QUOTES = {'60-0': 68, '30-0': 54, '30-1': 58, '15-0': 49, '15-1': 57, '15-2': 62, '15-3': 50}
+QUOTES.update({f'5-{index}': 50 for index in range(12)})
+QUOTES.update({f'1-{index}': 50 for index in range(60)})
 MAX_PREDICTION_CREDITS = 1000
 COMING_SOON_CATEGORIES = {'oil', 'weather'}
 AUTH_ATTEMPTS = {}
@@ -79,6 +81,7 @@ PUBLIC_FILES = {
     'index.html',
     'login.html',
     'market-model.js',
+    'market-detail.js',
     'portfolio-model.js',
     'portfolio.css',
     'portfolio.html',

@@ -373,6 +373,74 @@ class AccountsTest(unittest.TestCase):
         with patch.dict('os.environ', {'P60_HOST': 'https://predict60.com'}):
             self.assertEqual(self.request('POST', '/api/login', {}, extra_headers={'Content-Type': 'text/plain'})[0], 415)
 
+    def test_five_minute_predictions_accept_all_twelve_intervals_and_settle(self):
+        _, _, cookie = self.request('POST', '/api/signup', {
+            'name': 'Five minute', 'email': 'five@example.com', 'password': 'pass-five',
+            'confirmPassword': 'pass-five', 'signupCode': '777'})
+        account = self.request('GET', '/api/account', cookie=cookie)[1]
+        csrf = account['csrf']
+        hour = int(server.time.time()) // 3600 * 3600
+        for index in range(12):
+            start = hour + index * 300
+            order = {'coin': 'BTC', 'marketId': f'5-{index}', 'side': 'up', 'budget': 1,
+                     'requestId': f'five-minute-request-{index:04}', 'startsAt': start * 1000}
+            with patch('server.time.time', return_value=start + 20), patch('server.candle_close', return_value=100), patch('server.fresh_spot', return_value=100), patch('server.market_up', return_value=50):
+                status, saved, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
+                self.assertEqual(status, 201, saved)
+                prediction = next(p for p in saved['predictions'] if p['market_id'] == f'5-{index}')
+                self.assertEqual(prediction['starts_at'], start)
+                self.assertEqual(prediction['ends_at'], start + 300)
+            with patch('server.time.time', return_value=start + 270):
+                status, error, _ = self.request('POST', '/api/predictions',
+                    dict(order, requestId=f'five-minute-locked-{index:04}'), cookie, csrf)
+                self.assertEqual(status, 400)
+                self.assertIn('Betting closed', error['error'])
+        with patch('server.time.time', return_value=hour + 3606), patch('server.candle_close', return_value=100):
+            server.settle_due()
+            settled = self.request('GET', '/api/account', cookie=cookie)[1]['predictions']
+        self.assertEqual(len(settled), 12)
+        self.assertTrue(all(p['outcome'] == 'up' and p['payout_cents'] == 200 for p in settled))
+        catalog = self.request('GET', '/api/coins', cookie=cookie)[1]
+        for index in range(12):
+            self.assertEqual(catalog['marketConfig']['quotes'][f'5-{index}'], 50)
+        for market in ('5-12', '5--1', '1-60'):
+            rejected = self.request('POST', '/api/predictions', dict(order, marketId=market), cookie, csrf)
+            self.assertEqual(rejected[0], 400)
+
+    def test_one_minute_predictions_accept_all_sixty_intervals_and_settle(self):
+        _, _, cookie = self.request('POST', '/api/signup', {
+            'name': 'One minute', 'email': 'minute@example.com', 'password': 'pass-minute',
+            'confirmPassword': 'pass-minute', 'signupCode': '777'})
+        account = self.request('GET', '/api/account', cookie=cookie)[1]
+        csrf = account['csrf']
+        hour = int(server.time.time()) // 3600 * 3600
+        for index in range(60):
+            start = hour + index * 60
+            order = {'coin': 'BTC', 'marketId': f'1-{index}', 'side': 'up', 'budget': 1,
+                     'requestId': f'one-minute-request-{index:04}', 'startsAt': start * 1000}
+            with patch('server.time.time', return_value=start + 20), patch('server.candle_close', return_value=100), patch('server.fresh_spot', return_value=100), patch('server.market_up', return_value=50):
+                status, saved, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
+                self.assertEqual(status, 201, saved)
+                prediction = next(p for p in saved['predictions'] if p['market_id'] == f'1-{index}')
+                self.assertEqual(prediction['starts_at'], start)
+                self.assertEqual(prediction['ends_at'], start + 60)
+            with patch('server.time.time', return_value=start + 30):
+                status, error, _ = self.request('POST', '/api/predictions',
+                    dict(order, requestId=f'one-minute-locked-{index:04}'), cookie, csrf)
+                self.assertEqual(status, 400)
+                self.assertIn('Betting closed', error['error'])
+        with patch('server.time.time', return_value=hour + 3606), patch('server.candle_close', return_value=100):
+            server.settle_due()
+            settled = self.request('GET', '/api/account', cookie=cookie)[1]['predictions']
+        self.assertEqual(len(settled), 60)
+        self.assertTrue(all(p['outcome'] == 'up' and p['payout_cents'] == 200 for p in settled))
+        catalog = self.request('GET', '/api/coins', cookie=cookie)[1]
+        for index in range(60):
+            self.assertEqual(catalog['marketConfig']['quotes'][f'1-{index}'], 50)
+        for market in ('1-60', '1--1', '1-01'):
+            rejected = self.request('POST', '/api/predictions', dict(order, marketId=market), cookie, csrf)
+            self.assertEqual(rejected[0], 400)
+
     def test_account_prediction_settlement_lifecycle(self):
         status, _, cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-123', 'signupCode': '777', 'name': '<Test>', 'email': 'one@example.com', 'password': 'pass-123'})
         self.assertEqual(status, 200)

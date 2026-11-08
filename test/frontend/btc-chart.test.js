@@ -26,9 +26,9 @@ function chartHarness({oil=false,live=false,spotError=false,transformCandles=c=>
   if(url.startsWith('/api/pricing-history'))return new Promise(resolve=>pending.push(resolve));
   const query=new URL(url,'http://localhost').searchParams;
   const start=oil?Number(query.get('start'))*1000:Date.parse(query.get('start'));
-  const end=Math.min(now,start+3660000);
+  const end=oil?Number(query.get('end'))*1000:Date.parse(query.get('end'));
   const candles=[];
-  for(let t=start;t<end;t+=60000) candles.push([t/1000,99,102,100,100+(t-start)/600000,1]);
+  for(let t=start;t<end;t+=60000) candles.push([t/1000,99,120,100,100+(t-hour+60000)/600000,1]);
   return {ok:true,json:async()=>transformCandles(candles)};
  };
  class FakeDate extends Date{static now(){return now;}}
@@ -153,14 +153,14 @@ test('a fresh quote just before the hour is displayed without inventing a chart 
  assert.equal(h.model.spot,120);
  assert.equal(h.model.spotStatus,'ready');
  assert.equal(h.element('btc-spot').children[0],'$120.');
- assert.equal(h.element('btc-line').d,'M0.000,65.000');
+ assert.match(h.element('btc-line').d,/^M0\.000,65\.000$/);
 });
 
 test('initial current hour backfills to its start before pricing history completes',async()=>{
  const h=chartHarness();await flush();
  assert.equal(h.pending.length,1);
  assert.match(h.element('btc-line').d,/^M0\.000,/);
- assert.match(h.element('btc-line').d,/ 416\.667,/);
+ assert.match(h.element('btc-line').d,/L416\.667,/);
  h.pending[0]({ok:false});await flush();
  assert.match(h.element('btc-line').d,/^M0\.000,/);
  assert.equal(h.model.historyStatus,'ready');
@@ -188,7 +188,7 @@ test('returning to current hour restores history and ignores old pricing respons
  h.element('current-hour').listeners.click();await flush();
  assert.equal(h.model.isHistorical,false);
  assert.match(h.element('btc-line').d,/^M0\.000,/);
- assert.match(h.element('btc-line').d,/ 416\.667,/);
+ assert.match(h.element('btc-line').d,/L416\.667,/);
  const currentPath=h.element('btc-line').d;
  h.pending[0]({ok:true,json:async()=>({candles:[]})});await flush();
  assert.equal(h.element('btc-line').d,currentPath);
@@ -275,11 +275,11 @@ test('missing boundary candle leaves completed segment without an invented winne
  assert.equal(h.element('segment-results').children.length,0);
 });
 
- test('smooth plot refreshes every five seconds while live prices remain current',async()=>{
+ test('minute plot refreshes every five seconds while live prices remain current',async()=>{
  const h=chartHarness();await flush();
  const initial=h.element('btc-line').d;
- assert.match(initial,/ C/);
- assert.doesNotMatch(initial,/ L/);
+ assert.match(initial,/ L/);
+ assert.doesNotMatch(initial,/ C/);
  h.tick(110);
  assert.equal(h.model.spot,110);
  for(let i=0;i<4;i++)h.step();
@@ -287,24 +287,19 @@ test('missing boundary candle leaves completed segment without an invented winne
  h.step();
  const refreshed=h.element('btc-line').d;
  assert.notEqual(refreshed,initial);
- assert.ok(h.element('btc-area').d.startsWith(refreshed));
- const end=refreshed.trim().split(' ').at(-1).split(',').map(Number);
+ assert.equal(h.element('btc-area').d,undefined,'no shaded area bridges missing minute data');
+ assert.match(h.element('minute-bars-up').d,/V/,'minute high and low wicks are visible');
+ const end=refreshed.trim().split(' ').at(-1).slice(1).split(',').map(Number);
  assert.ok(Math.abs(end[0]-h.element('btc-tip').cx)<.001);
  assert.ok(Math.abs(end[1]-h.element('btc-tip').cy)<.001);
 });
 
-test('smooth curve control points stay between neighboring prices at peaks and troughs',async()=>{
- const h=chartHarness({transformCandles:cs=>cs.map((c,i)=>[...c.slice(0,4),100+(i%3===1?5:0),c[5]])});await flush();
+test('minute chart keeps straight closes and separates missing minutes',async()=>{
+ const h=chartHarness({transformCandles:rows=>rows.filter(c=>c[0]*1000!==Date.UTC(2026,9,12,17,10))});await flush();
  const path=h.element('btc-line').d;
- const coordinates=path.match(/-?\d+\.\d+/g).map(Number);
- let previous=coordinates.slice(0,2);
- for(let i=2;i<coordinates.length;i+=6){
-  const [x1,y1,x2,y2,x,y]=coordinates.slice(i,i+6);
-  assert.ok(x1>=previous[0]&&x2>=x1&&x>=x2);
-  assert.ok(y1>=Math.min(previous[1],y)&&y1<=Math.max(previous[1],y));
-  assert.ok(y2>=Math.min(previous[1],y)&&y2<=Math.max(previous[1],y));
-  previous=[x,y];
- }
+ assert.doesNotMatch(path,/ C/);
+ assert.equal((path.match(/M/g)||[]).length,2,'a missing minute starts a new path');
+ assert.match(h.element('chart-description').textContent,/one-minute OHLC/);
 });
 
 test('segment countdown shows Locked exactly in the final thirty seconds',async()=>{
@@ -315,4 +310,16 @@ test('segment countdown shows Locked exactly in the final thirty seconds',async(
  for(let i=0;i<29;i++)h.step();
  assert.equal(market.remaining,'0m 01s - Locked');
  h.step();assert.equal(market.remaining.includes('Locked'),false);
+});
+
+test('a newly opened five-minute market refreshes its benchmark just after the minute boundary',async()=>{
+ const h=chartHarness({startTime:Date.UTC(2026,10,2,17,29,58)});await flush();
+ h.pending[0]({ok:true,json:async()=>({candles:[]})});await flush();
+ const next=h.model.markets.find(m=>m.id==='5-6');
+ assert.equal(next.status,'queued');assert.equal(next.strike,null);
+ for(let i=0;i<4;i++){h.step();await flush();}
+ assert.equal(next.status,'open');assert(Number.isFinite(next.strike));
+ const requests=h.requests.filter(url=>url.includes('/candles?'));
+ assert.equal(requests.length,2,'history refresh follows the minute boundary instead of waiting another full minute');
+ assert(requests.every(url=>new URL(url,'http://localhost').searchParams.get('granularity')==='60'));
 });

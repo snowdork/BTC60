@@ -11,7 +11,9 @@
     {id:'15-0',minutes:15,start:'17:00',end:'17:15',status:'settled',strike:67450,close:67440,up:49},
     {id:'15-1',minutes:15,start:'17:15',end:'17:30',status:'settled',strike:67440,close:67500,up:57},
     {id:'15-2',minutes:15,start:'17:30',end:'17:45',status:'open',strike:67500,up:62,remaining:'2m 48s'},
-    {id:'15-3',minutes:15,start:'17:45',end:'18:00',status:'queued',strike:null,up:null}
+    {id:'15-3',minutes:15,start:'17:45',end:'18:00',status:'queued',strike:null,up:null},
+    ...Array.from({length:12},(_,index)=>({id:`5-${index}`,minutes:5,start:`17:${String(index*5).padStart(2,'0')}`,end:index===11?'18:00':`17:${String((index+1)*5).padStart(2,'0')}`,status:'queued',strike:null,up:50})),
+    ...Array.from({length:60},(_,index)=>({id:`1-${index}`,minutes:1,start:`17:${String(index).padStart(2,'0')}`,end:index===59?'18:00':`17:${String(index+1).padStart(2,'0')}`,status:'queued',strike:null,up:50}))
   ];
   /** Validate market state, side, budget, and balance before calculating fractional shares and rounded payout. */ function quote(market,side,budget,balance) {
     const cents = side === 'up' ? market.up : 100-market.up;
@@ -83,7 +85,40 @@
     markets.forEach(m=>{m.up=config.quotes[m.id];});model.quoteReady=true;model.settlement=config.settlement;model.calibrations=config.calibrations||{};
   }
   /** Resolve equal or rising benchmark values as Up and falling values as Down. */ function outcome(start,close) { return close >= start ? 'up' : 'down'; }
-  const model={maxPredictionCredits,markets,quote,outcome,estimateChances,minuteVolatility,normalCDF,calibratedProbability,dataStatus,configure,quoteReady:false,initialBalance:10000,spot:67528.50,coin:typeof window!=='undefined'?window.PredictCoins.available[0]:null};
+  /** Build adjacent UTC intervals, including neighbors across an hour or day boundary. */
+  function adjacentMarkets(minutes,anchor,now,candles=[]){
+    const duration=minutes*60000,start=Math.floor(anchor/duration)*duration;
+    const closes=new Map(candles.filter(c=>Array.isArray(c)&&Number.isFinite(c[4])&&c[4]>0&&c[0]*1000+60000<=now).map(c=>[c[0]*1000+60000,c[4]]));
+    const /** Format the interval's UTC hour and minute. */ time=t=>new Date(t).toISOString().slice(11,16);
+    return [-1,0,1].map((offset)=>{
+      const startsAt=start+offset*duration,endsAt=startsAt+duration;
+      const status=now>=endsAt?'settled':now>=startsAt?'open':'queued';
+      return {id:`${minutes}-${Math.floor((startsAt%3600000+3600000)%3600000/duration)}`,minutes,startsAt,endsAt,start:time(startsAt),end:time(endsAt),status,
+        strike:status==='queued'?null:closes.get(startsAt)??null,close:status==='settled'?(closes.get(endsAt)??null):null,up:50};
+    });
+  }
+  /** Plot exact completed minute OHLC bars and closes. Missing minutes remain gaps. */
+  function minutePlot(candles,start,end,now,live=null){
+    const rows=[...new Map(candles.filter(c=>Array.isArray(c)&&c.length>=5&&c.slice(0,5).every(Number.isFinite)&&c.slice(1,5).every(v=>v>0)&&c[0]%60===0&&c[1]<=Math.min(c[3],c[4])&&c[2]>=Math.max(c[3],c[4])&&c[0]*1000>=start-60000&&c[0]*1000<end&&c[0]*1000+60000<=now).map(c=>[c[0],c])).values()].sort((a,b)=>a[0]-b[0]);
+    const bars=rows.filter(c=>c[0]*1000>=start),samples=rows.map(c=>({t:c[0]*1000+60000,price:c[4]}));
+    if(live&&Number.isFinite(live.price)&&live.price>0&&Number.isFinite(live.t)&&live.t>=start&&live.t<end&&live.t<=now&&(!samples.length||live.t>samples.at(-1).t))samples.push(live);
+    const values=[...bars.flatMap(c=>[c[1],c[2]]),...samples.map(p=>p.price)];
+    if(!values.length)return {line:'',up:'',down:'',tip:null,count:0};
+    let low=Math.min(...values),high=Math.max(...values);
+    const pad=Math.max((high-low)*.12,high*.000001);low-=pad;high+=pad;
+    const /** Project a timestamp onto the interval's horizontal axis. */ x=t=>(t-start)/(end-start)*1000;
+    const /** Project a price using the range of recorded minute highs and lows. */ y=p=>116-(p-low)/(high-low)*102;
+    const /** Format an SVG coordinate pair without changing the source values. */ xy=(t,p)=>`${x(t).toFixed(3)},${y(p).toFixed(3)}`;
+    const line=samples.map((p,i)=>`${i&&p.t-samples[i-1].t<=60000?'L':'M'}${xy(p.t,p.price)}`).join(' ');
+    const paths={up:'',down:''},half=60000/(end-start)*1000*.22;
+    for(const c of bars){
+      const center=x(c[0]*1000+30000),open=y(c[3]),close=y(c[4]),top=Math.min(open,close),height=Math.max(.8,Math.abs(open-close));
+      paths[c[4]>=c[3]?'up':'down']+=`M${center.toFixed(3)},${y(c[2]).toFixed(3)}V${y(c[1]).toFixed(3)} M${(center-half).toFixed(3)},${top.toFixed(3)}h${(half*2).toFixed(3)}v${height.toFixed(3)}h${(-half*2).toFixed(3)}Z `;
+    }
+    const last=samples.at(-1);
+    return {line,...paths,tip:last?{x:x(last.t),y:y(last.price),price:last.price}:null,low,high,count:bars.length};
+  }
+  const model={maxPredictionCredits,markets,quote,outcome,estimateChances,minuteVolatility,normalCDF,calibratedProbability,dataStatus,configure,adjacentMarkets,minutePlot,quoteReady:false,initialBalance:10000,spot:67528.50,coin:typeof window!=='undefined'?window.PredictCoins.available[0]:null};
   if (typeof module !== 'undefined' && module.exports) module.exports=model;
   else root.PredictModel=model;
 })(typeof globalThis!=='undefined'?globalThis:this);

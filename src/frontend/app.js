@@ -165,9 +165,13 @@
     });
   }
   /** Render markets from the latest account, market, and interface state. */ function renderMarkets() {
-    $('market-grid').innerHTML=[60,30,15].map(minutes=>{
+    const grid=$('market-grid'),resetScroll=grid.dataset.hour!==window.PredictModel.hour||grid.dataset.scrollPending==='true';
+    grid.dataset.hour=window.PredictModel.hour;
+    grid.dataset.scrollPending=String(grid.offsetParent===null);
+    const scrolls=new Map([...$('market-grid').querySelectorAll('.tier-cards')].map(row=>[row.closest('[data-duration]').dataset.duration,row.scrollLeft]));
+    $('market-grid').innerHTML=[60,30,15,5,1].map(minutes=>{
       const items=markets.filter(m=>m.minutes===minutes);
-      return `<div class="tier" data-duration="${minutes}"><div class="tier-label"><span>${minutes}m</span><img class="tier-coin-icon" width="24" height="24" alt=""></div><div class="tier-cards" style="--columns:${items.length}">${items.map(m=>{
+      return `<div class="tier" data-duration="${minutes}"><div class="tier-label"><span>${minutes}m</span><img class="tier-coin-icon" width="24" height="24" alt="">${minutes<=5?`<div class="tier-tools"><button type="button" data-tier-now="${minutes}" aria-label="Show current ${minutes}-minute market">Now</button><button type="button" data-tier-detail="${minutes}" aria-label="Show last, current and next ${minutes}-minute markets">Detail</button></div>`:''}</div><div class="tier-cards" style="--columns:${items.length}" ${minutes<=5?`tabindex="0" role="region" aria-label="${minutes===1?'Sixty one-minute':'Twelve five-minute'} markets. Scroll horizontally for all intervals."`:''}>${items.map(m=>{
         const settled=m.status==='settled',queued=m.status==='queued',result=settled&&Number.isFinite(m.strike)&&Number.isFinite(m.close)?outcome(m.strike,m.close):null;
         const actionIcon=settled?'<path d="M4 19h16M7 15v-4m5 4V5m5 10V8"/>':queued?'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>':'<path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z"/>';
         const action=`<button type="button" class="segment-action" data-segment-action="${m.id}" aria-haspopup="dialog" aria-controls="prediction-dialog" aria-label="${settled?'View result for':queued?'View details for':'Predict on'} ${minutes} minute segment ${m.start} to ${m.end} UTC"><svg class="segment-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${actionIcon}</svg><span class="segment-action-label">${settled?'Result':queued?'Details':'Predict'}</span></button>`;
@@ -186,6 +190,14 @@
         </div>`;
       }).join('')}</div></div>`;
     }).join('');
+    $('market-grid').querySelectorAll('.tier-cards').forEach(row=>{
+      const duration=row.closest('[data-duration]').dataset.duration;
+      if(!resetScroll&&scrolls.has(duration))row.scrollLeft=scrolls.get(duration);
+      else {
+        const active=row.querySelector('.market-card.open');
+        if(active)row.scrollLeft=Math.max(0,active.getBoundingClientRect().left-row.getBoundingClientRect().left+row.scrollLeft-12);
+      }
+    });
     $('market-grid').querySelectorAll('.tier-coin-icon').forEach(icon=>{
       icon.src=window.PredictModel.coin.icon||'assets/coins/btc.svg';
       icon.alt=window.PredictModel.coin.symbol;
@@ -362,6 +374,23 @@
   }
   window.addEventListener('account-update',()=>{if(account.error)notify(account.error);});
   window.addEventListener('account-update',renderAccount);
+  window.addEventListener('market-overview',renderMarkets);
+  $('market-grid').addEventListener('click',event=>{
+    const detail=event.target.closest('[data-tier-detail]');
+    if(detail){window.dispatchEvent(new CustomEvent('market-detail-open',{detail:{minutes:Number(detail.dataset.tierDetail)}}));return;}
+    const now=event.target.closest('[data-tier-now]');
+    if(now){
+      const row=now.closest('.tier').querySelector('.tier-cards'),active=row.querySelector('.market-card.open');
+      if(active)row.scrollLeft=Math.max(0,active.getBoundingClientRect().left-row.getBoundingClientRect().left+row.scrollLeft-12);
+    }
+  });
+  window.addEventListener('detail-predict',event=>{
+    const selected=markets.find(m=>m.id===event.detail.id&&m.startsAt===event.detail.startsAt);
+    if(!selected)return;
+    market=selected;side=null;review=null;$('review-dialog').close();
+    marketElements.forEach(({card},id)=>card.classList.toggle('selected',id===market.id));
+    renderTicket();if(!$('prediction-dialog').open)$('prediction-dialog').showModal();
+  });
   window.addEventListener('coin-change',()=>{$('prediction-dialog').close();initialMarketChosen=false;side=null;review=null;$('review-dialog').close();renderMarkets();renderTicket();});
   window.addEventListener('btc-market-update',()=>{if(!initialMarketChosen){const active=markets.find(m=>m.minutes===15&&m.status==='open'&&Number.isFinite(m.strike));if(active){market=active;initialMarketChosen=true;}}if(review&&review.hour!==window.PredictModel.hour&&!reviewExpired()){review=null;$('review-dialog').close();}renderMarkets();renderTicket();renderReviewChance();});
   window.addEventListener('btc-chances-update',renderChances);

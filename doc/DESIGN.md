@@ -2,9 +2,11 @@
 
 ## Workspace and visual language
 
-The primary view presents a complete UTC hour: one 60-minute card, two aligned 30-minute cards, and four aligned 15-minute cards. There are no 5-minute markets. A single chart sits above the 60-minute card, matching its width; cards do not contain individual graphs. One red dashed UTC cursor crosses the live chart and all tiers.
+The primary view presents a complete UTC hour: one 60-minute card, two aligned 30-minute cards, four aligned 15-minute cards, twelve five-minute cards, and sixty one-minute cards. The two shortest tiers use separate horizontal scrollers. On desktop, one red dashed UTC cursor crosses the hourly chart and the aligned 60/30/15-minute tiers. Both short scrollers have their own time labels and Now / Detail controls.
 
-The ticket opens in a dialog from each segment action. Screens from 601 to 850 pixels keep the timeline in its own horizontal scroll container; at 600 pixels and below, duration tiers stack readable cards beneath a full-width chart. Coin selection and portfolio tables have independent scroll containers. Account and welcome pages reflow to the viewport.
+The Last / Current / Next view offers 1/5/15/30/60-minute duration controls and three interval cards with one-minute OHLC charts. It follows the current UTC interval, including neighbors across hour and day boundaries. Historical mode centers the final interval in the selected hour. Exact minute boundaries determine benchmarks; missing candles remain gaps. The live price is provisional and never replaces a closing benchmark. Chart history includes the previous hour and, for historical views, the following hour when available, within Coinbase's 300-candle request limit.
+
+The ticket opens in a dialog from each segment action or the detail view's open interval. On screens up to 850 pixels, the chart fits the viewport and each duration row scrolls independently. Detail cards stack below 1000 pixels. Account and welcome pages reflow to the viewport.
 
 Dark surfaces use near-black tones with emerald Up/selection, crimson Down, amber data warnings, and cyan explanatory cues. Light and dark themes use shared variables. Financial values use monospace styling with native font fallbacks. Theme preference is applied before rendering, stored locally, and synchronized across tabs. Coin logos are local SVGs; the welcome page links a static terminal preview.
 

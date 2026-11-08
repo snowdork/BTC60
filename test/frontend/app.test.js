@@ -7,7 +7,7 @@ const source=fs.readFileSync(require('node:path').join(__dirname,'../../src/fron
 test('segments expose prediction, result, and upcoming details actions without nested buttons',()=>{
   const markets=[{id:'60-0',minutes:60,status:'open'},{id:'30-0',minutes:30,status:'settled'},{id:'15-0',minutes:15,status:'queued'}].map(m=>({...m,start:'12:00',end:'13:00',strike:100,close:101}));
   const icons=[{},{},{}];
-  const grid={innerHTML:'',querySelectorAll:selector=>selector==='.tier-coin-icon'?icons:[]};
+  const grid={innerHTML:'',dataset:{},querySelectorAll:selector=>selector==='.tier-coin-icon'?icons:[]};
   const start=source.indexOf('function renderMarkets()');
   const end=source.indexOf('  /** Estimate the selected interval',start);
   vm.runInNewContext(source.slice(start,end)+';renderMarkets();',{
@@ -19,7 +19,7 @@ test('segments expose prediction, result, and upcoming details actions without n
   assert.match(grid.innerHTML,/data-segment-action="15-0"[^>]*>[\s\S]*?<span class="segment-action-label">Details<\/span><\/button>/);
   for(const minutes of [60,30,15])assert.ok(grid.innerHTML.includes(`<span>${minutes}m</span>`));
   assert.ok(icons.every(icon=>icon.src==='assets/coins/eth.svg'&&icon.alt==='ETH'));
-  assert.equal((grid.innerHTML.match(/<button/g)||[]).length,3);
+  assert.equal((grid.innerHTML.match(/data-segment-action=/g)||[]).length,3);
   assert.equal((grid.innerHTML.match(/aria-controls="prediction-dialog"/g)||[]).length,3);
 });
 
@@ -37,6 +37,24 @@ test('segment action selects its market and opens the popup',()=>{
   assert.equal(context.side,null);
   assert.equal(rendered,1);
   assert.equal(opened,1);
+});
+
+test('overview exposes all twelve five-minute prediction and detail actions in a scrollable region',()=>{
+ const model=require('../../src/frontend/market-model.js');
+ const markets=model.markets.map(m=>({...m}));
+ const grid={innerHTML:'',dataset:{},querySelectorAll:()=>[]};
+ const start=source.indexOf('function renderMarkets()'),end=source.indexOf('  /** Estimate the selected interval',start);
+ vm.runInNewContext(source.slice(start,end)+';renderMarkets();',{
+  markets,market:markets[0],$:()=>grid,marketElements:new Map(),window:{PredictModel:{coin:{symbol:'BTC'}}},
+  outcome:model.outcome,price:String,renderSegmentPredictions(){},renderChances(){}
+ });
+ assert.equal((grid.innerHTML.match(/data-market="5-\d+"/g)||[]).length,12);
+ assert.match(grid.innerHTML,/tabindex="0" role="region" aria-label="Twelve five-minute markets/);
+ assert.match(grid.innerHTML,/tabindex="0" role="region" aria-label="Sixty one-minute markets/);
+ assert.equal((grid.innerHTML.match(/data-market="1-\d+"/g)||[]).length,60);
+ for(let index=0;index<60;index++)assert.match(grid.innerHTML,new RegExp(`data-segment-action="1-${index}"`));
+ assert.match(grid.innerHTML,/data-tier-detail="1"/);assert.match(grid.innerHTML,/data-tier-now="1"/);
+ for(let index=0;index<12;index++)assert.match(grid.innerHTML,new RegExp(`data-segment-action="5-${index}"`));
 });
 
 test('last-hour winner badge requires a finalized first-place result and clears on other states',()=>{
@@ -104,11 +122,11 @@ test('account updates refresh pending countdowns and remove settled or signed-ou
 
 test('pending and upcoming cards omit unavailable prices, movement, odds and countdowns',()=>{
   const markets=['queued','settled'].map((status,i)=>({id:`15-${i}`,minutes:15,status,start:'12:00',end:'12:15',strike:100,close:null}));
-  const grid={innerHTML:'',querySelectorAll:()=>[]};
+  const grid={innerHTML:'',dataset:{},querySelectorAll:()=>[]};
   const start=source.indexOf('function renderMarkets()'),end=source.indexOf('  /** Estimate the selected interval',start);
   vm.runInNewContext(source.slice(start,end)+';renderMarkets();',{
     markets,market:markets[0],$:()=>grid,marketElements:new Map(),outcome(){throw Error('No result without close');},
-    price:String,renderSegmentPredictions(){},renderChances(){}
+    price:String,renderSegmentPredictions(){},renderChances(){},window:{PredictModel:{coin:{}}}
   });
   for(const content of ['segment-price-row','segment-odds','data-direction-indicator','segment-countdown'])assert.equal(grid.innerHTML.includes(content),false,content);
   assert.match(grid.innerHTML,/UPCOMING/);assert.match(grid.innerHTML,/PENDING/);

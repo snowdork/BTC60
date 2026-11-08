@@ -53,7 +53,7 @@ Selecting a coin immediately requests a current price and shows **Loading…** w
 
 The live price display updates every two seconds. Clocks and betting countdowns continue to update every second. Selecting another coin or reporting unavailable data updates the price state immediately.
 
-Each UTC hour shows one 60-minute interval, two 30-minute intervals, and four 15-minute intervals. Select any card to inspect its benchmark and details in the ticket. Open cards accept predictions when data is ready. Upcoming and completed cards are read-only. A red dashed cursor shows the current UTC time across the chart and markets.
+Each UTC hour shows one 60-minute interval, two 30-minute intervals, four 15-minute intervals, twelve 5-minute intervals, and sixty 1-minute intervals. Select any card to inspect its benchmark and details in the ticket. Open cards accept predictions when data is ready. Upcoming and completed cards are read-only. On desktop, a red dashed cursor shows current UTC time across the chart and the aligned 60/30/15-minute rows. The one- and five-minute rows scroll independently; **Now** brings the open card into view and **Detail** opens that duration’s Last / Current / Next view.
 
 Up/Down percentages are heuristic model estimates, not calibrated odds. They also set simulated contract prices: 70% Up means an Up contract costs 0.70 credits. Percentages and prices change with spot, time remaining, and recent volatility. Upcoming cards hide percentages; completed cards show results when candle history is available.
 
@@ -105,7 +105,7 @@ For setup and checks, see [README.md](../README.md). For backups and database ma
 ## Choose a market
 
 Open the entry screen and select **Crypto** to use the 60 minute playfield, with
-15-, 30-, and 60-minute prediction intervals. Oil and Weather are shown as
+1-, 5-, 15-, 30-, and 60-minute prediction intervals. Oil and Weather are shown as
 **Coming soon** and cannot open a prediction terminal. Use **Categories** in the
 terminal header to return to the market list.
 
@@ -128,15 +128,21 @@ OilPriceAPI mode shows dated physical spot assessments for all five crudes. Thes
 
 ## Laptop and phone displays
 
-Duration tiers are labeled **60m**, **30m** and **15m**, each with the selected
+Duration tiers are labeled **60m**, **30m**, **15m**, **5m** and **1m**, each with the selected
 coin icon centered underneath. The icons update when you switch coins.
 
 On a laptop, the chart and the 60-, 30-, and 15-minute segment rows share one
 hourly timeline. Compact navigation and cards leave more room for predictions.
-On phone screens up to 600 pixels wide, the chart fits the screen and segments
-stack by duration. Choose coins from the five-column icon grid in the live price
+On screens up to 850 pixels wide, the chart fits the screen and each duration row
+scrolls horizontally. The one- and five-minute rows scroll on desktop too, keeping all sixty and twelve cells readable. Choose coins from the five-column icon grid in the live price
 panel. Use **← Categories** in the top bar to switch market categories; the coin grid has no separate heading row. The default ten coins are BTC, ETH, SOL, XRP, DOGE, ADA, LTC, LINK, AVAX and SUI, arranged in two rows of five. Each icon shows its ticker; the inner highlight marks the selected coin,
 and the outer ring shows your hourly prediction direction.
+
+Choose **Last / Current / Next** for three interval cards with individual one-minute candle graphs. Select **1m**, **5m**, **15m**, **30m**, or **60m** above the cards. On phones the cards stack vertically. Current follows the active UTC interval; Last and Next continue across hour and date boundaries. In historical mode, Current is the final interval in the selected hour. Use **Full hour** to return to all cells.
+
+One-minute predictions accept orders during their first 30 seconds, following the same final 30-second cutoff as every other duration.
+
+The charts show completed one-minute open/high/low/close candles and straight lines between recorded minute closes. Missing minutes leave gaps; a fresh live price adds a provisional endpoint. Chart history refreshes shortly after each minute closes. The graph's visual movement is separate from the model's prediction probabilities.
 
 Each card starts with a bold UTC time range, Up/Down model percentages and status.
 The next row reads **benchmark → current price** (closing price for a completed

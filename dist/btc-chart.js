@@ -60,7 +60,7 @@
   }
   let volatilityCandles=null,volatilityMinute=-1;
   /** Align interval states and opening/closing benchmarks to the displayed hour. */ function syncMarkets(now,force=false) {
-    const state=[];model.paused=paused;model.now=now;const minute=Math.floor(now/60000);
+    const state=[];model.paused=paused;model.now=now;model.displayHour=hour;model.candles=candles;const minute=Math.floor(now/60000);
     if(candles!==volatilityCandles||minute!==volatilityMinute){
       model.volatility=model.minuteVolatility(candles,now);volatilityCandles=candles;volatilityMinute=minute;
     }
@@ -72,7 +72,7 @@
       const strike=marketStatus==='queued'?null:opening?Number(opening[4]):null;
       const close=marketStatus==='settled'&&closing?Number(closing[4]):null;
       const changed=m.status!==marketStatus||m.strike!==strike||m.close!==close||m.start!==time(start);
-      Object.assign(m,{start:time(start),end:time(end),status:marketStatus,strike,close,startsAt:start,endsAt:end,remaining:remaining(end-now)});
+      Object.assign(m,{start:time(start),end:time(end),status:marketStatus,strike,close,startsAt:start,endsAt:end,remaining:remaining(end-now)+(marketStatus==='open'&&now>=end-30000?' - Locked':'')});
       if(m.up===null)m.up=50;
       state.push(changed);
       const label=document.querySelector(`[data-remaining="${m.id}"]`);if(label)label.textContent=m.remaining;
@@ -96,7 +96,7 @@
   /** Calculate an illustrative synthetic price; these values cannot execute orders. */ function demoPrice(minute,second=0){return coin.demoBase*(1+(minute*1.5+Math.sin(minute*.48)*19+Math.sin(minute*1.8)*4+Math.sin(second*.5)*1.4)/67450);}
   /** Populate the synthetic preview hour with deterministic chart points. */ function demoHistory(now) {
     candles=[];
-    for(let minute=-1;minute<60;minute++) {
+    for(let minute=-61;minute<120;minute++) {
       const t=hour+minute*60000;
       if(t>now)break;
       const price=demoPrice(minute);
@@ -113,8 +113,9 @@
     const version=++historyVersion,requestedHour=hour,requestedCoin=coin.symbol;
     const timeout=setTimeout(()=>controller.abort(),60000);
     try {
-      const params=new URLSearchParams({granularity:'60',start:new Date(hour-60000).toISOString(),end:new Date(Math.min(Date.now(),hour+3600000)).toISOString()});
-      const historyUrl=serverFeed()?`/api/candles?coin=${encodeURIComponent(coin.symbol)}&start=${Math.floor((hour-60000)/1000)}&end=${Math.floor(Math.min(Date.now(),hour+3600000)/1000)}`:`https://api.exchange.coinbase.com/products/${coin.product}/candles?${params}`;
+      const historyStart=hour-3660000,historyEnd=Math.min(Date.now(),hour+7200000);
+      const params=new URLSearchParams({granularity:'60',start:new Date(historyStart).toISOString(),end:new Date(historyEnd).toISOString()});
+      const historyUrl=serverFeed()?`/api/candles?coin=${encodeURIComponent(coin.symbol)}&start=${Math.floor(historyStart/1000)}&end=${Math.floor(historyEnd/1000)}`:`https://api.exchange.coinbase.com/products/${coin.product}/candles?${params}`;
       const response=await fetch(historyUrl,{signal:controller.signal});
       if(!response.ok)throw new Error('History unavailable');
       const chartData=await response.json();
@@ -123,7 +124,7 @@
       if(!Array.isArray(chartData))throw new Error('Invalid chart history');
       /** Apply validated history only to the request context that remains current. */ function applyHistory(data){
         const displayEnd=Math.min(Date.now(),hour+3600000);
-        candles=[...new Map(data.filter(c=>Array.isArray(c)&&c.length>=5&&c.slice(0,5).every(Number.isFinite)&&c[4]>0&&c[0]*1000>=displayEnd-86400000&&c[0]*1000<displayEnd).map(c=>[c[0],c])).values()].sort((a,b)=>a[0]-b[0]);
+        candles=[...new Map(data.filter(c=>Array.isArray(c)&&c.length>=5&&c.slice(0,5).every(Number.isFinite)&&c[4]>0&&c[0]*1000>=displayEnd-86400000&&c[0]*1000<historyEnd).map(c=>[c[0],c])).values()].sort((a,b)=>a[0]-b[0]);
         const history=candles.filter(c=>c[0]*1000>=hour&&c[0]*1000+60000<=displayEnd).map(c=>({t:c[0]*1000+60000,price:c[4]}));
         // The preceding minute's close is the known price at the hour's start.
         const opening=candles.find(c=>c[0]*1000===hour-60000);
@@ -281,26 +282,6 @@
     }
     $('segment-results').replaceChildren(...markers);
   }
-  /** Interpolate samples with bounded cubic tangents, preserving prices and local extrema. */
-  function smoothPath(samples){
-    if(!samples.length)return '';
-    const slopes=samples.slice(1).map((point,index)=>{
-      const previous=samples[index],width=point.x-previous.x;
-      return width>0?(point.y-previous.y)/width:0;
-    });
-    const tangents=samples.map((point,index)=>{
-      if(index===0)return slopes[0]||0;
-      if(index===samples.length-1)return slopes[index-1]||0;
-      const before=slopes[index-1],after=slopes[index];
-      return before*after>0?Math.sign(before)*Math.min(Math.abs(before),Math.abs(after)):0;
-    });
-    let path=`M${samples[0].x.toFixed(3)},${samples[0].y.toFixed(3)}`;
-    for(let index=1;index<samples.length;index++){
-      const previous=samples[index-1],point=samples[index],third=(point.x-previous.x)/3;
-      path+=` C${(previous.x+third).toFixed(3)},${(previous.y+third*tangents[index-1]).toFixed(3)} ${(point.x-third).toFixed(3)},${(point.y-third*tangents[index]).toFixed(3)} ${point.x.toFixed(3)},${point.y.toFixed(3)}`;
-    }
-    return path;
-  }
   /** Project valid price points into SVG coordinates and update chart and benchmark labels. */ function draw(now,force=false) {
     const displayTime=historical?hour+3600000:now;
     $('time-cursor').hidden=historical;
@@ -323,8 +304,13 @@
     const plotTime=Date.now();
     if(!force&&plotTime-lastPlotAt<5000)return;
     lastPlotAt=plotTime;
+    const fresh=mode==='demo'||(hasFreshQuote()&&model.feedConnection==='connected');
+    const minutePlot=coin.feed==='oilpriceapi'&&mode==='live'?null:model.minutePlot(candles,hour,hour+3600000,displayTime,!historical&&fresh?{t:model.priceUpdatedAt,price:model.spot}:null);
+    $('chart-high').textContent=Number.isFinite(minutePlot?.high)?money(minutePlot.high):'';
+    $('chart-low').textContent=Number.isFinite(minutePlot?.low)?money(minutePlot.low):'';
+    $('minute-bars-up').setAttribute('d',minutePlot?.up||'');$('minute-bars-down').setAttribute('d',minutePlot?.down||'');
     const valid=points.filter(p=>p.t>=hour&&p.t<=displayTime);
-    const hasPoints=valid.length>0;
+    const hasPoints=minutePlot?!!minutePlot.line:valid.length>0;
     renderMinuteHeatmap(displayTime);
     renderSegmentResults(displayTime);
     $('chart-empty').hidden=hasPoints;
@@ -334,10 +320,17 @@
     $('btc-change').textContent=change===null?(model.spotStatus==='unavailable'?'Retrying price feed…':'Waiting for price data'):`${change>=0?'+':'−'}${money(Math.abs(change))} ${historical?'that hour':'this hour'}`;
     $('btc-change').style.color=change!==null&&change<0?'var(--red)':'var(--green)';
     if(!hasPoints){$('btc-line').removeAttribute('d');$('btc-area').removeAttribute('d');$('btc-tip').setAttribute('visibility','hidden');return;}
+    if(minutePlot){
+      $('btc-line').setAttribute('d',minutePlot.line);$('btc-area').removeAttribute('d');
+      if(minutePlot.tip){$('btc-tip').setAttribute('cx',minutePlot.tip.x);$('btc-tip').setAttribute('cy',minutePlot.tip.y);}
+      $('btc-tip').setAttribute('visibility',!historical&&fresh&&minutePlot.tip?'visible':'hidden');
+      $('chart-description').textContent=`${coin.name} ${historical?'historical':'current'} hour on ${new Date(hour).toISOString().slice(0,10)}, ${time(hour)}–${time(hour+3600000)} UTC. ${minutePlot.count} completed one-minute OHLC candles. Straight lines connect minute closes; missing minutes leave gaps. Live price is provisional.`;
+      return;
+    }
     let low=Math.min(...valid.map(p=>p.price)),high=Math.max(...valid.map(p=>p.price));
     const pad=Math.max(coin.demoBase*.00012,(high-low)*.18);low-=pad;high+=pad;
     const /** Project a timestamp into the chart horizontal coordinate. */ x=t=>(t-hour)/3600000*1000,/** Project a price into the chart vertical coordinate. */ y=p=>116-(p-low)/(high-low)*102;
-    const path=smoothPath(valid.map(p=>({x:x(p.t),y:y(p.price)}))),first=valid[0],last=valid.at(-1);
+    const path=valid.map((p,index)=>`${index?'L':'M'}${x(p.t).toFixed(3)},${y(p.price).toFixed(3)}`).join(' '),first=valid[0],last=valid.at(-1);
     $('btc-line').setAttribute('d',path);
     $('btc-area').setAttribute('d',`${path} L${x(last.t)},130 L${x(first.t)},130 Z`);
     $('btc-tip').setAttribute('cx',x(last.t));$('btc-tip').setAttribute('cy',y(last.price));$('btc-tip').setAttribute('visibility','visible');
@@ -357,7 +350,10 @@
         if(serverFeed()||Date.now()-model.priceUpdatedAt>=5000)pollSpot();
         if(coin.feed!=='oilpriceapi'&&lastPriceAt&&!hasFreshQuote()){unavailableSpot();if(socket){socket.close();}}
         if(socket&&Date.now()-connectionStartedAt>20000&&(!lastPriceAt||socket.readyState===WebSocket.CONNECTING))socket.close();
-        if(!fetchController&&Date.now()-lastHistoryAt>60000){lastHistoryAt=Date.now();loadHistory();}
+        // Refresh shortly after each minute closes so new interval benchmarks
+        // do not wait until the wall-clock second of the initial page load.
+        const minuteClosed=Math.floor(Date.now()/60000)>Math.floor(lastHistoryAt/60000)&&Date.now()%60000>=2000;
+        if(!fetchController&&(minuteClosed||Date.now()-lastHistoryAt>60000)){lastHistoryAt=Date.now();loadHistory();}
       }
       syncMarkets(now);if(!paused)draw(now);else status('PAUSED','neutral');
     }
@@ -382,7 +378,7 @@
     $('price-coin-icon').hidden=!coin.icon;$('price-coin-icon').onerror=/** Handle the error event for the current transport or resource. */ ()=>{$('price-coin-icon').hidden=true;};if(coin.icon)$('price-coin-icon').src=coin.icon;$('price-coin-icon').alt=`${coin.name} logo`;
     $('coin-name').textContent=coin.name.toUpperCase();
     $('market-pair-label').textContent=`${coin.symbol} / USD · PREDICTION MARKETS`;
-    $('chart-pair-label').textContent=`${coin.symbol} / USD · 1H`;
+    $('chart-pair-label').textContent=`${coin.symbol} / USD · 1H · 1m candles`;
     $('chart-title').textContent=`${coin.name} hourly price`;
     document.querySelector('.hour-chart').setAttribute('aria-label',`${coin.name} price for the current hour`);
     document.title=`${coin.name} · ${window.Predict60Category?.name||'Crypto'} · Predict60`;
@@ -397,6 +393,7 @@
   $('previous-hour').addEventListener('click',()=>navigateHour(hour-3600000));
   $('next-hour').addEventListener('click',()=>navigateHour(hour+3600000));
   $('current-hour').addEventListener('click',()=>navigateHour(hourOf(currentTime())));
+  window.addEventListener('market-overview',()=>draw(currentTime(),true));
   document.querySelectorAll('[data-coin]').forEach(button=>button.addEventListener('click',()=>{if(button.dataset.coin!==coin.symbol)selectCoin(button.dataset.coin);}));
   let savedCoin=window.PredictCoins.available[0].symbol;try{const preference=localStorage.getItem(`predict_selected_coin_${window.Predict60Category?.id||'crypto'}`)||localStorage.getItem('predict_selected_coin');if(window.PredictCoins.available.some(coin=>coin.symbol===preference))savedCoin=preference;}catch{}
   selectCoin(savedCoin);frameId=setTimeout(()=>frame(performance.now()),1000);
