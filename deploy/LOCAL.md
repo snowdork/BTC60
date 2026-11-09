@@ -21,7 +21,8 @@ For Google testing, use `http://localhost:8000` and register that origin in Goog
 
 Open http://127.0.0.1:8000. Stop with Ctrl-C; restart after Python changes.
 Refresh the browser after HTML/CSS/JS changes. An empty signup code disables new
-signups but existing accounts can log in. Python does not read `.env` files.
+signups but existing accounts can log in. Local Python launches read the signup
+code from `.env.local` when neither an environment override nor a saved code exists.
 Leave `P60_HOST` unset for the default local HTTP origin, or set it to the exact
 origin you use. Do not carry the production HTTPS origin into a local session.
 
@@ -242,3 +243,5 @@ owner-only permissions and loads it on later restarts. A nonempty exported
 disables signup for that run. Direct local `server.py` and VS Code launches also load the saved code when
 `P60_SIGNUP_CODE` is unset. Explicit environment settings take precedence, and
 production origins continue to require deployment environment configuration.
+When no saved code exists, local launches use `P60_SIGNUP_CODE` from `.env.local`,
+sharing the local Compose setting. Other `.env.local` variables are not loaded.

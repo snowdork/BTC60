@@ -4,19 +4,27 @@ import os
 DEFAULT_CLIENT_ID = "572697973282-e17b6uqatr36toqi48sohg6vigkarvai.apps.googleusercontent.com"
 
 
+class GoogleVerificationUnavailable(RuntimeError):
+    """Carry a fixed diagnostic code without exposing credentials or upstream data."""
+
+    def __init__(self, reason):
+        self.reason = reason
+        super().__init__(reason)
+
+
 def verify_google_login(credential):
     """Check Google's signature, audience, issuer, expiry and verified account claims."""
     if not isinstance(credential, str) or not 1 <= len(credential) <= 7000:
         raise ValueError('Invalid Google credential.')
     client_id = os.environ.get('GOOGLE_CLIENT_ID', DEFAULT_CLIENT_ID).strip()
     if not client_id:
-        raise RuntimeError('Google sign-in is not configured.')
+        raise GoogleVerificationUnavailable('client_id_missing')
     try:
         from google.auth.exceptions import GoogleAuthError, TransportError
         from google.oauth2 import id_token
         from google.auth.transport.requests import Request
     except ImportError as exc:
-        raise RuntimeError('Google sign-in dependencies are not installed.') from exc
+        raise GoogleVerificationUnavailable('dependencies_missing') from exc
 
     class BoundedRequest(Request):
         """Avoid leaving a server worker waiting indefinitely for signing keys."""
@@ -29,7 +37,7 @@ def verify_google_login(credential):
     try:
         payload = id_token.verify_oauth2_token(credential, transport, audience=client_id)
     except TransportError as exc:
-        raise RuntimeError('Google verification is temporarily unavailable.') from exc
+        raise GoogleVerificationUnavailable('signing_keys_unreachable') from exc
     except (ValueError, GoogleAuthError) as exc:
         raise ValueError('Invalid Google credential.') from exc
     finally:

@@ -13,6 +13,12 @@ spec.loader.exec_module(restart)
 
 
 class LocalSignupConfigTest(unittest.TestCase):
+    def test_restart_uses_local_env_when_no_saved_code_exists(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(restart, 'DATA', Path(directory) / 'data'), patch.dict(os.environ, {}, clear=True), patch('sys.stdout', new_callable=io.StringIO):
+            (Path(directory) / '.env.local').write_text('P60_SIGNUP_CODE=local-test-code\n')
+            restart.configure_signup_code()
+            self.assertEqual(os.environ['P60_SIGNUP_CODE'], 'local-test-code')
+
     def test_prompt_saves_private_code_and_next_shell_restores_it(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(restart, 'DATA', Path(directory)), patch.dict(os.environ, {}, clear=True), patch('sys.stdout', new_callable=io.StringIO) as output:
             with patch.object(restart.getpass, 'getpass', return_value='local-test-code'):

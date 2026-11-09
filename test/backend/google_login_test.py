@@ -103,6 +103,20 @@ class GoogleLoginHTTPTest(unittest.TestCase):
         self.assertNotEqual(cookie, new_cookie)
         self.assertEqual(self.google_request(identity)[0], 200)
 
+    def test_unavailable_verification_logs_reason_without_token_or_upstream_details(self):
+        headers = {'Origin': f'http://127.0.0.1:{self.http.server_port}', 'X-Requested-With': 'XMLHttpRequest'}
+        _, data, cookie = self.request('GET', '/api/auth/google/csrf', extra_headers=headers)
+        for reason in ('dependencies_missing', 'client_id_missing', 'signing_keys_unreachable'):
+            with self.subTest(reason=reason), patch('server.verify_google_login',
+                    side_effect=google_login.GoogleVerificationUnavailable(reason)), self.assertLogs(level='WARNING') as logs:
+                status, response, session = self.request('POST', '/api/auth/google',
+                    {'credential': 'private-token'}, cookie, data['csrf'], headers)
+            self.assertEqual(status, 503)
+            self.assertFalse(session)
+            self.assertEqual(response['error'], 'Google sign-in is temporarily unavailable.')
+            self.assertIn('reason=' + reason, '\n'.join(logs.output))
+            self.assertNotIn('private-token', '\n'.join(logs.output))
+
     def test_google_login_is_rate_limited(self):
         with patch.object(server.Handler, 'auth_rate_limited', return_value=True), patch('server.verify_google_login') as verify:
             self.assertEqual(self.google_request({'googleSub': 'x', 'email': 'x@example.com'})[0], 429)

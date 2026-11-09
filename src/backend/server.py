@@ -6,7 +6,8 @@ import argparse
 import ipaddress
 import odds
 import contests
-from google_login import verify_google_login
+from google_login import GoogleVerificationUnavailable, verify_google_login
+from local_settings import local_signup_code
 import simulated_prices
 import live_oil
 import oilprice_api
@@ -138,10 +139,7 @@ def configured_signup_code():
     hostname = urllib.parse.urlsplit(origin).hostname if origin else None
     if hostname not in (None, 'localhost', '127.0.0.1', '::1'):
         return ''
-    try:
-        return (ROOT / 'data' / 'local-signup-code').read_text()
-    except FileNotFoundError:
-        return ''
+    return local_signup_code(ROOT)
 
 
 def trusted_proxies():
@@ -1134,6 +1132,11 @@ class Handler(SimpleHTTPRequestHandler):
             identity = verify_google_login(data.get('credential'))
         except ValueError:
             return self.reply(401, {'error': 'Google credential is invalid or expired.'})
+        except GoogleVerificationUnavailable as exc:
+            LOG.warning('Google sign-in verification unavailable reason=%s', exc.reason)
+            if exc.reason == 'dependencies_missing':
+                LOG.warning('Install requirements.txt in the server Python environment and restart the server')
+            return self.reply(503, {'error': 'Google sign-in is temporarily unavailable.'})
         except Exception:
             # Never log credentials, decoded claims, or upstream response bodies.
             LOG.warning('Google sign-in verification unavailable')
