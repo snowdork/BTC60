@@ -5,7 +5,7 @@
 (() => {
   'use strict';
   const model=window.PredictModel,/** Find an interface element by its stable DOM identifier. */ $=id=>document.getElementById(id);
-  const PRICE_UPDATE_MS=2000;
+  const PRICE_UPDATE_MS=1000;
   let coin=model.coin;
   const /** Report whether the selected instrument uses the deterministic simulation feed. */ simulated=()=>coin.feed==='simulated';
   const /** Choose server polling for simulated and oil-provider instruments. */ serverFeed=()=>simulated()||['twelvedata','oilpriceapi'].includes(coin.feed);
@@ -21,6 +21,21 @@
   let historical=false,historyFailed=false;
   let mode='live',paused=false,socket=null,retryTimer=null,fetchController=null,historyVersion=0,feedVersion=0;
   let hour=hourOf(Date.now()),points=[],candles=[],lastPriceAt=0,lastPrice=null,lastHistoryAt=0,lastSpotPollAt=-Infinity,backoff=1000;
+  const secondHistory=new Map();
+  /** Keep one observed price per second, isolated by coin and feed mode, for two hours. */
+  function recordSecond(now){
+    if(historical||paused||stopped||!Number.isFinite(lastPrice)||lastPrice<=0)return;
+    if(mode!=='demo'&&(!hasFreshQuote()||model.priceUpdatedAt<hourOf(now)))return;
+    const trail=model.secondPoints;if(!trail)return;
+    const t=Math.floor(now/1000)*1000,last=trail.at(-1);
+    if(last&&t<last.t)return;
+    const closing=candles.findLast(c=>c[0]*1000+60000<=now);
+    const price=closing&&closing[0]*1000+60000>model.priceUpdatedAt?Number(closing[4]):lastPrice;
+    if(last?.t===t)last.price=price;
+    else trail.push({t,price});
+    while(trail.length&&trail[0].t<now-7200000)trail.shift();
+    if(trail.length>7201)trail.splice(0,trail.length-7201);
+  }
   let demoEpoch=Date.now(),demoStart=new Date().setUTCHours(17,42,12,0),demoSecond=-1,lastDraw=0;
   let lastPlotAt=-Infinity;
   let previousBannerPrice,bannerTrend='',lastBannerUpdate=-Infinity;
@@ -47,7 +62,7 @@
   let spotController=null;
   let frameId=0,stopped=false,connectionStartedAt=0,lastPriceBroadcast=0;
   const /** Return live wall-clock time or the synthetic preview timeline. */ currentTime=()=>mode==='demo'?demoStart+Date.now()-demoEpoch:Date.now();
-  /** Update the feed badge label and visual tone. */ function status(text,tone='amber'){$('feed-status').textContent=text;$('feed-status').className=`badge ${tone}`;}
+  /** Update the feed badge label and visual tone. */ function status(text,tone='amber'){$('feed-status').dataset.live=String(['LIVE','SIMULATED','SIMULATED OIL','LIVE OIL'].includes(text));$('feed-status').textContent=text;$('feed-status').className=`badge ${tone}`;}
   /** Dispatch a chart state event for the prediction ticket and market renderer. */ function broadcast(name){window.dispatchEvent(new Event(name));}
   /** Check quote freshness independently of the WebSocket connection or chart history. */ function hasFreshQuote(){
     return Number.isFinite(lastPrice)&&Number.isFinite(model.priceUpdatedAt)&&Date.now()-model.priceUpdatedAt<=maxAge()&&model.priceUpdatedAt<=Date.now()+5000;
@@ -90,6 +105,7 @@
       if(points.length>3662)points.splice(0,points.length-3662);
     }
     lastPrice=price;lastPriceAt=Date.now();model.priceUpdatedAt=t;model.spot=price;model.spotStatus='ready';
+    recordSecond(currentTime());
     renderBannerPrice();
     if(Date.now()-lastPriceBroadcast>=PRICE_UPDATE_MS){lastPriceBroadcast=Date.now();broadcast('btc-price-update');}
   }
@@ -105,6 +121,31 @@
     points=candles.filter(c=>c[0]*1000>=hour&&c[0]*1000+60000<=now).map(c=>({t:c[0]*1000+60000,price:c[4]}));
     syncMarkets(now,true);
   }
+  /** Fetch an interval's provider candles, falling back to server pricing history for recent ranges. */
+  async function loadMinuteHistory(start,end,{signal}={}){
+    const instrument=coin;
+    const useServer=['simulated','twelvedata','oilpriceapi'].includes(instrument.feed);
+    const params=new URLSearchParams({granularity:'60',start:new Date(start).toISOString(),end:new Date(end).toISOString()});
+    const url=useServer?`/api/candles?coin=${encodeURIComponent(instrument.symbol)}&start=${Math.floor(start/1000)}&end=${Math.floor(end/1000)}`:`https://api.exchange.coinbase.com/products/${encodeURIComponent(instrument.product)}/candles?${params}`;
+    try{
+      const response=await fetch(url,{signal});
+      if(!response.ok)throw Error('Minute history unavailable');
+      const rows=await response.json();
+      if(!Array.isArray(rows))throw Error('Invalid minute history');
+      return rows;
+    }catch(error){
+      if(signal?.aborted||start<Date.now()-86400000)throw error;
+      // The server can still reach the provider when the browser's direct request fails.
+      const response=await fetch(`/api/pricing-history?coin=${encodeURIComponent(instrument.symbol)}`,{signal});
+      if(!response.ok)throw Error('Minute history unavailable');
+      const rows=(await response.json()).candles;
+      if(!Array.isArray(rows))throw Error('Invalid minute history');
+      const selected=rows.filter(c=>Array.isArray(c)&&c[0]*1000>=start&&c[0]*1000<end);
+      if(!selected.length)throw Error('No minute history for this interval');
+      return selected;
+    }
+  }
+  model.loadMinuteHistory=loadMinuteHistory;
   /** Load exact minute benchmarks and volatility history, discarding responses for superseded hours or instruments. */ async function loadHistory() {
     if(mode!=='live'||stopped)return;
     if(fetchController)fetchController.abort();
@@ -114,11 +155,7 @@
     const timeout=setTimeout(()=>controller.abort(),60000);
     try {
       const historyStart=hour-3660000,historyEnd=Math.min(Date.now(),hour+7200000);
-      const params=new URLSearchParams({granularity:'60',start:new Date(historyStart).toISOString(),end:new Date(historyEnd).toISOString()});
-      const historyUrl=serverFeed()?`/api/candles?coin=${encodeURIComponent(coin.symbol)}&start=${Math.floor(historyStart/1000)}&end=${Math.floor(historyEnd/1000)}`:`https://api.exchange.coinbase.com/products/${coin.product}/candles?${params}`;
-      const response=await fetch(historyUrl,{signal:controller.signal});
-      if(!response.ok)throw new Error('History unavailable');
-      const chartData=await response.json();
+      const chartData=await loadMinuteHistory(historyStart,historyEnd,{signal:controller.signal});
       const /** Prevent a stale asynchronous history response from replacing a newer instrument or hour. */ isCurrentRequest=()=>mode==='live'&&version===historyVersion&&requestedHour===hour&&requestedCoin===coin.symbol;
       if(!isCurrentRequest())return;
       if(!Array.isArray(chartData))throw new Error('Invalid chart history');
@@ -159,7 +196,7 @@
   }
   /** Fetch an initial quote and retry missing updates, validating provider timestamps before displaying prices. */ async function pollSpot(){
     if(spotController||stopped||historical||mode!=='live')return;
-    if(Date.now()-lastSpotPollAt<5000)return;
+    if(Date.now()-lastSpotPollAt<(serverFeed()?5000:PRICE_UPDATE_MS))return;
     lastSpotPollAt=Date.now();
     const controller=new AbortController(),requestedCoin=coin.symbol,version=feedVersion,useServer=serverFeed();
     spotController=controller;
@@ -226,6 +263,9 @@
     previousBannerPrice=undefined;bannerTrend='';
     $('feed-message').textContent='';$('feed-message').hidden=true;
     hour=targetHour;historical=hour<hourOf(now);model.isHistorical=historical;model.feedMode=mode;model.priceUpdatedAt=0;model.spotStatus='loading';model.historyStatus='loading';model.feedConnection='disconnected';model.historyUpdatedAt=0;historyFailed=false;points=[];candles=[];lastPrice=null;lastPriceAt=0;model.spot=NaN;
+    const historyKey=`${mode}:${coin.symbol}`;
+    if(!secondHistory.has(historyKey))secondHistory.set(historyKey,[]);
+    model.secondPoints=secondHistory.get(historyKey);
     syncMarkets(now,true);if(mode==='demo'){demoHistory(historical?hour+3600000:now);if(historical){lastPrice=points.at(-1)?.price??null;model.spot=lastPrice??NaN;syncMarkets(now,true);}}else loadHistory();
   }
   /** Switch between live and synthetic preview modes and reload the selected hour. */ function setMode(next,targetHour) {
@@ -284,6 +324,13 @@
   }
   /** Project valid price points into SVG coordinates and update chart and benchmark labels. */ function draw(now,force=false) {
     const displayTime=historical?hour+3600000:now;
+    $('hour-overview').dataset.state=historical?'completed':'live';
+    $('chart-pair-label').textContent=`${coin.symbol} · ${time(hour)} – ${time(hour+3600000)} UTC · FULL HOUR`;
+    const duration=Number($('hour-overview').dataset.duration)||15;
+    const selected=model.markets.find(m=>m.minutes===duration&&m.status==='open');
+    const chance=selected&&(mode==='demo'||model.dataStatus(model,selected,Date.now(),{allowLocked:true}).ready)?model.estimateChances(selected,model.spot,now,model.volatility):null;
+    $('overview-up-chance').textContent=`↑ Up ${chance?chance.up+'%':'—'}`;
+    $('overview-down-chance').textContent=`↓ Down ${chance?chance.down+'%':'—'}`;
     $('time-cursor').hidden=historical;
     $('next-hour').disabled=!historical;$('current-hour').hidden=!historical;$('chart-pause').disabled=historical;
     $('hour-date').textContent=`${new Date(hour).toISOString().slice(0,10)} · UTC`;
@@ -293,6 +340,7 @@
     const stack=$('timeline-stack'),chart=$('btc-chart'),bounds=chart.getBoundingClientRect(),stackBounds=stack.getBoundingClientRect();
     // Pixel geometry keeps one vertical line aligned on every duration row.
     stack.style.setProperty('--cursor-x',`${bounds.left-stackBounds.left+fraction*bounds.width}px`);
+    stack.style.setProperty('--cursor-top',`${bounds.top-stackBounds.top}px`);
     $('time-cursor-label').textContent=clock(now);
     const wallTime=Date.now();
     $('workspace-clock').textContent=`${clock(wallTime)} UTC`;
@@ -302,10 +350,11 @@
     if($('chart-times').dataset.hour!==String(hour)){$('chart-times').dataset.hour=String(hour);$('chart-times').replaceChildren(...[0,15,30,45,60].map(minute=>{const span=document.createElement('span');span.textContent=time(hour+minute*60000);return span;}));}
     renderBannerPrice();
     const plotTime=Date.now();
-    if(!force&&plotTime-lastPlotAt<5000)return;
+    if(!force&&plotTime-lastPlotAt<PRICE_UPDATE_MS)return;
     lastPlotAt=plotTime;
-    const fresh=mode==='demo'||(hasFreshQuote()&&model.feedConnection==='connected');
-    const minutePlot=coin.feed==='oilpriceapi'&&mode==='live'?null:model.minutePlot(candles,hour,hour+3600000,displayTime,!historical&&fresh?{t:model.priceUpdatedAt,price:model.spot}:null);
+    const quoteFresh=mode==='demo'||hasFreshQuote();
+    const fresh=quoteFresh&&(mode==='demo'||model.feedConnection==='connected');
+    const minutePlot=coin.feed==='oilpriceapi'&&mode==='live'?null:model.minutePlot(candles,hour,hour+3600000,displayTime,!historical&&quoteFresh?{t:model.priceUpdatedAt,price:model.spot}:null,model.secondPoints);
     $('chart-high').textContent=Number.isFinite(minutePlot?.high)?money(minutePlot.high):'';
     $('chart-low').textContent=Number.isFinite(minutePlot?.low)?money(minutePlot.low):'';
     $('minute-bars-up').setAttribute('d',minutePlot?.up||'');$('minute-bars-down').setAttribute('d',minutePlot?.down||'');
@@ -324,7 +373,7 @@
       $('btc-line').setAttribute('d',minutePlot.line);$('btc-area').removeAttribute('d');
       if(minutePlot.tip){$('btc-tip').setAttribute('cx',minutePlot.tip.x);$('btc-tip').setAttribute('cy',minutePlot.tip.y);}
       $('btc-tip').setAttribute('visibility',!historical&&fresh&&minutePlot.tip?'visible':'hidden');
-      $('chart-description').textContent=`${coin.name} ${historical?'historical':'current'} hour on ${new Date(hour).toISOString().slice(0,10)}, ${time(hour)}–${time(hour+3600000)} UTC. ${minutePlot.count} completed one-minute OHLC candles. Straight lines connect minute closes; missing minutes leave gaps. Live price is provisional.`;
+      $('chart-description').textContent=`${coin.name} ${historical?'historical':'current'} hour on ${new Date(hour).toISOString().slice(0,10)}, ${time(hour)}–${time(hour+3600000)} UTC. ${minutePlot.count} completed one-minute OHLC candles and ${minutePlot.secondCount} observed one-second prices. The line retains recorded second-by-second movement; earlier history uses minute closes. Live price is provisional.`;
       return;
     }
     let low=Math.min(...valid.map(p=>p.price)),high=Math.max(...valid.map(p=>p.price));
@@ -347,7 +396,7 @@
         if(second!==demoSecond){demoSecond=second;const minute=(now-hour)/60000;appendPoint(now,demoPrice(minute,second));}
         status('SIMULATED','amber');
       } else {
-        if(serverFeed()||Date.now()-model.priceUpdatedAt>=5000)pollSpot();
+        if(serverFeed()||Date.now()-model.priceUpdatedAt>=PRICE_UPDATE_MS)pollSpot();
         if(coin.feed!=='oilpriceapi'&&lastPriceAt&&!hasFreshQuote()){unavailableSpot();if(socket){socket.close();}}
         if(socket&&Date.now()-connectionStartedAt>20000&&(!lastPriceAt||socket.readyState===WebSocket.CONNECTING))socket.close();
         // Refresh shortly after each minute closes so new interval benchmarks
@@ -355,7 +404,7 @@
         const minuteClosed=Math.floor(Date.now()/60000)>Math.floor(lastHistoryAt/60000)&&Date.now()%60000>=2000;
         if(!fetchController&&(minuteClosed||Date.now()-lastHistoryAt>60000)){lastHistoryAt=Date.now();loadHistory();}
       }
-      syncMarkets(now);if(!paused)draw(now);else status('PAUSED','neutral');
+      recordSecond(now);syncMarkets(now);if(!paused)draw(now);else status('PAUSED','neutral');
     }
     frameId=setTimeout(()=>frame(performance.now()),1000);
   }

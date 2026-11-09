@@ -407,39 +407,38 @@ class AccountsTest(unittest.TestCase):
             rejected = self.request('POST', '/api/predictions', dict(order, marketId=market), cookie, csrf)
             self.assertEqual(rejected[0], 400)
 
-    def test_one_minute_predictions_accept_all_sixty_intervals_and_settle(self):
+    def test_one_minute_crypto_predictions_are_not_offered_or_accepted(self):
         _, _, cookie = self.request('POST', '/api/signup', {
-            'name': 'One minute', 'email': 'minute@example.com', 'password': 'pass-minute',
+            'name': 'Removed duration', 'email': 'minute@example.com', 'password': 'pass-minute',
             'confirmPassword': 'pass-minute', 'signupCode': '777'})
         account = self.request('GET', '/api/account', cookie=cookie)[1]
-        csrf = account['csrf']
         hour = int(server.time.time()) // 3600 * 3600
         for index in range(60):
-            start = hour + index * 60
             order = {'coin': 'BTC', 'marketId': f'1-{index}', 'side': 'up', 'budget': 1,
-                     'requestId': f'one-minute-request-{index:04}', 'startsAt': start * 1000}
-            with patch('server.time.time', return_value=start + 20), patch('server.candle_close', return_value=100), patch('server.fresh_spot', return_value=100), patch('server.market_up', return_value=50):
-                status, saved, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
-                self.assertEqual(status, 201, saved)
-                prediction = next(p for p in saved['predictions'] if p['market_id'] == f'1-{index}')
-                self.assertEqual(prediction['starts_at'], start)
-                self.assertEqual(prediction['ends_at'], start + 60)
-            with patch('server.time.time', return_value=start + 30):
-                status, error, _ = self.request('POST', '/api/predictions',
-                    dict(order, requestId=f'one-minute-locked-{index:04}'), cookie, csrf)
-                self.assertEqual(status, 400)
-                self.assertIn('Betting closed', error['error'])
-        with patch('server.time.time', return_value=hour + 3606), patch('server.candle_close', return_value=100):
+                     'requestId': f'removed-minute-{index:04}', 'startsAt': (hour+index*60)*1000}
+            self.assertEqual(self.request('POST', '/api/predictions', order, cookie, account['csrf'])[0], 400)
+        quotes = self.request('GET', '/api/coins', cookie=cookie)[1]['marketConfig']['quotes']
+        self.assertFalse(any(key.startswith('1-') for key in quotes))
+        self.assertEqual(len(quotes), 19)
+        self.assertEqual(self.request('GET', '/api/account', cookie=cookie)[1]['predictions'], [])
+
+    def test_legacy_one_minute_predictions_still_settle_and_remain_in_history(self):
+        _, _, cookie = self.request('POST', '/api/signup', {
+            'name': 'Legacy duration', 'email': 'legacy-minute@example.com', 'password': 'pass-minute',
+            'confirmPassword': 'pass-minute', 'signupCode': '777'})
+        account = self.request('GET', '/api/account', cookie=cookie)[1]
+        hour = int(server.time.time()) // 3600 * 3600
+        with server.connect() as conn:
+            conn.execute('INSERT INTO predictions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                         ('legacy-minute',account['user']['id'],'legacy-minute-request','BTC','1-0',
+                          'up',hour,hour+60,100,50,2,100,hour))
+        with patch('server.time.time', return_value=hour+66), patch('server.candle_close', return_value=101):
             server.settle_due()
-            settled = self.request('GET', '/api/account', cookie=cookie)[1]['predictions']
-        self.assertEqual(len(settled), 60)
-        self.assertTrue(all(p['outcome'] == 'up' and p['payout_cents'] == 200 for p in settled))
-        catalog = self.request('GET', '/api/coins', cookie=cookie)[1]
-        for index in range(60):
-            self.assertEqual(catalog['marketConfig']['quotes'][f'1-{index}'], 50)
-        for market in ('1-60', '1--1', '1-01'):
-            rejected = self.request('POST', '/api/predictions', dict(order, marketId=market), cookie, csrf)
-            self.assertEqual(rejected[0], 400)
+            predictions = self.request('GET', '/api/account', cookie=cookie)[1]['predictions']
+        self.assertEqual(len(predictions), 1)
+        self.assertEqual(predictions[0]['market_id'], '1-0')
+        self.assertEqual(predictions[0]['outcome'], 'up')
+        self.assertEqual(predictions[0]['payout_cents'], 200)
 
     def test_account_prediction_settlement_lifecycle(self):
         status, _, cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-123', 'signupCode': '777', 'name': '<Test>', 'email': 'one@example.com', 'password': 'pass-123'})

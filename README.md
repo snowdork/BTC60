@@ -1,6 +1,6 @@
 # Predict60 — Hourly prediction terminal
 
-Predict60 is a buildless web app for exploring hourly direction predictions with game credits. See a complete UTC hour at once: one 60-minute market, two 30-minute markets, four 15-minute markets, twelve 5-minute markets, and sixty 1-minute markets, with a live chart and prediction popups.
+Predict60 is a buildless web app for exploring hourly direction predictions with game credits. See a complete UTC hour at once: one 60-minute market, two 30-minute markets, four 15-minute markets, twelve 5-minute markets, with a live chart and prediction popups.
 
 ![Predict60 terminal with an hourly chart, aligned prediction intervals, and an order ticket](src/frontend/assets/previews/prediction-playfield.png)
 
@@ -308,8 +308,8 @@ Both commands report progress. Rerun the download command after interruption to 
 
 The entry screen at `/` (or `welcome.html`) offers login and signup. Signed-in visitors go directly to `categories.html`, which loads category buttons from `/api/categories`. Oil and Weather are visible as Coming soon; neither category can open a terminal or accept predictions while their data feeds are being completed. See [weather preparation](doc/WEATHER.md).
 Choose **Crypto** to open the one-hour playfield at
-`index.html?category=crypto`. The 1-, 5-, 15-, 30-,
-and 60-minute intervals cover that hour; one- and five-minute cards have their own scrollable rows with **Now** and **Detail** controls. Each category has its own
+`index.html?category=crypto`. The 5-, 15-, 30-,
+and 60-minute intervals cover that hour; five-minute cards have their own scrollable rows with **Now** and **Detail** controls. Each category has its own
 background, accent, instrument selection, and remembered instrument. The portfolio
 shows both categories and can filter history and statistics by category; the demo
 balance is shared.

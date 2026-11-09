@@ -1,9 +1,9 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {markets,quote,outcome}=require('../../src/frontend/market-model.js');
-test('one hour contains all 60, 30, 15, 5 and 1 minute markets',()=>{
- assert.deepEqual(markets.map(m=>m.minutes),[60,30,30,15,15,15,15,...Array(12).fill(5),...Array(60).fill(1)]);
- for(const duration of [1,5,15,30,60]){const tier=markets.filter(m=>m.minutes===duration);assert.equal(tier[0].start,'17:00');assert.equal(tier.at(-1).end,'18:00');tier.slice(1).forEach((m,i)=>assert.equal(tier[i].end,m.start));}
+test('one hour contains only 60, 30, 15 and 5 minute markets',()=>{
+ assert.deepEqual(markets.map(m=>m.minutes),[60,30,30,15,15,15,15,...Array(12).fill(5)]);
+ for(const duration of [5,15,30,60]){const tier=markets.filter(m=>m.minutes===duration);assert.equal(tier[0].start,'17:00');assert.equal(tier.at(-1).end,'18:00');tier.slice(1).forEach((m,i)=>assert.equal(tier[i].end,m.start));}
 });
 test('detail intervals preserve exact UTC benchmarks across midnight',()=>{
  const {adjacentMarkets}=require('../../src/frontend/market-model.js');
@@ -33,6 +33,31 @@ test('minute graphs preserve highs/lows, omit incomplete candles, and split miss
  assert.equal(live.tip.price,98);assert.equal(live.count,2);assert.equal(live.tip.x,190000/300000*1000);
  assert.equal(minutePlot(candles,300000,600000,190000).line,'','future intervals have no plotted values');
 });
+
+test('an active graph endpoint stays on display time between quotes and across slightly ahead provider timestamps',()=>{
+ const {minutePlot}=require('../../src/frontend/market-model.js');
+ const candles=[[-60,99,101,100,100],[0,99,103,100,102]],start=0,end=300000;
+ for(const now of [90000,91000,92000]){
+  for(const t of [89000,now+250]){
+   const plot=minutePlot(candles,start,end,now,{t,price:104});
+   assert.equal(plot.tip.price,104);
+   assert.equal(plot.tip.x,now/end*1000);
+  }
+ }
+ const closed=minutePlot(candles,start,60000,90000,{t:90000,price:500});
+ assert.equal(closed.tip.price,102,'completed intervals use the exact closing candle');
+ assert.equal(closed.tip.x,1000);
+ const invalid=minutePlot(candles,start,end,90000,{t:96000,price:500});
+ assert.equal(invalid.tip.price,102,'a quote beyond the accepted clock skew is not plotted');
+});
+
+test('a newly closed candle takes precedence over an older quote at the live edge',()=>{
+ const {minutePlot}=require('../../src/frontend/market-model.js');
+ const candles=[[-60,99,101,100,100],[0,99,103,100,102]];
+ const plot=minutePlot(candles,0,300000,61000,{t:59500,price:101});
+ assert.equal(plot.tip.price,102);
+ assert.equal(plot.tip.x,61000/300000*1000);
+});
 test('binary outcome includes equal prices on Up',()=>{assert.equal(outcome(100,100),'up');assert.equal(outcome(100,101),'up');assert.equal(outcome(100,99.99),'down');});
 test('fractional shares use the full budget with upward penny payout rounding',()=>{const m=markets.find(m=>m.id==='15-2');assert.deepEqual(quote(m,'up',50,14250),{cents:62,contracts:5000/62,cost:50,payout:80.65,profit:30.65});assert.deepEqual(quote(m,'down',50,14250),{cents:38,contracts:5000/38,cost:50,payout:131.58,profit:81.58});});
 test('closed and upcoming markets cannot be traded',()=>{for(const m of markets.filter(m=>m.status!=='open'))assert.equal(quote(m,'up',50,14250),null);});
@@ -46,7 +71,7 @@ test('chance model is independent of coin price units',()=>{const a=estimateChan
 test('queued baseline and completed outcomes are distinguished from estimates',()=>{assert.deepEqual(estimateChances({status:'queued'},NaN,0),{up:50,down:50,label:'BASELINE'});assert.deepEqual(estimateChances({status:'settled',strike:100,close:100},NaN,0),{up:100,down:0,label:'RESULT'});assert.deepEqual(estimateChances({status:'settled',strike:100,close:99},NaN,0),{up:0,down:100,label:'RESULT'});assert.equal(estimateChances({status:'open',strike:100,endsAt:100},NaN,0),null);assert.equal(estimateChances({status:'open',strike:100,endsAt:100},100,100),null);});
 test('volatility uses only completed consecutive minute candles',()=>{const candles=[[0,0,0,0,100],[60,0,0,0,101],[120,0,0,0,1000]];const sigma=minuteVolatility(candles,120000);assert(Math.abs(sigma-Math.log(1.01))<1e-10);assert(Number.isNaN(minuteVolatility([],120000)));assert(Number.isNaN(minuteVolatility([[0,0,0,0,100],[120,0,0,0,1000]],180000)));});
 
-test('opening probability responds immediately to price movement',()=>{for(const minutes of [1,5,15,30,60]){const m={status:'open',strike:100,startsAt:60000,endsAt:60000+minutes*60000};assert(estimateChances(m,101,60000,.001).up>50);assert.equal(estimateChances(m,100,60000,.001).up,50);}});
+test('opening probability responds immediately to price movement',()=>{for(const minutes of [5,15,30,60]){const m={status:'open',strike:100,startsAt:60000,endsAt:60000+minutes*60000};assert(estimateChances(m,101,60000,.001).up>50);assert.equal(estimateChances(m,100,60000,.001).up,50);}});
 
 const {dataStatus,configure}=require('../../src/frontend/market-model.js');
 test('prediction gate requires fresh connected data, benchmark and server quote',()=>{
@@ -68,7 +93,7 @@ test('purchase prices are configured by server, independently of model chances',
 
 test('betting closes exactly 30 seconds before every interval ends',()=>{
  const now=100000,model={feedMode:'live',feedConnection:'connected',spot:101,priceUpdatedAt:now,historyStatus:'ready',quoteReady:true};
- for(const minutes of [1,5,15,30,60]){
+ for(const minutes of [5,15,30,60]){
   const market={status:'open',strike:100,up:62,minutes,endsAt:now+30001};
   assert.equal(dataStatus(model,market,now).ready,true);
   assert.equal(dataStatus(model,market,now+1).ready,false);
@@ -99,19 +124,36 @@ test('locked segments retain display probabilities without allowing bets',()=>{
  assert.equal(dataStatus({...model,priceUpdatedAt:now+30000},market,now+30000,{allowLocked:true}).ready,false);
 });
 
-test('one-minute neighbors and plots preserve exact opening and closing minutes at midnight',()=>{
- const {adjacentMarkets,minutePlot}=require('../../src/frontend/market-model.js');
- const start=Date.UTC(2026,10,3),now=start+20000;
- const candles=[[-120,99,102,100,101],[-60,100,104,101,103],[0,1,1000,103,900]].map(c=>[start/1000+c[0],...c.slice(1)]);
- const [last,current,next]=adjacentMarkets(1,now,now,candles);
- assert.equal(last.id,'1-59');assert.equal(last.start,'23:59');assert.equal(last.end,'00:00');
- assert.equal(last.strike,101);assert.equal(last.close,103);assert.equal(current.strike,103);
- assert.equal(current.id,'1-0');assert.equal(next.id,'1-1');assert.equal(next.strike,null);
- const plot=minutePlot(candles,last.startsAt,last.endsAt,now);
- assert.equal(plot.count,1);assert.equal(plot.tip.price,103);assert.equal(plot.tip.x,1000);
- assert.match(plot.line,/^M0\.000,.* L1000\.000,/);
- assert(plot.high<110,'the incomplete candle must not distort the scale');
- assert.match(plot.up,/h440\.000/,'a minute candle has readable width in a one-minute graph');
+test('one-minute plays are absent from the market catalog',()=>{
+ assert(markets.every(m=>m.minutes>=5));
+ assert(!markets.some(m=>m.id.startsWith('1-')));
+});
+
+test('one-second movement survives minute backfills instead of collapsing into minute-close chords',()=>{
+ const {minutePlot}=require('../../src/frontend/market-model.js');
+ const seconds=Array.from({length:62},(_,i)=>({t:(i+1)*1000,price:i%2?103:98}));
+ const opening=[[-60,99,101,100,100]],close=[0,97,104,100,100];
+ const before=minutePlot(opening,0,300000,62500,{t:62000,price:103},seconds);
+ const after=minutePlot([...opening,close],0,300000,62500,{t:62000,price:103},seconds);
+ assert.equal(before.secondCount,62);assert.equal(after.secondCount,62);
+ assert.equal(before.line.split(' ').length,64);
+ assert.equal(after.line.split(' ').length,64,'minute backfills preserve the observed seconds');
+ assert.equal(after.tip.x,62500/300000*1000,'the trail still ends at the live playhead');
+ const interior=minutePlot([...opening,close],0,300000,60000,null,seconds);
+ assert.equal(interior.tip.price,103,'an interior minute close does not replace the observed one-second price');
+ const settled=minutePlot([...opening,close],0,60000,61000,null,[...seconds,{t:60000,price:500}]);
+ assert.equal(settled.tip.price,100,'settlement boundaries retain the exact minute close');
+ assert.equal(settled.tip.x,1000);
+});
+
+test('one-second trails omit invalid and future samples and leave gaps between unobserved seconds',()=>{
+ const {minutePlot}=require('../../src/frontend/market-model.js');
+ const plot=minutePlot([],0,10000,6000,null,[{t:1000,price:100},{t:2000,price:101},
+  {t:6000,price:99},{t:7000,price:200},{t:6500,price:100},{t:3000,price:0},null]);
+ assert.equal(plot.secondCount,3);
+ assert.equal((plot.line.match(/M/g)||[]).length,2);
+ assert.equal((plot.line.match(/L/g)||[]).length,1);
+ assert.equal(plot.tip.price,99);
 });
 test('minute plots reject malformed and unaligned candles rather than inventing continuity',()=>{
  const {minutePlot}=require('../../src/frontend/market-model.js');

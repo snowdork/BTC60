@@ -37,9 +37,12 @@
       const label=document.createElement('span');label.textContent=coin.symbol;button.append(label);return button;
     }));
     const coinButtons=[...picker.querySelectorAll('[data-coin]')];
+    const durationButtons=[...document.querySelectorAll('[data-detail-duration]')];
     const hourlyPredictions=new Map();
+    const hourlyDurationPredictions=new Map();
     /** Index contest directions by hour when account data changes, including settled orders. */ function updateCoinPredictions(){
       hourlyPredictions.clear();
+      hourlyDurationPredictions.clear();
       const account=window.Predict60Account;
       for(const prediction of account.user?account.predictions||[]:[]){
         if(prediction.mode!=='contest'||!Number.isFinite(prediction.starts_at))continue;
@@ -48,6 +51,11 @@
         if(!hourlyPredictions.has(hour))hourlyPredictions.set(hour,new Map());
         const states=hourlyPredictions.get(hour);
         states.set(prediction.coin,(states.get(prediction.coin)||0)|(prediction.side==='up'?1:2));
+        const minutes=Number(prediction.market_id?.split('-')[0])||(prediction.ends_at-prediction.starts_at)/60;
+        if(![5,15,30,60].includes(minutes))continue;
+        if(!hourlyDurationPredictions.has(hour))hourlyDurationPredictions.set(hour,new Map());
+        const durations=hourlyDurationPredictions.get(hour),key=`${prediction.coin}:${minutes}`;
+        durations.set(key,(durations.get(key)||0)|(prediction.side==='up'?1:2));
       }
       renderCoinPredictions();
     }
@@ -67,6 +75,18 @@
         button.title=`${coin.name} (${coin.symbol})${detail}`;
         button.setAttribute('aria-label',`Select ${coin.name}${detail}`);
       }
+      const durations=model?.feedMode==='demo'?null:hourlyDurationPredictions.get(hour);
+      for(const button of durationButtons){
+        const minutes=Number(button.dataset.detailDuration),symbol=model?.coin?.symbol;
+        const state=symbol?durations?.get(`${symbol}:${minutes}`)||0:0;
+        const marker=state===3?'mixed':state===1?'up':state===2?'down':'none';
+        const context=`${minutes}-minute plays${symbol?' for '+symbol:''}`;
+        const direction=state===3?'Up and Down':state===1?'Up':state===2?'Down':'';
+        const detail=direction?` · ${direction} prediction${state===3?'s':''} in this hour`:'';
+        button.dataset.prediction=marker;
+        button.title=context+detail;
+        button.setAttribute('aria-label','Select '+context+detail);
+      }
     }
     window.addEventListener('account-update',updateCoinPredictions);
     window.addEventListener('btc-market-update',renderCoinPredictions);
@@ -74,7 +94,7 @@
     updateCoinPredictions();
     const coinPredictionTimer=setInterval(renderCoinPredictions,1000);
     window.addEventListener('pagehide',()=>clearInterval(coinPredictionTimer),{once:true});
-    for(const src of ['market-model.js','app.js','market-detail.js','btc-chart.js'])await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=/** Handle the load event for the current transport or resource. */ ()=>{try{if(src==='market-model.js')window.PredictModel.configure(window.Predict60MarketConfig);resolve();}catch(error){reject(error);}};script.onerror=/** Handle the error event for the current transport or resource. */ ()=>reject(Error('Unable to load the terminal.'));document.head.append(script);});
+    for(const src of ['market-model.js','segment-card.js','app.js','market-detail.js','btc-chart.js'])await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=/** Handle the load event for the current transport or resource. */ ()=>{try{if(src==='market-model.js')window.PredictModel.configure(window.Predict60MarketConfig);resolve();}catch(error){reject(error);}};script.onerror=/** Handle the error event for the current transport or resource. */ ()=>reject(Error('Unable to load the terminal.'));document.head.append(script);});
   }catch(error){
     picker.textContent='Markets unavailable';
     const connectionError=error instanceof TypeError||error.name==='AbortError'||error instanceof SyntaxError;

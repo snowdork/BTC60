@@ -11,10 +11,10 @@ test('segments expose prediction, result, and upcoming details actions without n
   const start=source.indexOf('function renderMarkets()');
   const end=source.indexOf('  /** Estimate the selected interval',start);
   vm.runInNewContext(source.slice(start,end)+';renderMarkets();',{
-    markets,market:markets[0],$:()=>grid,marketElements:new Map(),window:{PredictModel:{coin:{feed:'coinbase',icon:'assets/coins/eth.svg',symbol:'ETH'}}},
+    markets,market:markets[0],$:()=>grid,marketElements:new Map(),window:{PredictSegmentCard:require('../../src/frontend/segment-card.js'),PredictModel:{coin:{feed:'coinbase',icon:'assets/coins/eth.svg',symbol:'ETH'}}},
     outcome:()=> 'up',price:String,renderSegmentPredictions(){},renderChances(){}
   });
-  assert.match(grid.innerHTML,/data-segment-action="60-0"[^>]*>[\s\S]*?<span class="segment-action-label">Predict<\/span><\/button>/);
+  assert.match(grid.innerHTML,/data-segment-action="60-0"[^>]*>[\s\S]*?<span class="segment-action-label">Predict\.\.\.<\/span><\/button>/);
   assert.match(grid.innerHTML,/data-segment-action="30-0"[^>]*>[\s\S]*?<span class="segment-action-label">Result<\/span><\/button>/);
   assert.match(grid.innerHTML,/data-segment-action="15-0"[^>]*>[\s\S]*?<span class="segment-action-label">Details<\/span><\/button>/);
   for(const minutes of [60,30,15])assert.ok(grid.innerHTML.includes(`<span>${minutes}m</span>`));
@@ -45,15 +45,12 @@ test('overview exposes all twelve five-minute prediction and detail actions in a
  const grid={innerHTML:'',dataset:{},querySelectorAll:()=>[]};
  const start=source.indexOf('function renderMarkets()'),end=source.indexOf('  /** Estimate the selected interval',start);
  vm.runInNewContext(source.slice(start,end)+';renderMarkets();',{
-  markets,market:markets[0],$:()=>grid,marketElements:new Map(),window:{PredictModel:{coin:{symbol:'BTC'}}},
+  markets,market:markets[0],$:()=>grid,marketElements:new Map(),window:{PredictSegmentCard:require('../../src/frontend/segment-card.js'),PredictModel:{coin:{symbol:'BTC'}}},
   outcome:model.outcome,price:String,renderSegmentPredictions(){},renderChances(){}
  });
  assert.equal((grid.innerHTML.match(/data-market="5-\d+"/g)||[]).length,12);
  assert.match(grid.innerHTML,/tabindex="0" role="region" aria-label="Twelve five-minute markets/);
- assert.match(grid.innerHTML,/tabindex="0" role="region" aria-label="Sixty one-minute markets/);
- assert.equal((grid.innerHTML.match(/data-market="1-\d+"/g)||[]).length,60);
- for(let index=0;index<60;index++)assert.match(grid.innerHTML,new RegExp(`data-segment-action="1-${index}"`));
- assert.match(grid.innerHTML,/data-tier-detail="1"/);assert.match(grid.innerHTML,/data-tier-now="1"/);
+ assert.equal((grid.innerHTML.match(/data-market="1-\d+"/g)||[]).length,0);
  for(let index=0;index<12;index++)assert.match(grid.innerHTML,new RegExp(`data-segment-action="5-${index}"`));
 });
 
@@ -80,7 +77,7 @@ test('reused hourly winnings allow further orders in an interval up to the per-p
   const market={startsAt:1800000000000,endsAt:1800003600000};
   const context={available:1500,market,maxPredictionCredits:1000,
     account:{predictions:[{coin:'BTC',mode:'contest',starts_at:1800000000,ends_at:1800003600,cost_cents:100000}]},
-    window:{PredictModel:{coin:{symbol:'BTC'}}}};
+    window:{PredictSegmentCard:require('../../src/frontend/segment-card.js'),PredictModel:{coin:{symbol:'BTC'}}}};
   context.balance=()=>context.available;
   vm.createContext(context);vm.runInContext(source.slice(start,end),context);
   assert.equal(vm.runInContext('budgetAvailable()',context),1000);
@@ -120,17 +117,18 @@ test('account updates refresh pending countdowns and remove settled or signed-ou
   assert.equal(context.predictionIndex.size,0);
 });
 
-test('pending and upcoming cards omit unavailable prices, movement, odds and countdowns',()=>{
+test('pending and upcoming cards share the placeholder layout without invented prices',()=>{
   const markets=['queued','settled'].map((status,i)=>({id:`15-${i}`,minutes:15,status,start:'12:00',end:'12:15',strike:100,close:null}));
   const grid={innerHTML:'',dataset:{},querySelectorAll:()=>[]};
   const start=source.indexOf('function renderMarkets()'),end=source.indexOf('  /** Estimate the selected interval',start);
   vm.runInNewContext(source.slice(start,end)+';renderMarkets();',{
     markets,market:markets[0],$:()=>grid,marketElements:new Map(),outcome(){throw Error('No result without close');},
-    price:String,renderSegmentPredictions(){},renderChances(){},window:{PredictModel:{coin:{}}}
+    price:String,renderSegmentPredictions(){},renderChances(){},window:{PredictSegmentCard:require('../../src/frontend/segment-card.js'),PredictModel:{coin:{}}}
   });
-  for(const content of ['segment-price-row','segment-odds','data-direction-indicator','segment-countdown'])assert.equal(grid.innerHTML.includes(content),false,content);
+  assert.equal((grid.innerHTML.match(/data-detail-strike class="segment-benchmark-price">—/g)||[]).length,2);
+  assert.equal((grid.innerHTML.match(/data-detail-price class="segment-current-price">—/g)||[]).length,2);
   assert.match(grid.innerHTML,/UPCOMING/);assert.match(grid.innerHTML,/PENDING/);
-  assert.equal((grid.innerHTML.match(/class="card-time"/g)||[]).length,2);
+  assert.equal((grid.innerHTML.match(/class="detail-range"/g)||[]).length,2);
   assert.equal((grid.innerHTML.match(/class="segment-action"/g)||[]).length,2);
 });
 
@@ -149,7 +147,7 @@ test('segment refresh preserves stable DOM values and clears stale live movement
   const model={coin:{feed:'coinbase'},feedMode:'live',feedConnection:'connected',priceUpdatedAt:100000,spot:101,
     dataStatus:()=>({ready:true}),estimateChances:m=>m.status==='settled'?{up:0,down:100}:{up:60,down:40}};
   const start=source.indexOf('function renderChances()'),end=source.indexOf('  /** Render segment predictions',start);
-  const context={window:{PredictModel:model},markets:[open,settled,{id:'queued'}],marketElements,Date:{now:()=>100000},
+  const context={window:{PredictSegmentCard:require('../../src/frontend/segment-card.js'),PredictModel:model},markets:[open,settled,{id:'queued'}],marketElements,Date:{now:()=>100000},
     renderStatusLine(){},renderExecutionState(){},renderReviewChance(){},price:String,
     setText(element,value){if(element.textContent!==value)element.textContent=value;}};
   vm.createContext(context);vm.runInContext(source.slice(start,end),context);
