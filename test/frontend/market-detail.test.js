@@ -218,3 +218,18 @@ test('duration changes return to the current play and coin switches refresh iden
  assert.equal(h.get('play-coin-fallback').hidden,true);
  assert.equal(h.field(0,'coin-name').textContent,'ETH · 60 MIN');
 });
+
+test('play reuses history across price ticks and refreshes replaced candles',()=>{
+ const h=detailHarness(),inputs=[];
+ const plot=h.model.minutePlot;
+ h.model.minutePlot=(candles,...args)=>{inputs.push(candles);return plot(candles,...args);};
+ h.events.get('btc-price-update')();
+ const line=h.get('play-line').attrs.d;
+ h.events.get('btc-chances-update')();
+ assert.equal(inputs[0],inputs[1]);
+ assert.equal(h.get('play-line').attrs.d,line);
+ h.model.candles=h.model.candles.map(c=>[...c.slice(0,4),c[4]+1,...c.slice(5)]);
+ h.events.get('btc-market-update')();
+ assert.notEqual(inputs[2],inputs[0]);
+ assert.equal(h.field(0,'strike').textContent,'$101.00');
+});

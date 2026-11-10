@@ -74,15 +74,25 @@
     renderBannerPrice();broadcast('btc-chances-update');
   }
   let volatilityCandles=null,volatilityMinute=-1;
+  let indexedCandles=null,candlesByTime=new Map();
+  /** Rebuild the boundary lookup only when minute history is replaced. */
+  function candleIndex(){
+    if(indexedCandles!==candles){
+      indexedCandles=candles;
+      candlesByTime=new Map(candles.map(c=>[c[0]*1000,c]));
+    }
+    return candlesByTime;
+  }
   /** Align interval states and opening/closing benchmarks to the displayed hour. */ function syncMarkets(now,force=false) {
     const state=[];model.paused=paused;model.now=now;model.displayHour=hour;model.candles=candles;const minute=Math.floor(now/60000);
     if(candles!==volatilityCandles||minute!==volatilityMinute){
       model.volatility=model.minuteVolatility(candles,now);volatilityCandles=candles;volatilityMinute=minute;
     }
     model.hour=`${coin.symbol}:${mode}:${new Date(hour).toISOString()}`;
+    const boundaries=candleIndex();
     model.markets.forEach(m=>{
       const index=Number(m.id.split('-')[1]),start=hour+index*m.minutes*60000,end=start+m.minutes*60000;
-      const opening=candles.find(c=>c[0]*1000===start-60000),closing=candles.find(c=>c[0]*1000===end-60000);
+      const opening=boundaries.get(start-60000),closing=boundaries.get(end-60000);
       const marketStatus=now>=end?'settled':now>=start?'open':'queued';
       const strike=marketStatus==='queued'?null:opening?Number(opening[4]):null;
       const close=marketStatus==='settled'&&closing?Number(closing[4]):null;
@@ -279,6 +289,7 @@
     if(historical){status('HISTORICAL','neutral');$('chart-source').textContent=mode==='demo'?'Simulated history · settlements':`${sourceLabel()} history · settlements`;}
     draw(currentTime());
   }
+  let annotationCandles=null,annotationHour=null,annotationMinute=null,annotationMode=null,annotationHistorical=null;
   /** Render sixty minute direction cells from exact candle opens and closes. */
   function renderMinuteHeatmap(displayTime){
     const map=$('minute-heatmap'),currentMinute=Math.max(0,Math.min(59,Math.floor((displayTime-hour)/60000)));
@@ -360,11 +371,16 @@
     $('minute-bars-up').setAttribute('d',minutePlot?.up||'');$('minute-bars-down').setAttribute('d',minutePlot?.down||'');
     const valid=points.filter(p=>p.t>=hour&&p.t<=displayTime);
     const hasPoints=minutePlot?!!minutePlot.line:valid.length>0;
-    renderMinuteHeatmap(displayTime);
-    renderSegmentResults(displayTime);
+    const annotationMinuteNow=Math.floor(displayTime/60000);
+    if(annotationCandles!==candles||annotationHour!==hour||annotationMinute!==annotationMinuteNow||annotationMode!==mode||annotationHistorical!==historical){
+      renderMinuteHeatmap(displayTime);
+      renderSegmentResults(displayTime);
+      annotationCandles=candles;annotationHour=hour;annotationMinute=annotationMinuteNow;
+      annotationMode=mode;annotationHistorical=historical;
+    }
     $('chart-empty').hidden=hasPoints;
     $('chart-empty').textContent=historical?(historyFailed?'Data Not Available for this hour.':'Loading the selected hour…'):model.spotStatus==='unavailable'?'Data Not Available · retrying automatically…':coin.feed==='oilpriceapi'&&mode==='live'?'Checking latest spot assessment every 5 seconds…':mode==='demo'?'Starting synthetic preview…':lastPriceAt?'Waiting for history…':`Loading ${coin.symbol}/USD prices…`;
-    const opening=candles.find(c=>c[0]*1000===hour-60000)?.[4];
+    const opening=candleIndex().get(hour-60000)?.[4];
     const change=(historical||model.spotStatus==='ready')&&Number.isFinite(lastPrice)&&Number.isFinite(opening)?lastPrice-opening:null;
     $('btc-change').textContent=change===null?(model.spotStatus==='unavailable'?'Retrying price feed…':'Waiting for price data'):`${change>=0?'+':'−'}${money(Math.abs(change))} ${historical?'that hour':'this hour'}`;
     $('btc-change').style.color=change!==null&&change<0?'var(--red)':'var(--green)';

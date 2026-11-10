@@ -368,3 +368,14 @@ test('a newly opened five-minute market refreshes its benchmark just after the m
  assert.equal(requests.length,2,'history refresh follows the minute boundary instead of waiting another full minute');
  assert(requests.every(url=>new URL(url,'http://localhost').searchParams.get('granularity')==='60'));
 });
+
+test('price ticks reuse minute annotations until the minute changes',async()=>{
+ const h=chartHarness();await flush();
+ const dots=h.element('minute-heatmap').children,results=h.element('segment-results').children;
+ h.tick(109,1000);
+ assert.equal(h.element('minute-heatmap').children,dots);
+ assert.equal(h.element('segment-results').children,results);
+ h.tick(110,30000);
+ assert.notEqual(h.element('minute-heatmap').children,dots);
+ assert.notEqual(h.element('segment-results').children,results);
+});

@@ -8,6 +8,24 @@
   const creditFormatter=new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   let minutes=15,visible=true,lastSignature='',intervals=[],selectedStart=null;
   const historyCache=new Map();
+  let sourceCandles=null,extraCandles=null,mergedCandles=[];
+  let cardFields=new WeakMap();
+  /** Reuse the merged history until either source is replaced. */
+  function playCandles(cached){
+    const source=model.candles,extra=cached?.rows;
+    if(source!==sourceCandles||extra!==extraCandles){
+      sourceCandles=source;extraCandles=extra;
+      mergedCandles=extra?.length?[...new Map([...(source||[]),...extra].map(c=>[c[0],c])).values()]:source||[];
+    }
+    return mergedCandles;
+  }
+  /** Resolve card fields once per markup build, keeping live ticks free of repeated selectors. */
+  function field(card,name){
+    if(!cardFields.has(card))cardFields.set(card,new Map());
+    const fields=cardFields.get(card);
+    if(!fields.has(name))fields.set(name,card.querySelector(`[data-detail-${name}]`));
+    return fields.get(name);
+  }
   let historyRequest=null;
   /** Show the saved bet amount and execution percentage for this exact coin and interval. */
   function renderPredictionTags(selected,container){
@@ -80,9 +98,10 @@
     $('hour-overview').dataset.duration=String(minutes);
     const now=model.feedMode==='demo'?model.now:Math.max(model.now,Date.now());
     const anchor=selectedStart??(model.isHistorical?model.displayHour+3599999:now);
-    const bounds=model.adjacentMarkets(minutes,anchor,now,[])[1];
+    const startsAt=Math.floor(anchor/(minutes*60000))*minutes*60000;
+    const bounds={startsAt,endsAt:startsAt+minutes*60000};
     const key=historyKey(bounds),cached=historyCache.get(key);
-    const candles=[...new Map([...(model.candles||[]),...(cached?.rows||[])].map(c=>[c[0],c])).values()];
+    const candles=playCandles(cached);
     intervals=[model.adjacentMarkets(minutes,anchor,now,candles)[1]];
     const selected=intervals[0];
     if(historyRequest&&historyRequest.key!==key)cancelHistory();
@@ -101,6 +120,7 @@
     $('play-timeframe').textContent=`${model.coin.symbol} · ${selected.start} – ${selected.end} UTC · ${minutes} MIN`;
     if(force||signature!==lastSignature){
       lastSignature=signature;
+      cardFields=new WeakMap();
       $('detail-cards').innerHTML=intervals.map((m,index)=>window.PredictSegmentCard.markup(m,{index})).join('');
     }
     const quoteFresh=model.feedMode==='demo'||(model.spotStatus==='ready'&&Number.isFinite(model.priceUpdatedAt)&&Date.now()-model.priceUpdatedAt<=(model.coin.maxPriceAgeMs||15000)&&model.priceUpdatedAt<=Date.now()+5000&&!model.paused);
@@ -125,9 +145,10 @@
     $('play-next').disabled=intervals[0].startsAt>now;
     $('play-chart-empty').hidden=!!timeline.line||timeline.count>0;
     $('play-chart-empty').textContent=selected.status==='queued'?'Chart begins when this play opens':historyRequest?.key===key?'Loading selected interval…':cached?.error?'Minute history unavailable · retrying automatically':'No minute candles available for this interval';
-    $('play-times').innerHTML=[intervals[0].start,intervals[0].end].map(time=>`<span>${time}</span>`).join('');
+    const times=`<span>${selected.start}</span><span>${selected.end}</span>`;
+    if($('play-times').innerHTML!==times)$('play-times').innerHTML=times;
     $('detail-cards').querySelectorAll('[data-detail-index]').forEach((card,index)=>{
-      const m=intervals[index],/** Find an indexed field within one interval card. */ get=selector=>card.querySelector(`[data-detail-${selector}]`),queued=m.status==='queued',closed=m.status==='settled';
+      const m=intervals[index],/** Find an indexed field within one interval card. */ get=selector=>field(card,selector),queued=m.status==='queued',closed=m.status==='settled';
       const live=!model.isHistorical&&!closed&&!queued&&fresh?{t:model.priceUpdatedAt,price:model.spot}:null;
       const result=closed&&Number.isFinite(m.strike)&&Number.isFinite(m.close)?model.outcome(m.strike,m.close):null;
       const seconds=Math.max(0,Math.ceil(((queued?m.startsAt:m.endsAt)-now)/1000));
@@ -151,7 +172,7 @@
       get('movement').textContent=movement?movement.label:'';
       get('movement').dataset.direction=movement?movement.direction:'';
       get('result').style.color=result==='up'?'var(--green)':result==='down'?'var(--red)':'var(--muted)';
-      const action=card.querySelector('[data-detail-predict]');action.hidden=false;
+      const action=get('predict');action.hidden=false;
       action.disabled=!closed&&!queued&&(!model.markets.some(item=>item.id===m.id&&item.startsAt===m.startsAt)||!model.dataStatus(model,m,Date.now()).ready);
     });
   }
