@@ -76,7 +76,7 @@ body:not(.auth-page) main{padding:10px 20px 0}
 /* Each prediction horizon has its own outline and horizontal divider. */
 .tier[data-duration="60"]{--tier-color:#ffd54f}
 .tier[data-duration="30"]{--tier-color:#00d4ff}
-.tier[data-duration="15"]{--tier-color:#b388ff}
+.tier[data-duration="15"]{--tier-color:#e879f9}
 .tier[data-duration]{position:relative;padding-top:7px;border-top:2px solid var(--tier-color)}
 .tier[data-duration] .tier-label{color:var(--tier-color)}
 .tier[data-duration] .market-card{border-color:color-mix(in srgb,var(--tier-color) 65%,transparent)}
@@ -360,12 +360,9 @@ body:not(.auth-page) main{padding:10px 20px 0}
 
 .chart-toolbar>div[hidden]{display:none}
 
-/* Outer direction ring and inner selection ring remain visible together. */
+/* Neutral pending ring and inner selection ring remain visible together. */
 :root .coin-picker .coin-button{position:relative}
-:root .coin-picker .coin-button[data-prediction="up"]{--coin-ring:var(--green)}
-:root .coin-picker .coin-button[data-prediction="down"]{--coin-ring:var(--red)}
-:root .coin-picker .coin-button[data-prediction="mixed"]{--coin-ring:var(--green) var(--red) var(--red) var(--green)}
-:root .coin-picker .coin-button:is([data-prediction="up"],[data-prediction="down"],[data-prediction="mixed"]):after{content:'';position:absolute;inset:-3px;border:2px solid;border-color:var(--coin-ring);border-radius:calc(6px + 3px);pointer-events:none}
+:root .coin-picker .coin-button[data-prediction="pending"]:after{content:'';position:absolute;inset:-3px;border:2px solid var(--amber);border-radius:calc(6px + 3px);pointer-events:none}
 :root .coin-picker .coin-button[aria-pressed="true"]{border-color:var(--border);box-shadow:inset 0 0 0 2px #fff}
 :root[data-theme="light"] .coin-picker .coin-button[aria-pressed="true"]{border-color:var(--border);box-shadow:inset 0 0 0 2px #000}
 

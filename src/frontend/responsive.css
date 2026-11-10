@@ -519,11 +519,11 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
 .play-duration-picker small{font-size:11px}
 [data-detail-duration="60"]{--duration-color:#a78bfa}
 [data-detail-duration="30"]{--duration-color:#60a5fa}
-[data-detail-duration="15"]{--duration-color:#2dd4bf}
+[data-detail-duration="15"]{--duration-color:#e879f9}
 [data-detail-duration="5"]{--duration-color:#fbbf24}
 .detail-durations button{border-bottom:3px solid var(--duration-color)}
 .detail-durations button[aria-pressed="true"]{color:var(--duration-color);background:var(--raised)}
-#market-detail{--play-color:#2dd4bf}
+#market-detail{--play-color:#e879f9}
 #market-detail[data-duration="60"]{--play-color:#a78bfa}
 #market-detail[data-duration="30"]{--play-color:#60a5fa}
 #market-detail[data-duration="5"]{--play-color:#fbbf24}
@@ -759,12 +759,12 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
 /* Completed plays have a light gray surface with readable prices in either theme. */
 #market-detail[data-duration="60"]{--completed-play-color:#7c3aed}
 #market-detail[data-duration="30"]{--completed-play-color:#2563eb}
-#market-detail[data-duration="15"]{--completed-play-color:#0f766e}
+#market-detail[data-duration="15"]{--completed-play-color:#a21caf}
 #market-detail[data-duration="5"]{--completed-play-color:#a16207}
 #market-detail[data-state="completed"] :is(.play-timeline,.detail-card){
  --text:#1f2937;--muted:#566173;--surface:#e5e7eb;--raised:#d1d5db;
  --border:#aeb8c4;--green:#087443;--red:#b42338;
- --play-color:var(--completed-play-color,#0f766e);
+ --play-color:var(--completed-play-color,#a21caf);
  background:#e5e7eb;color:var(--text);
 }
 .terminal-page #hour-overview .market-card.settled{background:#e5e7eb}
@@ -890,7 +890,7 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
 }
 @media(prefers-reduced-motion:reduce){#market-detail[data-state="live"] #play-now-label{animation:none}}
 
-/* Blue marks selection; the outer green/red rings mark saved directions. */
+/* Blue marks selection; the amber coin rings mark pending bets and interval rings mark directions. */
 :root .terminal-page .play-controls .coin-selection .coin-button[aria-pressed="true"]{
  border-color:#3b82f6;box-shadow:inset 0 0 0 2px #3b82f6;
  background:color-mix(in srgb,#3b82f6 10%,var(--surface));color:var(--text);
@@ -905,13 +905,13 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
 }
 
 /* Full hour shares the selected-play header, graph size, palette and card surfaces. */
-#hour-overview{--overview-color:#2dd4bf;--overview-completed-color:#0f766e;--tier-gutter:54px;--chart-height:260px}
+#hour-overview{--overview-color:#e879f9;--overview-completed-color:#a21caf;--tier-gutter:54px;--chart-height:260px}
 #hour-overview[data-duration="60"]{--overview-color:#a78bfa;--overview-completed-color:#7c3aed}
 #hour-overview[data-duration="30"]{--overview-color:#60a5fa;--overview-completed-color:#2563eb}
 #hour-overview[data-duration="5"]{--overview-color:#fbbf24;--overview-completed-color:#a16207}
 :root .terminal-page #hour-overview .tier[data-duration="60"]{--tier-color:#a78bfa}
 :root .terminal-page #hour-overview .tier[data-duration="30"]{--tier-color:#60a5fa}
-:root .terminal-page #hour-overview .tier[data-duration="15"]{--tier-color:#2dd4bf}
+:root .terminal-page #hour-overview .tier[data-duration="15"]{--tier-color:#e879f9}
 :root .terminal-page #hour-overview .tier[data-duration="5"]{--tier-color:#fbbf24}
 #hour-overview .timeline-stack{min-width:0;--chart-height:260px}
 #hour-overview .hour-chart{margin:0 0 14px;border-radius:12px;overflow:hidden;background:color-mix(in srgb,var(--overview-color) 12%,var(--surface))}
