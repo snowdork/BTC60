@@ -3,8 +3,10 @@ import math
 import subprocess
 import runpy
 import tempfile
+from datetime import datetime
 from pathlib import Path
 import urllib.error
+import urllib.parse
 import unittest
 from unittest.mock import patch
 import odds
@@ -71,16 +73,21 @@ class OddsTest(unittest.TestCase):
 
     def test_history_paginates_deduplicates_and_caches(self):
         class Response:
+            def __init__(self, request):
+                query = urllib.parse.parse_qs(urllib.parse.urlsplit(request.full_url).query)
+                end = int(datetime.fromisoformat(query['end'][0]).timestamp())
+                candle = [end - 60, 0, 0, 0, 100]
+                # The response belongs to its requested interval regardless of worker order.
+                self.batch = [candle, candle, [end, 0, 0, 0, 100]]
             def __enter__(self):return self
             def __exit__(self,*args):pass
         server.HISTORY_CACHE.clear()
-        batches=[[[86400-i*14400-60,0,0,0,100]] for i in range(6)]
-        with patch('server.urllib.request.urlopen',return_value=Response()) as fetch,patch('server.json.load',side_effect=batches):
+        with patch('server.urllib.request.urlopen',side_effect=lambda request, **kwargs: Response(request)) as fetch,patch('server.json.load',side_effect=lambda response: response.batch):
             history=server.pricing_history('TEST-USD',86401)
             self.assertEqual(len(history),6)
             self.assertEqual(server.pricing_history('TEST-USD',86420),history)
             self.assertEqual(fetch.call_count,6)
-        with patch('server.urllib.request.urlopen',return_value=Response()) as fetch,patch('server.json.load',return_value=[[86400,0,0,0,101]]):
+        with patch('server.urllib.request.urlopen',side_effect=lambda request, **kwargs: Response(request)) as fetch,patch('server.json.load',return_value=[[86400,0,0,0,101]]):
             updated=server.pricing_history('TEST-USD',86461)
             self.assertEqual(fetch.call_count,1)
             self.assertEqual(updated[-1][4],101)

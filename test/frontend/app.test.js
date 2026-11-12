@@ -27,16 +27,22 @@ test('segment action selects its market and opens the popup',()=>{
   const start=source.indexOf("$('market-grid').addEventListener('click'");
   const end=source.indexOf('  let directionHintTimer;',start);
   let click,rendered=0,opened=0;
+  const dispatched=[],grid={dataset:{},addEventListener(_,fn){click=fn;}};
   const dialog={open:false,showModal(){this.open=true;opened++;}};
-  const selected={id:'30-0'};
+  const selected={id:'30-0',minutes:30,startsAt:1800000000000};
   const context={markets:[selected],market:null,side:'up',review:{},marketElements:new Map(),renderTicket(){rendered++;},
-    $:id=>id==='market-grid'?{addEventListener(_,fn){click=fn;}}:id==='prediction-dialog'?dialog:{close(){}}};
+    window:{dispatchEvent(event){dispatched.push(event);}},CustomEvent:class{constructor(type,{detail}){this.type=type;this.detail=detail;}},
+    $:id=>id==='market-grid'?grid:id==='prediction-dialog'?dialog:{close(){}}};
   vm.runInNewContext(source.slice(start,end),context);
   click({target:{closest:selector=>selector==='[data-market]'?{dataset:{market:'30-0'}}:{}}});
   assert.equal(context.market,selected);
   assert.equal(context.side,null);
   assert.equal(rendered,1);
   assert.equal(opened,1);
+  assert.equal(grid.dataset.selection,'30-0:1800000000000');
+  assert.equal(dispatched[0].type,'market-interval-select');
+  assert.equal(dispatched[0].detail.minutes,30);
+  assert.equal(dispatched[0].detail.startsAt,selected.startsAt);
 });
 
 test('overview exposes all twelve five-minute prediction and detail actions in a scrollable region',()=>{

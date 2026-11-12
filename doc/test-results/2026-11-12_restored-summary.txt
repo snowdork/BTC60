@@ -1,0 +1,10 @@
+Restored compact summary browser checks
+2026-11-12 · Playwright/Chromium · mocked account and candle data
+
+1440px dark: compact summary arrows align below candles in Hour and all four intervals; plot heights remain 180/150px, summary rows add 16px, and navigation resets them correctly.
+1440px light: compact summary arrows align below candles in Hour and all four intervals; plot heights remain 180/150px, summary rows add 16px, and navigation resets them correctly.
+390px dark: compact summary arrows align below candles in Hour and all four intervals; plot heights remain 180/150px, summary rows add 16px, and navigation resets them correctly.
+390px light: compact summary arrows align below candles in Hour and all four intervals; plot heights remain 180/150px, summary rows add 16px, and navigation resets them correctly.
+320px dark: compact summary arrows align below candles in Hour and all four intervals; plot heights remain 180/150px, summary rows add 16px, and navigation resets them correctly.
+320px light: compact summary arrows align below candles in Hour and all four intervals; plot heights remain 180/150px, summary rows add 16px, and navigation resets them correctly.
+Minute trend browser checks passed.

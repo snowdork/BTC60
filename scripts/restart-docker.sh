@@ -49,8 +49,16 @@ if [[ ${1:-} == --local ]]; then
     echo 'P60_PORT must be a port number from 1 to 65535.' >&2
     exit 1
   fi
+  # Refuse a conflict before stopping anything or replacing the current local app.
+  published_ports=$(docker ps --format '{{.Names}}|{{.Ports}}')
+  while IFS='|' read -r container_name container_ports; do
+    if [[ $container_name != p60-local && $container_ports == *":${local_port}->"* ]]; then
+      echo "Port ${local_port} is already published by ${container_name}. Set a different P60_PORT in .env.local or stop that deployment first." >&2
+      exit 1
+    fi
+  done <<< "$published_ports"
   # Build first so a failed build leaves the existing local app available.
-  docker build -t p60:local .
+  docker build -t p60:local-dev .
   stop_host_service
   if docker container inspect p60-local >/dev/null 2>&1; then
     docker stop p60-local
@@ -72,7 +80,7 @@ if [[ ${1:-} == --local ]]; then
     -e "P60_HOST=http://localhost:${local_port}" \
     -e PREDICT60_DB=/app/data/p60.sqlite3 \
     -v p60-local-data:/app/data \
-    p60:local
+    p60:local-dev
   for attempt in {1..30}; do
     if docker exec p60-local python3 -c \
       "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).read()" >/dev/null 2>&1; then
@@ -110,7 +118,7 @@ fi
 stop_host_service
 
 echo 'Starting the app behind the shared VPS proxy...'
-if ! "${compose[@]}" up -d --no-build --wait --wait-timeout 120; then
+if ! "${compose[@]}" up -d --no-build --no-deps --wait --wait-timeout 120 app; then
   "${compose[@]}" ps -a >&2
   echo 'Startup failed. Inspect: sudo docker compose logs --tail=100 app' >&2
   exit 1

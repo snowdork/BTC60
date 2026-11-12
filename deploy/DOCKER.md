@@ -3,7 +3,7 @@
 Run one shared reverse proxy on the VPS for all projects. Predict60 publishes
 HTTP only on `127.0.0.1:8085`; set `P60_PORT` in the project's `.env` to change it.
 Phunky uses `127.0.0.1:8086` and `https://phunk.free-vibe.com`.
-For now these are the two applications on this VPS; see [the shared address plan](VPS.md).
+Other shared applications have their own ports; see [the shared address plan](VPS.md).
 Each project needs a distinct Compose project name and non-overlapping network.
 Predict60 keeps its existing `p60` project and data volume.
 
@@ -18,7 +18,22 @@ When changing `P60_PORT`, update the proxy upstream too: Compose's `.env` does
 not set the host Caddy service environment. Set that service's `P60_PORT` or edit
 the upstream in its configuration. Keep the existing shared site's blocks.
 Google OAuth Authorized JavaScript origins must include both HTTPS origins.
+Configure them under [Google Auth Platform → Clients](https://console.cloud.google.com/auth/clients).
 Accounts share the database; browser login cookies are separate per hostname.
+
+For Google login at `http://localhost:8085` on this same stack, add that exact
+origin to the existing comma-separated `P60_ADDITIONAL_ORIGINS` in `.env`:
+
+```dotenv
+P60_ADDITIONAL_ORIGINS=https://predict60.free-vibe.com,http://localhost:8085
+```
+
+Then run `docker compose up -d --no-build --wait app` to apply the setting.
+Keep `P60_HOST` on the public HTTPS origin and keep the existing aliases.
+Authorize `http://localhost:8085` in Google's web client settings as well.
+An `Invalid request origin.` response from `/api/auth/google` means the
+browser origin is missing from the app's allowlist. For a separate local
+development container, use [local Docker mode](LOCAL.md#docker).
 
 Existing deployments: stop the old stack's Caddy with `docker compose stop caddy`
 **before updating the checkout**, then let the shared host proxy own 80/443.
@@ -27,7 +42,7 @@ Do not remove volumes. Existing app data and old certificate volumes are retaine
 The app trusts the host via Docker gateway `172.30.60.1`; keep that subnet free.
 
 ```bash
-cp deploy/docker.env.example .env
+cp -n deploy/docker.env.example .env
 chmod 600 .env
 # Edit .env and set P60_DOMAIN to your real domain.
 sudo systemctl enable --now docker
@@ -35,19 +50,32 @@ bash deploy/start-docker.sh
 docker compose logs --tail=100 app
 ```
 
-`start-docker.sh` can be called from any directory. It requires the repository’s
-`.env`, validates Compose without printing secrets, checks daemon access, builds
-the images, and waits up to 120 seconds for service readiness. Use a recent
+`start-docker.sh` delegates to `scripts/restart-docker.sh`; both can be called
+from any directory. They explicitly use this checkout's `compose.yaml` and
+`.env`, validate Compose without printing secrets, check daemon access, build
+the app, and wait up to 120 seconds for service readiness. Use a recent
 Compose plugin supporting `up --wait`. If startup fails, containers remain
 available for log inspection; correct the problem and rerun the command. App
 startup does not verify public DNS or certificate issuance, so check the public
-HTTPS endpoint separately. The helper does not stop host services or import an
-existing database; complete the data import below before first startup if needed.
+HTTPS endpoint separately. After a successful build, the helper stops an installed
+`predict60.service` before starting the container; run with `sudo` when required.
+It does not import an existing database; complete the data import below before
+first startup if needed.
 
 The shared host proxy provides HTTPS and sends a single `X-Forwarded-For`
 address. The app port stays on loopback. The image runs as user 10001; Docker
 restarts exited containers with `unless-stopped`. Keep one app replica and do
 not run the host app service against the same database.
+
+VPS builds use `p60:${P60_IMAGE_TAG}` (default `p60:local`). Local development
+uses `p60:local-dev`, so rebuilding a local image cannot replace the VPS image
+tag. Set `GOOGLE_CLIENT_ID` in the selected environment file; the server supplies
+the same ID to the login, signup, and account-linking pages and verifies tokens
+against it. No frontend edits or client secret are required.
+
+`P60_ADDITIONAL_ORIGINS` accepts exact origins separated by commas. Set it to
+an empty value to remove all aliases, or list only the aliases this deployment
+serves. Google must authorize every origin on which its sign-in button is used.
 
 The image health check probes `/healthz`. An unhealthy status alone does not
 restart a running container; monitor public HTTP availability separately.

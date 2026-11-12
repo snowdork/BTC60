@@ -95,7 +95,7 @@
     renderCoinPredictions();
     const coinPredictionTimer=setInterval(renderCoinPredictions,1000);
     window.addEventListener('pagehide',()=>clearInterval(coinPredictionTimer),{once:true});
-    for(const src of ['market-model.js','segment-card.js','app.js','market-detail.js','btc-chart.js'])await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=/** Handle the load event for the current transport or resource. */ ()=>{try{if(src==='market-model.js')window.PredictModel.configure(window.Predict60MarketConfig);resolve();}catch(error){reject(error);}};script.onerror=/** Handle the error event for the current transport or resource. */ ()=>reject(Error('Unable to load the terminal.'));document.head.append(script);});
+    for(const src of ['market-model.js','minute-trend.js','segment-card.js','app.js','market-detail.js','btc-chart.js'])await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=/** Handle the load event for the current transport or resource. */ ()=>{try{if(src==='market-model.js')window.PredictModel.configure(window.Predict60MarketConfig);resolve();}catch(error){reject(error);}};script.onerror=/** Handle the error event for the current transport or resource. */ ()=>reject(Error('Unable to load the terminal.'));document.head.append(script);});
   }catch(error){
     picker.textContent='Markets unavailable';
     const connectionError=error instanceof TypeError||error.name==='AbortError'||error instanceof SyntaxError;

@@ -18,8 +18,9 @@ Predictions and settlement
 --------------------------
 
 ``bootstrap.js`` waits for authentication, loads category/instrument metadata,
-then loads the market model, controller and chart in order. Coming-soon Weather
-cannot enter the terminal. ``coins.js`` validates and freezes the browser catalog.
+then loads ``market-model.js``, ``minute-trend.js``, ``segment-card.js``,
+``app.js``, ``market-detail.js``, and ``btc-chart.js`` in that order. Oil and Weather
+cannot enter the terminal while marked Coming soon. ``coins.js`` validates and freezes the browser catalog.
 ``btc-chart.js`` switches quote transports, retains exact minute history, and
 ignores superseded asynchronous history responses. Browser times use milliseconds.
 
@@ -29,7 +30,7 @@ orders again, including the thirty-second cutoff, CSRF, budget and authoritative
 provider quote. Database transactions protect balance changes and duplicate
 request IDs. Prediction-source snapshots preserve original settlement semantics.
 
-``app.js`` renders compact upcoming/pending cards without unavailable data.
+``app.js`` renders upcoming/pending cards with placeholders for unavailable data.
 Its segment node index supports in-place updates; unchanged refreshes do not
 rewrite price text, direction classes or accessible movement labels.
 ``responsive.css`` owns the final segment layout and phone touch sizes.
@@ -53,6 +54,44 @@ diagnostics. ``weather.py`` uses signed temperatures and nonnegative
 wind, UTC hourly boundaries, pinned stations, and actual observations no older
 than ten minutes. Missing or conflicting latest observations defer settlement.
 The positive-price financial log-return model cannot be applied to weather.
+
+Chart views and compact plots
+-----------------------------
+
+``market-detail.js`` owns the Interval/Hour view state and defaults to Interval.
+The title-bar controls and delegated card-body ``dblclick`` handlers call the
+mode switch. Single-click duration choices and ``market-interval-select`` events
+change the interval without changing modes. Double-clicking an Hour card resolves
+its exact market start/duration; double-clicking an Interval card returns to Hour.
+The handlers ignore buttons, links, form fields, and editable content.
+Entering Hour clears its duration and card highlights; ``market-overview`` tells
+``app.js`` to clear the explicit card selection and render the overview.
+
+A segment click emits ``market-interval-select`` with minutes and the absolute
+``startsAt`` in milliseconds. ``market-duration-change`` refreshes the Hour graph's
+cutoffs and clears an obsolete card highlight when only a duration was chosen.
+The selected interval is inspected when the user selects Interval or double-clicks
+the card. ``market-hour-select`` carries an absolute UTC hour in milliseconds
+when a browsed past interval returns to Hour; ``btc-chart.js`` validates the hour
+boundary and retains the existing current-hour limit. The Hour grid records an explicit ``id:startsAt`` selection separately from the ticket's
+automatic current-market fallback, so a background refresh does not restore an
+unrequested highlight. Changing the instrument/hour clears that grid selection.
+
+``responsive.css`` defines a shared ``--price-chart-height`` of 180 pixels,
+reduced to 150 pixels at viewport widths of 700 pixels or less. Hour and Interval
+use this value for their plots; the Hour time cursor inherits the same height.
+Time labels follow a compact, 16-pixel minute summary beneath each plot.
+
+``minute-trend.js`` validates the same OHLC fields as ``minutePlot`` and renders
+green up/red down arrows at completed candles' midpoints. Unchanged closes count
+as Up; current, missing, and upcoming minutes never receive a completed direction.
+It caches candle identity, interval bounds, minute, and historical state. Both
+views call the shared renderer, which loads before them through ``bootstrap.js``
+and is included in the server's public allowlist and static export.
+
+Graph surfaces remain black. Hour has a white trace and separate green/red
+candles. Interval uses its duration color for the trace, grid, and endpoint.
+Wrapped and scrolling interval cards retain their local current-time cursors.
 
 Loops, guards, and failure handling
 -----------------------------------

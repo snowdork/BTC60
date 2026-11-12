@@ -3,7 +3,7 @@ name: p60-local
 services:
   app:
     build: .
-    image: p60:local
+    image: p60:local-dev
     container_name: p60-local
     restart: unless-stopped
     stop_grace_period: 30s

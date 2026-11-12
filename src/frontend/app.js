@@ -100,6 +100,14 @@
     markets.forEach(m=>{
       const nodes=marketElements.get(m.id);
       if(!nodes?.price)return;
+      if(nodes.now){
+        const active=!model.isHistorical&&m.status==='open'&&model.now>=m.startsAt&&model.now<m.endsAt;
+        if(nodes.now.hidden===active)nodes.now.hidden=!active;
+        if(active){
+          const left=`${(model.now-m.startsAt)/(m.endsAt-m.startsAt)*100}%`;
+          if(nodes.now.style.left!==left)nodes.now.style.left=left;
+        }
+      }
       if(nodes.coin){
         const icon=model.coin.icon||'assets/coins/btc.svg';
         if(nodes.coin.dataset.source!==icon){nodes.coin.src=icon;nodes.coin.dataset.source=icon;}
@@ -185,13 +193,14 @@
   }
   /** Render markets from the latest account, market, and interface state. */ function renderMarkets() {
     const grid=$('market-grid'),resetScroll=grid.dataset.hour!==window.PredictModel.hour||grid.dataset.scrollPending==='true';
+    if(grid.dataset.hour!==window.PredictModel.hour)delete grid.dataset.selection;
     grid.dataset.hour=window.PredictModel.hour;
     grid.dataset.scrollPending=String(grid.offsetParent===null);
     const scrolls=new Map([...$('market-grid').querySelectorAll('.tier-cards')].map(row=>[row.closest('[data-duration]').dataset.duration,row.scrollLeft]));
     $('market-grid').innerHTML=[60,30,15,5].map(minutes=>{
       const items=markets.filter(m=>m.minutes===minutes);
-      return `<div class="tier" data-duration="${minutes}"><div class="tier-label"><span>${minutes}m</span><img class="tier-coin-icon" width="24" height="24" alt="">${minutes<=5?`<div class="tier-tools"><button type="button" data-tier-now="${minutes}" aria-label="Show current ${minutes}-minute market">Now</button><button type="button" data-tier-detail="${minutes}" aria-label="Show selected ${minutes}-minute play">Detail</button></div>`:''}</div><div class="tier-cards" style="--columns:${items.length}" ${minutes<=5?`tabindex="0" role="region" aria-label="Twelve five-minute markets. Scroll horizontally for all intervals."`:''}>${items.map(m=>{
-        return window.PredictSegmentCard.markup(m,{selected:m.id===market.id&&m.startsAt===market.startsAt});
+      return `<div class="tier" data-duration="${minutes}"><div class="tier-label"><span>${minutes}m</span><img class="tier-coin-icon" width="24" height="24" alt="">${minutes<=5?`<div class="tier-tools"><button type="button" data-tier-now="${minutes}" aria-label="Show current ${minutes}-minute market">Now</button><button type="button" data-tier-detail="${minutes}" aria-label="Select current ${minutes}-minute interval">Select</button></div>`:''}</div><div class="tier-cards" style="--columns:${items.length}" ${minutes<=5?`tabindex="0" role="region" aria-label="Twelve five-minute markets. Scroll horizontally for all intervals."`:''}>${items.map(m=>{
+        return window.PredictSegmentCard.markup(m,{selected:grid.dataset.selection===`${m.id}:${m.startsAt}`});
       }).join('')}</div></div>`;
     }).join('');
     $('market-grid').querySelectorAll('.tier-cards').forEach(row=>{
@@ -208,7 +217,7 @@
     });
     marketElements.clear();
     $('market-grid').querySelectorAll('[data-market]').forEach(card=>{
-      marketElements.set(card.dataset.market,{card,reference:card.querySelector('[data-reference-price]'),predictions:card.querySelector('[data-predictions]'),up:card.querySelector('.segment-odds-up'),down:card.querySelector('.segment-odds-down'),price:card.querySelector('.segment-current-price'),direction:card.querySelector('[data-direction-indicator]'),arrow:card.querySelector('.segment-direction-arrow'),change:card.querySelector('.segment-direction-change'),coin:card.querySelector('[data-detail-coin]'),coinName:card.querySelector('[data-detail-coin-name]'),strike:card.querySelector('[data-detail-strike]'),status:card.querySelector('[data-detail-status]'),countdown:card.querySelector('[data-detail-countdown]'),chances:card.querySelector('.segment-chances'),summary:card.querySelector('.segment-summary'),movement:card.querySelector('[data-detail-movement]')});
+      marketElements.set(card.dataset.market,{card,now:card.querySelector('[data-segment-now]'),reference:card.querySelector('[data-reference-price]'),predictions:card.querySelector('[data-predictions]'),up:card.querySelector('.segment-odds-up'),down:card.querySelector('.segment-odds-down'),price:card.querySelector('.segment-current-price'),direction:card.querySelector('[data-direction-indicator]'),arrow:card.querySelector('.segment-direction-arrow'),change:card.querySelector('.segment-direction-change'),coin:card.querySelector('[data-detail-coin]'),coinName:card.querySelector('[data-detail-coin-name]'),strike:card.querySelector('[data-detail-strike]'),status:card.querySelector('[data-detail-status]'),countdown:card.querySelector('[data-detail-countdown]'),chances:card.querySelector('.segment-chances'),summary:card.querySelector('.segment-summary'),movement:card.querySelector('[data-detail-movement]')});
     });
     renderSegmentPredictions();
     renderChances();
@@ -305,8 +314,10 @@
   $('market-grid').addEventListener('click',event=>{
     const button=event.target.closest('[data-market]');if(!button)return;
     market=markets.find(m=>m.id===button.dataset.market);side=null;
+    $('market-grid').dataset.selection=`${market.id}:${market.startsAt}`;
     review=null;$('review-dialog').close();
     marketElements.forEach(({card},id)=>{const selected=id===market.id;card.classList.toggle('selected',selected);});
+    window.dispatchEvent(new CustomEvent('market-interval-select',{detail:{minutes:market.minutes,startsAt:market.startsAt}}));
     renderTicket();
     if(event.target.closest('[data-segment-action]')&&!$('prediction-dialog').open)$('prediction-dialog').showModal();
   });
@@ -378,10 +389,15 @@
   }
   window.addEventListener('account-update',()=>{if(account.error)notify(account.error);});
   window.addEventListener('account-update',renderAccount);
-  window.addEventListener('market-overview',renderMarkets);
+  window.addEventListener('market-overview',()=>{delete $('market-grid').dataset.selection;renderMarkets();});
+  window.addEventListener('market-duration-change',event=>{
+    if(Number.isFinite(event.detail?.startsAt))return;
+    delete $('market-grid').dataset.selection;
+    marketElements.forEach(({card})=>card.classList.remove('selected'));
+  });
   $('market-grid').addEventListener('click',event=>{
     const detail=event.target.closest('[data-tier-detail]');
-    if(detail){window.dispatchEvent(new CustomEvent('market-detail-open',{detail:{minutes:Number(detail.dataset.tierDetail)}}));return;}
+    if(detail){window.dispatchEvent(new CustomEvent('market-interval-select',{detail:{minutes:Number(detail.dataset.tierDetail)}}));return;}
     const now=event.target.closest('[data-tier-now]');
     if(now){
       const row=now.closest('.tier').querySelector('.tier-cards'),active=row.querySelector('.market-card.open');

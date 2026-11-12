@@ -47,17 +47,60 @@ also completes when another tab has already ended that session.
 
 ## Read the terminal
 
-Choose a coin using the icon grid beside the price. The default choices are BTC, ETH, SOL, XRP, DOGE, ADA, and LTC; administrators can change availability. Coin selection updates prices, chart, and market context. All coins share your account balance.
+Choose a coin in the selector below the title bar. The default catalog enables
+BTC, ETH, SOL, XRP, DOGE, ADA, LTC, LINK, AVAX, and SUI; administrators can change
+availability. Coin selection updates the price, both charts, and prediction
+context. All coins share your hourly contest balance.
 
-Selecting a coin immediately requests a current price and shows **Loading…** while it arrives. If no valid, recent quote is available, the price reads **Data Not Available**. The terminal retries automatically; you do not need to refresh or switch coins again. Historical candles never substitute for a current quote, and predictions remain blocked until the required price and benchmark data are ready.
+The title bar shows the P60 logo with Predict60 beneath it, the selected coin's
+icon and USD price, and the dollar and percentage change for the displayed UTC
+hour. The hourly change compares the current price with the exact opening
+benchmark; past hours use their closing price. Green means up or unchanged and
+red means down. If the quote or opening benchmark is unavailable, the change
+stays unavailable. Credits and UTC/local clocks are also in the title bar.
 
-The live price display updates every two seconds. Clocks and betting countdowns continue to update every second. Selecting another coin or reporting unavailable data updates the price state immediately.
+Price displays refresh at most once per second; clocks and betting countdowns
+update every second. Switching coins shows **Loading…** immediately. If no valid
+recent quote arrives, the price reads **Data Not Available** and retries
+continue automatically. Historical candles do not substitute for a current
+quote, and orders require both a fresh price and an exact opening benchmark.
 
-Each UTC hour shows one 60-minute interval, two 30-minute intervals, four 15-minute intervals, and twelve 5-minute intervals. Select any card to inspect its benchmark and details in the ticket. Open cards accept predictions when data is ready. Upcoming and completed cards are read-only. Use the arrows beside the graph to navigate time; **Now** finds the current five-minute card and **Detail** opens Selected play for that duration.
+The title-bar controls are **Interval** followed by **Hour**. Interval is the
+default and shows one 5-, 15-, 30-, or 60-minute play. The arrows beside its graph
+move by one interval; **Back to live** resumes the current interval.
 
-Up/Down percentages are heuristic model estimates, not calibrated odds. They also set simulated contract prices: 70% Up means an Up contract costs 0.70 credits. Percentages and prices change with spot, time remaining, and recent volatility. Upcoming cards hide percentages; completed cards show results when candle history is available.
+Hour shows one 60-minute interval, two 30-minute intervals, four 15-minute
+intervals, and twelve 5-minute intervals. Switching to Hour clears the duration
+and segment selection highlights. Clicking a segment highlights its time and
+duration without changing views. Select **Interval** to inspect that chosen
+segment. You can also **double-click the card body or time range** to open that
+exact interval directly. Double-click the Interval card to return to Hour; when
+browsing a past interval, its containing UTC hour opens. Buttons and other
+interactive controls keep their normal actions and do not trigger this shortcut.
 
-The prediction pane shows the selected interval within its UTC hour, current spot and source time, distance from the benchmark, and the exact closing-price conditions for Up and Down. Completed intervals show their closing benchmark; upcoming intervals wait for their opening benchmark. Stale or disconnected prices hide the live comparison.
+Single-click selections and duration buttons keep the current view. Use the
+**Interval / Hour** controls or the card double-click shortcut to switch views.
+In the five-minute row, **Now** scrolls to the current
+card and **Select** chooses that duration without leaving Hour.
+
+Both graphs have black backgrounds in either theme, green up candles, red down
+candles, and alternating red/yellow dotted current-time markers. Hour has a white price line. Interval's
+line, grid, and endpoint use its duration color: purple for 60 minutes, blue for
+30, pink for 15, and amber for 5. Orange dashed markers indicate the prediction
+cutoff, 30 seconds before each interval ends.
+
+Both plots use a compact height: 180 pixels on desktop and 150 pixels on phones.
+A compact row beneath each graph shows green up/red down arrows for completed
+minute candles. Each arrow aligns with its candle and compares the minute's
+close with its open; unchanged closes count as Up. The current minute uses an
+amber dash, and missing/upcoming minutes stay neutral. Hover for the UTC minute
+and movement. The row takes 16 pixels; Up/Down model estimates remain in the
+chart header.
+
+Model percentages are uncalibrated estimates and set simulated contract prices:
+70% Up means an Up contract costs 0.70 credits. Percentages change with price,
+time remaining, and recent volatility. Available completed intervals show
+confirmed results; upcoming or missing-data fields use placeholders.
 
 ## Make a prediction
 
@@ -80,21 +123,26 @@ Portfolio realized profit/loss counts only settled predictions. Pending committe
 
 ## History and display controls
 
-Previous hour opens a completed hour. Next moves forward; Current hour returns to the live view. The UTC date helps distinguish days. Historical views disable orders, show the full-hour chart, and preserve the hour when switching coins. Missing history leaves affected results unavailable.
+In Hour, the graph arrows navigate previous/next UTC hours and **Back to now**
+returns to the live hour. In Interval, they navigate individual plays. Dates
+help distinguish intervals across midnight. Switching coins preserves the
+hour context. Past intervals are read-only; missing history leaves their
+benchmarks or results unavailable. Time navigation does not switch views.
 
-Pause freezes the chart and blocks order entry; it does not stop the market countdown. Resume restores rendering. Synthetic preview shows animated synthetic prices for exploring the interface and cannot place account orders. Reconnect returns to or retries the live feed.
-
-The sun/moon button switches themes and saves your preference across tabs. On smaller screens, the ticket moves below the markets; scroll the timeline or coin strip horizontally to see all items.
+The sun/moon button switches themes and saves your preference across tabs.
+Use **Menu** for categories, prediction history, contest results, logout, and
+phone rotation controls. Price and credits stay visible while the playfield
+scrolls.
 
 ## Troubleshooting
 
 | Message or symptom | Action |
 | --- | --- |
 | Coins unavailable / terminal offline | On a hosted site, refresh and contact the administrator if it persists. For local use, start `python3 src/backend/server.py` and open the localhost URL. |
-| Price feed disconnected or stale | Check internet access and use Reconnect; wait for a fresh live update. |
+| Price feed disconnected or stale | Check internet access and wait for the automatic retry and a fresh live update. |
 | Data Not Available | No valid current quote was received. Automatic retries continue; check internet access if it persists. Available chart history can still be viewed. |
 | History or opening benchmark unavailable | The server automatically retries the exact minute using wider history windows and reuses matching cached history. If it still fails, wait for provider recovery and review a new prediction. Logging out does not repair missing provider data; orders stay blocked until the exact benchmark is available. |
-| Chart paused / synthetic preview / historical market | Resume, reconnect to live data, or select Current hour. |
+| Historical market | Use **Back to now** in Hour or **Back to live** in Interval to return to the current market. |
 | Too late to place | Select an open interval and review a new prediction. |
 | Insufficient credits | Reduce the budget and check pending commitments in your portfolio. |
 | Site temporarily unavailable | Wait for the service to recover, then refresh. Contact the administrator if it remains unavailable. |
@@ -105,7 +153,7 @@ For setup and checks, see [README.md](../README.md). For backups and database ma
 ## Choose a market
 
 Open the entry screen and select **Crypto** to use the 60 minute playfield, with
-1-, 5-, 15-, 30-, and 60-minute prediction intervals. Oil and Weather are shown as
+5-, 15-, 30-, and 60-minute prediction intervals. Oil and Weather are shown as
 **Coming soon** and cannot open a prediction terminal. Use **Categories** in the
 terminal header to return to the market list.
 
@@ -128,41 +176,49 @@ OilPriceAPI mode shows dated physical spot assessments for all five crudes. Thes
 
 ## Laptop and phone displays
 
-Choose **60m**, **30m**, **15m**, or **5m** plays. One-minute plays are no longer offered. Full hour shows one 60-minute interval, two 30-minute intervals, four 15-minute intervals, and twelve 5-minute intervals. Selected play focuses on one interval, with arrows for previous and next plays.
+The coin selector and 60/30/15/5-minute controls remain above the playfield. The
+coin selector uses two rows of five on smaller screens. The active coin has a
+blue outline. Green/red outer rings indicate your saved pending Up/Down
+predictions for that coin and hour; these are separate from the current duration
+selection highlight.
 
-Both views share the coin selector, duration colors, price graph, prediction controls, and saved amount/percentage tags. Completed intervals have a light gray background; upcoming and unsettled intervals use amber. The selected coin has a blue outline; green and red outer rings on coins and duration buttons indicate saved Up and Down predictions for the displayed hour.
+In Hour, the graph and the 60/30-minute rows share a horizontal time axis. The
+15-minute cards share it on wide screens and wrap into two rows on phones. The
+five-minute cards scroll horizontally. Wrapped or scrolling intervals have a
+moving time marker inside the active card; it need not line up with the Hour
+graph's marker. Markers span the full graph or card height and hide in historical
+views.
 
-On smaller screens the coin selector uses two rows of five with smaller icons and text. The selector remains pinned while the playfield scrolls. Credits, live price, and clocks stay in the top bar. Market status and the last-hour result appear below the playfield.
+Graph backgrounds remain black when a play completes or is upcoming. Card
+surfaces describe state instead: live cards use their duration tint, completed
+cards are light gray, and upcoming cards are light yellow. A confirmed Up/Down
+result has a green/red arrow in the card heading. Missing settlement candles do
+not produce a result arrow. Hour cards place the coin icon below the UTC time.
 
-Both charts retain one observed price per second for up to two hours per coin while the terminal is open. The live line preserves that detail across minute-history refreshes, view changes, coin changes, and hour rollover. Earlier history uses minute closes; one-second history is available only for prices observed by this terminal. Completed minute candles remain the settlement reference, and the live endpoint stays aligned with the red time marker. Missing observations leave gaps.
+Cards show starting and live/closing prices, the actual percentage move from
+the starting price, model estimates where available, and saved bet amounts with
+their executed percentage. The actual movement is not a probability. Stale,
+paused, or disconnected live quotes clear the live comparison; confirmed closes
+remain historical. Missing values use placeholders.
 
-Each card starts with a bold UTC time range, Up/Down model percentages and status.
-The next row reads **benchmark → current price** (closing price for a completed
-interval). The benchmark stays neutral; current prices are green above or equal
-to it and red below it. **Open** is blue. At the lower right, a signed percentage
-above a direction arrow shows the actual price movement from the benchmark;
-this is different from the model probabilities. The dot sits above an Up arrow
-or below a Down arrow. Stale, paused or disconnected live data clears that live
-comparison instead of leaving a misleading price.
+Both charts retain one observed price per second for up to two hours per coin
+while the terminal is open. That detail survives minute-history refreshes,
+view changes, coin changes, and hour rollover. Earlier history uses minute
+closes. Missing observations leave gaps, and minute closes remain the settlement
+reference.
 
-On narrow phones, model percentages wrap below the time range and status;
-buttons retain a 44-pixel minimum touch height. Upcoming intervals and completed
-intervals still missing an exact benchmark show only time, status and their
-read-only action. Available completed intervals show the closing price and final
-100%/0% result, rather than a live forecast.
+Tap **Predict...** on an open segment to open the prediction popup, select Up or
+Down, enter a budget, and review before confirming. **Result** shows a completed
+play; **Details** describes an upcoming one. Popups scroll on short screens and
+close with the close button or Escape. The top title bar keeps credits and
+navigation accessible. Pending predictions, market status, and last-hour contest
+results appear below the playfield.
 
-Tap **Predict** on an open segment to open the prediction popup, select Up or
-Down, enter a budget, and review before confirming. Tap **Result** on a closed
-segment to see its outcome and your returns. **Details** describes an upcoming
-segment. Popups scroll on short screens; use the close button or Escape to close
-them. The hourly balance and last-hour results remain in the header. The top navigation bar stays visible while scrolling so credits and navigation remain accessible on phones and laptops.
-
-On a phone, tap **Rotate** in the top title bar to request landscape view.
-If the browser permits it, the page enters full screen and rotates. Tap
-**Auto rotate** to release the orientation lock and leave full screen. On
-browsers without automatic rotation support, follow the on-screen prompt to
-turn the phone sideways and disable the phone’s rotation lock if necessary.
-The button shows **Landscape** when the phone is already sideways.
+On a phone, open **Menu → Rotate** to request landscape view. If the browser
+permits it, the page enters full screen and rotates. **Auto rotate** releases
+the lock and leaves full screen. Otherwise follow the prompt to turn the phone
+sideways and disable its rotation lock. The button reads **Landscape** when the
+phone is already sideways.
 
 ## Hourly contests
 

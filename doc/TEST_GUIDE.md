@@ -9,7 +9,7 @@ Install Python 3.10+ and Node.js. The documentation coverage tests also need the
 Acorn dependency (Sphinx is only needed to build the reference documentation):
 
 ```bash
-npm install --prefix doc
+npm ci --prefix doc
 python3 scripts/run_tests.py
 ```
 
@@ -26,6 +26,7 @@ PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest server_test logg
 PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest discover -s test/scripts -p '*_test.py'
 PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest docs_test
 node --test test/frontend/*.test.js
+node --test test/frontend/btc-chart.test.js test/frontend/market-detail.test.js test/frontend/app.test.js test/frontend/bootstrap.test.js
 python3 src/backend/server.py --help
 git diff --check
 ```
@@ -44,8 +45,9 @@ manual procedure explicitly says to use a live feed.
 | --- | --- |
 | `test/frontend/account.test.js`, `test/frontend/auth.test.js`, `test/frontend/password.test.js` | Restored/expired sessions, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery, bounded retries, and request/body timeouts without automatic order replay. |
 | `test/frontend/bootstrap.test.js`, `test/frontend/coins.test.js`, `test/frontend/categories.test.js` | Catalog-first startup, offline/static-server failures, instrument selection, category configuration, coming-soon availability and displayed-hour coin prediction rings (direction, settled retention, hour navigation and logout). |
-| `test/frontend/btc-chart.test.js` | Minute history and heat maps, current/historical-hour navigation, page-cache restoration, two-second price display with one-second clocks, stale response rejection, benchmark/quote freshness and oil-feed error states. |
-| `test/frontend/app.test.js` | Segment popups, omitted pending/upcoming values, stable DOM writes, disconnected live comparisons, winner badges, per-prediction budgets, and pending countdowns that skip settled history and clear after settlement/logout. |
+| `test/frontend/btc-chart.test.js` | Minute history, candle geometry and summary arrows, current/historical-hour navigation, one-second price/clock updates, hourly signed dollar/percentage changes, moving time-axis geometry, stale response rejection, and quote/benchmark freshness. |
+| `test/frontend/market-detail.test.js` | Interval default, view controls and double-click shortcuts, exact interval/past-hour returns, interactive-control guards, cleared and explicit duration highlights, exact selected starts, range-history cancellation/retry, saved execution tags, summary arrows and history across durations, missing candles, minute rollover, and upcoming intervals. |
+| `test/frontend/app.test.js` | Segment selection events and popups, pending/upcoming placeholders, stable DOM writes, disconnected live comparisons, winner badges, per-prediction budgets, and pending countdowns that skip settled history and clear after settlement/logout. |
 | `test/frontend/market-model.test.js`, `test/frontend/portfolio-model.test.js` | Interval layout, Up/Down outcomes, probability and volatility calculations, cutoff rules, credit limits, payout rounding, settled P/L and numeric history sorting. |
 | `test/frontend/community.test.js`, `test/frontend/contests.test.js`, `test/frontend/sponsor.test.js` | Community polling recovery, hourly score states, contest history and lookup, pending resets, safe sponsor links and absent/failed sponsor configuration. |
 | `server_test.py` | Exact-minute benchmark cache reuse, wider-window bounded recovery, malformed/truncated responses, permanent provider rejection, HTTP accounts, signup code, password changes, CSRF/origin/proxy/cookie rules, credit cap, idempotent predictions, settlement, health, catalog, community, protected pages and static allowlist/compression/HEAD. |
@@ -189,6 +191,49 @@ measurements, also record the dataset, concurrency, environment and whether
 providers were mocked. A successful mocked run does not establish live-feed
 availability, rendered layout, Docker recovery or production capacity.
 
+## Chart and view acceptance checks
+
+Use a disposable local account or controlled browser fixtures. Repeat in dark
+and light themes at a wide desktop width, 390 pixels, and 320 pixels. Mocked
+fixtures establish layout and interaction behavior; live provider availability
+and order execution require separate checks.
+
+1. Reload the terminal. The title bar reads **Interval | Hour**, with Interval
+   selected. Confirm the small Predict60 label below P60, coin icon beside the
+   price, signed hourly dollar/percentage movement, and a single credits value.
+   Switching coins must update the icon and price without overlapping controls.
+2. Select Hour. No duration button or segment should remain highlighted. Choose
+   a duration and a segment; Hour must stay visible, the segment and its duration
+   must highlight, and a market refresh must preserve only that explicit choice.
+   Select Interval to open the chosen exact time. Select Hour again to clear it.
+3. Change durations, use the five-minute Now/Select controls, and navigate time.
+   None may switch views automatically. The title-bar controls and card-body
+   double-clicks are explicit view changes. Double-click a past, live, or upcoming
+   Hour cell: Interval must show that exact UTC range. Double-click its card to
+   return; a browsed past interval must load its containing hour. Confirm that
+   single clicks stay selections and action buttons never invoke the shortcut.
+4. Verify black plot backgrounds in live, completed, and upcoming states in both
+   themes. Hour has a white line plus green up/red down candles. Interval's line,
+   grid, and endpoint follow the duration color. Completed card backgrounds must
+   not turn the graph gray.
+5. Check alternating red/yellow dotted time markers at the graph and card bounds
+   and orange cutoffs 30 seconds before interval ends. Aligned rows share the
+   graph axis; scrolled five-minute cards and the two rows of phone fifteen-minute cards use their
+   own moving local markers. Historical views hide current-time markers.
+6. Verify both plots are 180 pixels high on desktop and 150 pixels high at
+   viewport widths of 700 pixels or less. A compact 16-pixel summary row places
+   green up/red down arrows beneath completed candle centers; current minutes
+   use an amber dash and missing/upcoming minutes stay neutral. Check all four
+   durations and Hour in both themes, including past/upcoming intervals and
+   minute rollover. Candles, grid, chart navigation, UTC labels, and full-height
+   moving time markers must remain visible and aligned.
+7. Compare the hourly percentage with the displayed hour's exact opening
+   benchmark. Check up, down, zero, and small changes, then remove the benchmark
+   or expire the quote: no stale or infinite percentage should remain.
+8. Ensure one-minute plays, the old view toolbar, and the removed trend title do
+   not reappear. History, predictions, menu navigation, themes, and rotation
+   controls remain usable.
+
 ## Contest and sponsor acceptance checks
 
 Run `PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest contests_test` for backend and HTTP checks. In a browser,
@@ -213,9 +258,9 @@ use two disposable accounts and confirm:
 8. Using a temporary database, reserve a future pool via the CLI and check that
    it appears as upcoming, is allocated once, and cannot skip prize review.
 
-Do not use real ad tags or send real gift cards during automated tests. No
-browser was connected during implementation; rendered desktop/mobile layout and
-these manual interface checks still require a browser-capable environment.
+Do not use real ad tags or send real gift cards during automated tests. Record
+which rendered-browser checks were performed and whether they used mocked data.
+Passing browser fixtures does not establish live order, contest, or delivery behavior.
 
 ## Signup access code
 

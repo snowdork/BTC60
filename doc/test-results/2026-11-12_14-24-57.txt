@@ -1,0 +1,265 @@
+Predict60 unit-test run
+Log: /tmp/test_results/test_result_2026-11-12_14-24-57_378539.log
+
+▶ JavaScript
+$ node --test test/frontend/account.test.js test/frontend/app.test.js test/frontend/auth.test.js test/frontend/bootstrap.test.js test/frontend/btc-chart.test.js test/frontend/categories.test.js test/frontend/coins.test.js test/frontend/community.test.js test/frontend/contests.test.js test/frontend/google-onboarding.test.js test/frontend/market-detail.test.js test/frontend/market-model.test.js test/frontend/orientation.test.js test/frontend/password.test.js test/frontend/portfolio-model.test.js test/frontend/segment-card.test.js test/frontend/sponsor.test.js
+✔ restored session renders a plain-text name and skips welcome (4.41607ms)
+✔ expired session hides protected controls and redirects to welcome (0.959875ms)
+✔ logout sends CSRF token and clears user, predictions, and name (0.869745ms)
+✔ failed logout preserves the session and permits retry (0.840971ms)
+✔ settlement ignores overlapping requests and resumes after failure (8.888938ms)
+✔ background sync does not settle while the document is hidden (2.001846ms)
+✔ a stalled settlement releases its request guard after timeout and can retry (1.264512ms)
+✔ a timed out prediction is not automatically submitted twice (1.061908ms)
+✔ response body timeouts are reported as timeouts rather than invalid server data (5.449766ms)
+✔ a settlement response arriving after logout cannot restore the account (1.083849ms)
+✔ logout succeeds locally when another tab has already ended the session (0.720282ms)
+✔ stale prediction token refreshes the same account and retries the identical order once (0.700224ms)
+✔ background settlement recovers a stale token without reloading the page (0.686258ms)
+✔ CSRF recovery never retries an order for a different account (0.742294ms)
+✔ CSRF retries are bounded and other errors never replay predictions (1.895745ms)
+✔ segments expose prediction, result, and upcoming details actions without nested buttons (30.633356ms)
+✔ segment action selects its market and opens the popup (0.838084ms)
+✔ overview exposes all twelve five-minute prediction and detail actions in a scrollable region (3.208377ms)
+✔ last-hour winner badge requires a finalized first-place result and clears on other states (1.262567ms)
+✔ reused hourly winnings allow further orders in an interval up to the per-prediction cap (0.7298ms)
+✔ countdown updates visit pending predictions without scanning settled history (5.852927ms)
+✔ account updates refresh pending countdowns and remove settled or signed-out predictions (0.78278ms)
+✔ pending and upcoming cards share the placeholder layout without invented prices (0.66601ms)
+✔ segment refresh preserves stable DOM values and clears stale live movement (1.22693ms)
+✔ mixed completed results style win and loss separately and clear on pending state (1.064112ms)
+✔ NO CREDITS banner follows the signed-in balance and hides on read-only intervals (0.604172ms)
+✔ login and signup post form fields and navigate to categories (3.423484ms)
+✔ rejected credentials remain on the form with a retryable error (1.535734ms)
+✔ submission is disabled while pending and recovers from non-JSON responses (1.018957ms)
+✔ invalid signup code stays on signup with a retryable error (0.697559ms)
+✔ signup confirmation mismatch prevents the request (0.685296ms)
+✔ show controls toggle password and signup-code visibility without submitting (1.768103ms)
+✔ login change-password action authenticates before opening the protected form (0.842593ms)
+✔ password login in Google linking flow opens explicit account-link screen (0.616526ms)
+✔ file preview shows actionable offline state instead of Connecting (2.508704ms)
+✔ network errors and static-server HTML stop startup clearly (1.277245ms)
+✔ database catalog loads before terminal scripts (2.725113ms)
+✔ oil category configures the same framework with only oil instruments (2.003599ms)
+✔ hourly coin rings show only active pending directions and expire with time (1.564859ms)
+✔ coin position markers refresh after an order, settlement, and logout (0.956939ms)
+✔ duration prediction outlines follow the selected coin, saved directions and displayed hour (1.896366ms)
+✔ second-by-second prices survive history refreshes, coin switches and hour rollover (33.146649ms)
+✔ live price, chart and clock refresh on each one-second tick (4.551596ms)
+✔ hourly banner pairs the dollar move with its signed percentage, including small changes (8.601635ms)
+✔ hourly banner waits for the exact opening benchmark before showing a percentage (4.543261ms)
+✔ historical banner calculates the percentage from the selected hour opening and close (3.683836ms)
+✔ full-hour rows and graph share a moving time axis after resize and hide it for history (2.923799ms)
+✔ chart history falls back to the server when the browser cannot reach the provider (2.563216ms)
+✔ returning through the browser page cache restarts live quotes and the chart clock (2.280122ms)
+✔ initial selection loads a validated price without waiting for a WebSocket trade (1.392523ms)
+✔ one click on a different coin loads its own price without refreshing (1.837143ms)
+✔ late quote responses cannot overwrite a newly selected coin (2.121111ms)
+✔ an unavailable quote is labelled and retried automatically without a refresh (1.921754ms)
+✔ invalid and stale provider quotes never become current prices (8.980411ms)
+✔ a REST error cannot hide a newer valid live trade (1.321769ms)
+✔ an older REST quote cannot replace a newer live trade (1.334864ms)
+✔ an expired price is replaced by unavailable until a fresh quote arrives (3.980407ms)
+✔ a fresh quote before the hour holds the exact new-hour benchmark at the active playhead (1.251246ms)
+✔ initial current hour backfills to its start before pricing history completes (1.663606ms)
+✔ returning to current hour restores history and ignores old pricing responses (2.333152ms)
+✔ returning from an interval can select its containing hour without accepting malformed times (2.634913ms)
+✔ banner fractional digits follow price moves and reset on navigation (2.139646ms)
+✔ live banner coalesces intrasecond quotes and refreshes alongside the one-second clock (1.874815ms)
+✔ oil uses server simulated prices and history through the shared chart (3.722569ms)
+✔ live oil uses provider timestamps and its minute quote freshness limit (1.78204ms)
+✔ missing oil credentials show an actionable error without simulated substitution (1.816675ms)
+✔ completed quarters show a green direction arrow with an outcome-colored marker (1.259291ms)
+✔ falling quarter points down and ties resolve Up (2.445816ms)
+✔ missing boundary candle leaves completed segment without an invented winner (1.376754ms)
+✔ minute plot refreshes each second while preserving candle wicks and the price tip (1.660329ms)
+✔ minute chart keeps straight closes and separates missing minutes (1.699563ms)
+✔ segment countdown shows Locked exactly in the final thirty seconds (6.205034ms)
+✔ a newly opened five-minute market refreshes its benchmark just after the minute boundary (2.827618ms)
+✔ price ticks reuse minute annotations until the minute changes (1.643908ms)
+✔ category screen shows pending connection and unavailable grades without fake quotes (8.304954ms)
+✔ configured category shows a real quote and preserves its source timestamp (10.108114ms)
+✔ stale category quote is displayed as unavailable (2.070586ms)
+✔ dated spot assessments remain visible without being labeled live ticks (1.241588ms)
+✔ guests cannot load market choices or quotes (0.679755ms)
+✔ weather coming soon card has no market link or quote requests (0.982358ms)
+✔ oil coming soon card has no market link or quote requests (0.894422ms)
+✔ catalog uses supplied database records without a fixed coin list (1.238502ms)
+✔ formatting uses each database precision (8.378222ms)
+✔ empty and invalid catalogs are handled (0.284237ms)
+✔ category selection isolates instruments without truncating another category (0.255382ms)
+✔ default catalog contains ten tradable coins with local icons (1.646484ms)
+✔ shows actual counts including zero without caching (14.193189ms)
+✔ malformed and unavailable responses show unknown instead of invented counts (3.373229ms)
+✔ hidden tabs pause polling and visibility resumes it (1.069713ms)
+✔ concurrent refresh events share one in-flight request (2.274511ms)
+✔ recovers on the next refresh after a network error (1.11056ms)
+✔ last hour shows signed loss and final winner as text (21.661972ms)
+✔ older history uses the server cursor and the hour selector selects a result (3.55372ms)
+✔ new hour credits remain available while the previous winner awaits settlement (1.358729ms)
+✔ lookup with no recorded hour clears stale results (1.598202ms)
+✔ hour arrows move in both directions and stop at the current hour (1.782912ms)
+✔ browsing older results preserves the recent history (1.486301ms)
+✔ current hour button returns from an older result to live standings (1.950999ms)
+✔ selected hour shows its local timezone and updates when navigating (1.77645ms)
+✔ find hour icon opens lookup and submitting selects a GMT hour (2.24731ms)
+✔ find hour rejects future dates without navigating (1.300339ms)
+✔ new Google signup collects organizer code before creating an account (2.427972ms)
+✔ rejected signup code stays on the form for correction (1.579496ms)
+✔ existing password account routes to normal login without creating or merging (0.721194ms)
+✔ returning Google user skips signup code and returns to their account (0.60278ms)
+✔ linking requires an explicit Google selection and existing account CSRF (6.002631ms)
+✔ login shares credential submission and routes signup and linking responses (1.903911ms)
+✔ login shows a readable message for connection failures and permits retry (1.111281ms)
+✔ single play aligns chart, coin and red timer to the selected interval (18.094396ms)
+✔ above-chart percentages follow live estimates and clear when data becomes unavailable (3.541537ms)
+✔ single-click interval selections keep the chosen view; Hour clears selection until the user chooses again (2.06228ms)
+✔ double-clicking a card moves between Hour and its exact interval (1.53338ms)
+✔ double-click shortcuts ignore card action buttons and non-card areas (1.118114ms)
+✔ double-clicking a browsed past interval requests its containing UTC hour (1.747014ms)
+✔ the selected segment separates colored odds from the actual percentage move since its start (1.758695ms)
+✔ saved execution tags match the coin and exact interval, retain their percentage, and survive navigation (2.925321ms)
+✔ initial account data restores prediction tags after a reload (1.363769ms)
+✔ the graph never retracts when quotes arrive between timer ticks or the connection briefly reconnects (1.670128ms)
+✔ arrows move one duration and live restores automatic following (2.029918ms)
+✔ completed arrows appear only with confirmed closes and follow corrected results (1.340865ms)
+✔ missing interval history loads on navigation and late responses cannot replace the selected graph (5.990768ms)
+✔ stale prices and cutoff cannot place predictions (1.071536ms)
+✔ duration changes return to the current play and coin switches refresh identity (0.86215ms)
+✔ play reuses history across price ticks and refreshes replaced candles (0.993789ms)
+✔ one hour contains only 60, 30, 15 and 5 minute markets (2.180763ms)
+✔ detail intervals preserve exact UTC benchmarks across midnight (0.459018ms)
+✔ missing exact detail boundaries never inherit a nearby candle (0.13215ms)
+✔ minute graphs preserve highs/lows, omit incomplete candles, and split missing minutes (0.643037ms)
+✔ an active graph endpoint stays on display time between quotes and across slightly ahead provider timestamps (0.371943ms)
+✔ a newly closed candle takes precedence over an older quote at the live edge (0.125677ms)
+✔ binary outcome includes equal prices on Up (0.086183ms)
+✔ fractional shares use the full budget with upward penny payout rounding (0.646242ms)
+✔ closed and upcoming markets cannot be traded (0.678874ms)
+✔ invalid budgets and insufficient balances cannot be quoted (0.319043ms)
+✔ all quotes preserve funds and settle to one credit per contract (1.112213ms)
+✔ market without a loaded benchmark cannot accept a prediction (0.242008ms)
+✔ chance model is centered on the benchmark and complements to 100 (0.240595ms)
+✔ less time or lower volatility makes a price displacement more decisive (0.358418ms)
+✔ chance model is independent of coin price units (0.098486ms)
+✔ queued baseline and completed outcomes are distinguished from estimates (0.082196ms)
+✔ volatility uses only completed consecutive minute candles (0.20622ms)
+✔ opening probability responds immediately to price movement (0.125608ms)
+✔ prediction gate requires fresh connected data, benchmark and server quote (0.265472ms)
+✔ purchase prices are configured by server, independently of model chances (0.29606ms)
+✔ betting closes exactly 30 seconds before every interval ends (0.425976ms)
+✔ pricing backfill failures are distinct from benchmark failures (0.081544ms)
+✔ prediction cap accepts 1000 credits and rejects larger budgets even with sufficient balance (0.065293ms)
+✔ locked segments retain display probabilities without allowing bets (0.110098ms)
+✔ one-minute plays are absent from the market catalog (0.185962ms)
+✔ one-second movement survives minute backfills instead of collapsing into minute-close chords (0.659157ms)
+✔ one-second trails omit invalid and future samples and leave gaps between unobserved seconds (0.139404ms)
+✔ minute plots reject malformed and unaligned candles rather than inventing continuity (0.105419ms)
+✔ landscape request enters fullscreen, locks orientation, and is reversible (2.272427ms)
+✔ unsupported browsers receive physical rotation guidance without entering fullscreen (1.250745ms)
+✔ failed locking restores fullscreen and leaves a working fallback (0.649599ms)
+✔ denied fullscreen displays guidance without attempting a lock (0.563366ms)
+✔ an existing landscape view is reflected without forcing rotation (0.504464ms)
+✔ exiting fullscreen through browser controls clears the requested orientation (0.523991ms)
+✔ restoring rotation preserves fullscreen entered by another control (0.526827ms)
+✔ orientation can be requested without fullscreen when the browser permits it (0.485859ms)
+✔ leaving the page releases rotation before a restored page is used again (0.558516ms)
+✔ password change sends CSRF and clears secrets after success (2.27423ms)
+✔ confirmation mismatch prevents submission (0.666451ms)
+✔ incorrect current password permits retry without clearing fields (1.183037ms)
+✔ wins and losses use settlement outcome, never current spot (0.665599ms)
+✔ realized P/L excludes pending spend and win rate excludes pending orders (0.686799ms)
+✔ zero payout is a settled loss, not a pending prediction (0.156225ms)
+✔ history sorts amounts numerically without mutating account order (0.274379ms)
+✔ history keeps pending returns last in both directions and includes zero payouts (0.167527ms)
+✔ history sorts dates, market intervals, direction, status, and benchmarks (7.378072ms)
+✔ both card views show the confirmed green Up or red Down result, including ties as Up (0.72949ms)
+✔ upcoming, live and unconfirmed results never get a completed result arrow (0.135115ms)
+✔ price movement uses the starting price, including small moves and an unchanged Up result (0.242088ms)
+✔ sponsor strip is absent when disabled, unavailable, or unsafe (2.197686ms)
+✔ sponsor content stays plain text and outbound link has safe sponsored attributes (0.854185ms)
+ℹ tests 175
+ℹ suites 0
+ℹ pass 175
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 159.892249
+PASS JavaScript · 175 tests · 0.18s
+
+▶ Python application
+$ /mnt/dev/BTC60/.venv/bin/python -m unittest discover -s test/backend -p *_test.py
+....................../usr/lib/python3.14/ast.py:46: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7a3c3f28e3e0>
+  return compile(source, filename, mode, flags,
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+..............................Downloading 1970-02-01T16:00:00+00:00 · 0.0%
+Downloading 1970-02-01T20:00:00+00:00 · 1.7%
+Resuming saved download.
+Downloading 1970-02-01T20:00:00+00:00 · 99.6%
+Saved 2 candles to /tmp/tmpek3q_z1g/candles.json.
+......................Benchmark unavailable coin=BTC product=BTC-USD minute=60 after 3 attempts
+....../usr/lib/python3.14/tempfile.py:484: ResourceWarning: Implicitly cleaning up <HTTPError 403: 'Forbidden'>
+  _warnings.warn(self.warn_message, ResourceWarning)
+/usr/lib/python3.14/tempfile.py:484: ResourceWarning: Implicitly cleaning up <HTTPError 404: 'Not found'>
+  _warnings.warn(self.warn_message, ResourceWarning)
+....HTTP failure method=GET path=/healthz status=503
+....HTTP failure method=GET path=/api/spot status=503
+HTTP failure method=GET path=/api/spot status=503
+............................
+----------------------------------------------------------------------
+Ran 116 tests in 4.362s
+
+OK
+PASS Python application · 116 tests · 4.43s
+
+▶ Python scripts
+$ /mnt/dev/BTC60/.venv/bin/python -m unittest discover -s test/scripts -p *_test.py
+....../usr/lib/python3.14/unittest/mock.py:2259: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7537f9f90a90>
+  def __init__(self, name, parent):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/unittest/mock.py:2259: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7537f9f925c0>
+  def __init__(self, name, parent):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/unittest/mock.py:2259: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7537f9f922f0>
+  def __init__(self, name, parent):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/unittest/mock.py:2259: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7537f9c686d0>
+  def __init__(self, name, parent):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/unittest/mock.py:2259: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7537f9c68a90>
+  def __init__(self, name, parent):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/unittest/mock.py:2259: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7537f9c68b80>
+  def __init__(self, name, parent):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/unittest/mock.py:2259: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7537f9c68d60>
+  def __init__(self, name, parent):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/unittest/mock.py:2259: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7537f9c68e50>
+  def __init__(self, name, parent):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.14/unittest/mock.py:2259: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7537f9c68f40>
+  def __init__(self, name, parent):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+usage: python -m unittest [-h] [--service | --docker | --local]
+                          [--container CONTAINER] [--db DB] [--confirm-reset]
+python -m unittest: error: Reset clears account and prediction data; pass --confirm-reset.
+............................Docker database reset. App remains stopped; start it with docker start p60-local
+Service database reset. Service remains stopped; start with sudo systemctl start predict60.
+Stopping Predict60 Docker containers...
+.Stopping Predict60 Docker containers...
+....
+----------------------------------------------------------------------
+Ran 39 tests in 15.950s
+
+OK
+PASS Python scripts · 39 tests · 16.01s
+
+════════════ Test summary ════════════
+PASS  JavaScript               175 tests    0.18s
+PASS  Python application       116 tests    4.43s
+PASS  Python scripts            39 tests   16.01s
+ALL TESTS PASSED
+Tests: 330 · Passed: 330 · Failed: 0 · Skipped: 0
+Duration: 20.62s · Started: 2026-11-12T14:24:57-07:00

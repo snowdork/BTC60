@@ -6,7 +6,7 @@ import argparse
 import ipaddress
 import odds
 import contests
-from google_login import GoogleVerificationUnavailable, verify_google_login
+from google_login import DEFAULT_CLIENT_ID, GoogleVerificationUnavailable, configured_client_id, verify_google_login
 from local_settings import local_signup_code
 import simulated_prices
 import live_oil
@@ -14,6 +14,7 @@ import oilprice_api
 import weather
 import fcntl
 import hashlib
+import html
 import gzip
 import json
 import math
@@ -82,6 +83,7 @@ PUBLIC_FILES = {
     'login.html',
     'market-model.js',
     'market-detail.js',
+    'minute-trend.js',
     'portfolio-model.js',
     'portfolio.css',
     'portfolio.html',
@@ -911,10 +913,14 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(404, {'error': 'Not found.'})
         stat = path.stat()
         compressed = path.suffix in {'.html','.css','.js','.svg'} and 'gzip' in self.headers.get('Accept-Encoding','')
-        key = (relative,stat.st_mtime_ns,stat.st_size,compressed)
+        client_id = configured_client_id() if relative in {'login.html', 'signup.html', 'google-link.html'} else None
+        key = (relative,stat.st_mtime_ns,stat.st_size,compressed,client_id)
         cached = STATIC_CACHE.get(key)
         if cached is None:
             raw = path.read_bytes()
+            if client_id is not None:
+                raw = raw.replace(f'data-client_id="{DEFAULT_CLIENT_ID}"'.encode(),
+                                  f'data-client_id="{html.escape(client_id, quote=True)}"'.encode())
             body = gzip.compress(raw,compresslevel=6) if compressed else raw
             etag = '"' + hashlib.sha256(body).hexdigest()[:24] + '"'
             cached = (body,etag)

@@ -18,6 +18,12 @@ and local Compose share a volume/container name: stop the previous mode before
 switching. See [local operation](LOCAL.md) for setup, backups, and troubleshooting,
 and [Docker operation](DOCKER.md) for VPS upgrades and rollback.
 
+The local image is `p60:local-dev`; VPS images use `p60:${P60_IMAGE_TAG}`.
+When running both on one host, set a different `P60_PORT` in `.env.local`.
+Keep `.env` and `.env.local` private and use the examples under `deploy/` for
+new installations. Configure `GOOGLE_CLIENT_ID` in the selected environment
+file; the backend and all Google sign-in pages use that same value.
+
 Python serves the files in `src/frontend/`; server code lives in `src/backend/`.
 Docker copies the `src/` tree into the image.
 `dist/` is only a static export; editing it does not update the running app.
@@ -53,7 +59,7 @@ For a systemd deployment, copy `deploy/Caddyfile` to `/etc/caddy/Caddyfile`
 `sudo caddy validate --config /etc/caddy/Caddyfile`, then run
 `sudo systemctl reload caddy`. Refresh the sign-in page after the reload.
 Google's OAuth client must also list the site's exact origin under Authorized
-JavaScript origins, and its client ID must match the frontend and backend.
+JavaScript origins. The server supplies `GOOGLE_CLIENT_ID` to the browser.
 
 ## VPS capacity and upkeep
 
@@ -82,7 +88,7 @@ logs, and `unless-stopped` crash recovery. Run one app instance. The app binds t
 From the repository root, after installing Docker Engine and Compose:
 
 ```bash
-cp deploy/docker.env.example .env
+cp -n deploy/docker.env.example .env
 chmod 600 .env
 # Edit .env: set P60_DOMAIN to your domain, without https:// or a path.
 sudo systemctl enable --now docker

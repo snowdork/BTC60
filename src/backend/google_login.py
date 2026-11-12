@@ -8,15 +8,21 @@ class GoogleVerificationUnavailable(RuntimeError):
     """Carry a fixed diagnostic code without exposing credentials or upstream data."""
 
     def __init__(self, reason):
+        """Expose a fixed failure reason without upstream credentials or details."""
         self.reason = reason
         super().__init__(reason)
+
+
+def configured_client_id():
+    """Use one client ID for the browser buttons and backend token verification."""
+    return os.environ.get('GOOGLE_CLIENT_ID', DEFAULT_CLIENT_ID).strip()
 
 
 def verify_google_login(credential):
     """Check Google's signature, audience, issuer, expiry and verified account claims."""
     if not isinstance(credential, str) or not 1 <= len(credential) <= 7000:
         raise ValueError('Invalid Google credential.')
-    client_id = os.environ.get('GOOGLE_CLIENT_ID', DEFAULT_CLIENT_ID).strip()
+    client_id = configured_client_id()
     if not client_id:
         raise GoogleVerificationUnavailable('client_id_missing')
     try:

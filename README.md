@@ -9,14 +9,26 @@ Predict60 is a buildless web app for exploring hourly direction predictions with
 ## Overview
 
 - **Complete-hour workspace:** inspect open, upcoming, and completed intervals without hiding duration tiers; navigate previous hours and return to the current hour.
-- **Focused detail:** switch to Last / Current / Next for 1-, 5-, 15-, 30-, or 60-minute markets. Minute OHLC charts show recorded highs, lows, and closes with gaps for unavailable minutes; phones stack the three detail cards and scroll the overview rows.
-- **Readable segment cards:** time and bold Up/Down probabilities lead, benchmark → current/closing price follows, and controls stay grouped. Phone layouts wrap the header; pending/upcoming cards omit unavailable values.
-- **Live market context:** Coinbase Exchange ticker updates and minute-candle history, with separate spot freshness, history, and order-readiness indicators.
+- **Interval and Hour views:** Interval opens by default with one 5-, 15-, 30-, or 60-minute play. Hour shows all duration tiers. Use the title-bar view controls or double-click a card to switch views; single-click segment and duration selections stay in the current view.
+- **Readable interval cards:** UTC time, starting/live or closing prices, actual movement, model estimates, and saved execution terms stay together. Missing values use placeholders; confirmed results have a green/red outcome arrow.
+- **Live market context:** a compact title bar with coin icon, USD price, hourly dollar/percentage movement, credits, and UTC/local clocks. Green/red minute candles and matching trend arrows retain gaps for missing data.
 - **Points predictions:** choose Up or Down, set a budget, and review fractional shares, cost, possible return, and potential profit. Model percentages determine simulated contract prices.
 - **Live confirmation:** review follows the market; the server executes at its current model price within your budget. Final quantity and return can differ from review.
 - **Persistent accounts:** signup/login, password changes, 1,000 hourly contest credits, saved predictions, and automatic settlement backed by SQLite.
 - **Portfolio tracking:** pending orders, wins, losses, returns, and realized profit/loss, with committed funds shown separately.
-- **Display controls:** light/dark themes, responsive layouts, chart pause, reconnect, and an explicit synthetic preview mode.
+- **Display controls:** light/dark themes, black chart backgrounds, aligned time markers, and responsive interval rows. Fifteen-minute cards wrap on phones; five-minute cards scroll independently.
+
+### Chart views
+
+The title bar shows **Interval | Hour**. Entering Hour clears interval highlights;
+a single click highlights a segment without switching views. Double-click an
+Hour card to open its exact interval, or an Interval card to return to Hour.
+Hour uses a white price line with green/red candles. Interval's line, grid, and
+endpoint use the duration color. Both use compact black graphs with alternating
+red/yellow dotted time markers: 180 pixels high on desktop and 150 pixels on
+phones. A compact row of green up/red down summary arrows sits below the minute
+candles. See the
+[user guide](doc/USER_GUIDE.md#read-the-terminal) for navigation and display details.
 
 ### Default prediction coins
 
@@ -89,12 +101,15 @@ sudo bash scripts/restart-docker.sh --local
 
 Repeat the last command after edits. It builds first, replaces `p60-local`,
 preserves `p60-local-data`, and checks readiness at http://localhost:8085.
-Edit `.env.local` to change the signup code (the example uses `777`).
+Edit `.env.local` to change the signup code (the example uses `777`). If port
+8085 is already used by the VPS stack, set `P60_PORT=18085` in `.env.local`
+and open `http://localhost:18085` instead. The VPS `.env` configuration does not
+provide the local signup code.
 
 Requires Docker Engine and the Docker Compose plugin. From the project root:
 
 ```bash
-cp deploy/local.env.example .env.local
+cp -n deploy/local.env.example .env.local
 chmod 600 .env.local
 sudo docker compose -f compose.local.yaml --env-file .env.local up -d --build
 ```
@@ -244,7 +259,7 @@ inventories, plus an architecture guide. Build it without executing app modules:
 
 ```bash
 python3 -m pip install -r doc/requirements.txt
-npm install --prefix doc
+npm ci --prefix doc
 python3 -m sphinx -W --keep-going -b html doc doc/_build/html
 ```
 
@@ -259,8 +274,8 @@ Application sources live under `src/backend`, `src/frontend`, and `src/seeds`. `
 
 ```bash
 python3 scripts/run_tests.py
-node --check app.js
-node --check btc-chart.js
+node --check src/frontend/app.js
+node --check src/frontend/btc-chart.js
 ```
 
 The runner executes the JavaScript, application Python, and scripts Python
@@ -268,7 +283,7 @@ suites. Every run prints a colored summary and saves the complete colored log
 as `/tmp/test_results/test_result_<date_time>.log`. Use `less -R` to retain the
 PASS/FAIL colors while reading a saved log.
 
-Tests cover market calculations, catalog/bootstrap behavior, portfolio summaries, restored and expired sessions, login/signup errors, logout and settlement retries, community polling, weather benchmark boundaries, static build isolation, account/order/settlement handling, and database maintenance. They do not establish live Coinbase availability.
+Tests cover manual Interval/Hour selection, candle-aligned summary arrows, hourly price changes, market calculations, catalog/bootstrap behavior, portfolio summaries, restored and expired sessions, login/signup errors, logout and settlement retries, community polling, weather benchmark boundaries, static build isolation, account/order/settlement handling, and database maintenance. They do not establish live Coinbase availability.
 
 ## Data and catalog
 
@@ -309,7 +324,7 @@ Both commands report progress. Rerun the download command after interruption to 
 The entry screen at `/` (or `welcome.html`) offers login and signup. Signed-in visitors go directly to `categories.html`, which loads category buttons from `/api/categories`. Oil and Weather are visible as Coming soon; neither category can open a terminal or accept predictions while their data feeds are being completed. See [weather preparation](doc/WEATHER.md).
 Choose **Crypto** to open the one-hour playfield at
 `index.html?category=crypto`. The 5-, 15-, 30-,
-and 60-minute intervals cover that hour; five-minute cards have their own scrollable rows with **Now** and **Detail** controls. Each category has its own
+and 60-minute intervals cover that hour; five-minute cards have their own scrollable rows with **Now** and **Select** controls. Each category has its own
 background, accent, instrument selection, and remembered instrument. The portfolio
 shows both categories and can filter history and statistics by category; the demo
 balance is shared.
@@ -423,9 +438,10 @@ The login page uses Google Identity Services. The Python backend verifies tokens
 with `google-auth`, checks the configured audience and verified email, and maps
 Google's stable `sub` to `google_identities.user_id`. Google sign-in creates the
 same SQLite session and HttpOnly cookie as password login. The supplied public
-web client ID is the default; `GOOGLE_CLIENT_ID` overrides the backend setting
-(and must match `data-client_id` in `src/frontend/login.html`). No Google client
-secret is used in this ID-token flow.
+web client ID is the default; `GOOGLE_CLIENT_ID` overrides it for both backend
+verification and the served login, signup, and account-linking pages. Set it in
+`.env.local` for local Docker or `.env` for the VPS, then rebuild/recreate the
+app. No frontend edits or Google client secret are needed.
 
 Install the runtime dependencies in the Python environment that runs the server:
 

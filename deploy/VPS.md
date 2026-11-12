@@ -1,6 +1,6 @@
 # Shared VPS: BTC60 and Phunky
 
-For now, run both applications on the same VPS with one host Caddy service
+Run Predict60 and the other applications on the same VPS with one host Caddy service
 owning public ports 80/443. Each app has its own Compose project, private
 loopback address, environment file, and lifecycle.
 
@@ -9,7 +9,7 @@ loopback address, environment file, and lifecycle.
 | BTC60 / Predict60 | `predict60.com`, `predict60.free-vibe.com` | `127.0.0.1:8085` | `p60` | `compose.yaml`, `.env` |
 | Phunky | `phunk.free-vibe.com` | `127.0.0.1:8086` | `phunky-game` | `compose.vps.yaml`, `.env.vps` |
 
-All three DNS names point to the VPS. Separate hostnames and ports provide
+These DNS names point to the VPS. Separate hostnames and ports provide
 unique addresses; separate public IP addresses are unnecessary.
 
 ## Configure and start the applications
@@ -53,8 +53,7 @@ host Caddy connects to its loopback publication. Keep the Compose subnet and
 
 ```bash
 sudo cp /etc/caddy/Caddyfile "/etc/caddy/Caddyfile.backup-$(date -u +%Y%m%dT%H%M%SZ)"
-# For the current two-app VPS, this file contains all three public hostnames.
-# Merge any additional site blocks before installing if other apps are added.
+# Compare the template with the active config and retain every existing site block.
 sudo caddy validate --config deploy/Caddyfile.vps --adapter caddyfile
 sudo install -m 644 deploy/Caddyfile.vps /etc/caddy/Caddyfile
 sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

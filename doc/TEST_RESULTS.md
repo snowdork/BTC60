@@ -1,65 +1,76 @@
 # Latest regression test results
 
-**PASS — 240 passed, 0 failed, 0 skipped.**
+**PASS — 332 passed, 0 failed, 0 skipped.**
 
 ## Run identification
 
-- Started October 25, 2026 at 12:28:33 PM MDT (`America/Denver`, UTC−06:00).
-- Command: `python3 scripts/run_tests.py` from the repository root.
-- Branch: `Phase-9`; base commit: `5187373fd6f198e8ef1479fd200149d98517c175`.
-- Dirty worktree: ten-coin catalog and migration 6, updated capacity checks, new SUI
-  artwork, catalog documentation and the latest segment UI refinements.
-- Linux, Python 3.12 and Node.js 18.19.1; temporary databases, mocked providers.
+- Started November 12, 2026 at 02:29:40 PM MST (`America/Denver`, UTC−07:00).
+- Command: `.venv/bin/python scripts/run_tests.py` from the repository root.
+- Branch: `Phase-10`; base commit: `3d69370`; working tree includes the current
+  chart, view-selection, local deployment, authentication, and documentation changes.
+- Linux, Python 3.14.4, Node.js 24.22.2. HTTP and lifecycle tests use temporary
+  databases, mocked providers, and isolated process/container fixtures.
 
 ## Suite results
 
 | Suite | Tests | Passed | Failed | Skipped | Duration |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| JavaScript | 120 | 120 | 0 | 0 | 0.64 s |
-| Python application | 88 | 88 | 0 | 0 | 8.01 s |
-| Python scripts | 32 | 32 | 0 | 0 | 17.38 s |
-| **Total** | **240** | **240** | **0** | **0** | **26.04 s** |
+| JavaScript | 177 | 177 | 0 | 0 | 0.19 s |
+| Python application | 116 | 116 | 0 | 0 | 4.57 s |
+| Python scripts | 39 | 39 | 0 | 0 | 16.05 s |
+| **Total** | **332** | **332** | **0** | **0** | **20.81 s** |
 
-[Complete sanitized test log](test-results/2026-10-25_12-28-33.txt).
-Original local log: `/tmp/test_results/test_result_2026-10-25_12-28-33_909994.log`.
-The run includes expected error messages from negative provider/health/reset tests.
+[Complete regression log](test-results/2026-11-12_14-29-40.txt), with ANSI colors removed.
+Original local log: `/tmp/test_results/test_result_2026-11-12_14-29-40_579213.log`.
+Restored summary tests cover exact candle alignment, invalid/missing data,
+minute rollover, duration changes, and DOM reuse on price ticks. Expected negative cases produce provider,
+health, and reset messages. Python 3.14 also reports resource warnings from
+temporary test fixtures; no test failed. Historical logs remain in `doc/test-results/`.
 
-## Checks added and reviewed
+## Compact chart and interaction checks
 
-- Ten-coin defaults, local artwork, category-isolated picker capacity and rejection
-  of an eleventh enabled instrument. Migration 6 upgrades old catalogs once, keeps
-  saved data and custom coins, and preserves later administrator edits.
-- Mixed Win/Loss labels retain independent colors without slash/unit text, and
-  the NO CREDITS banner tracks restored balances and read-only interval states.
+[Summary browser check log](test-results/2026-11-12_restored-summary.txt).
+Earlier [compact-graph and navigation checks](test-results/2026-11-12_compact-graphs.txt)
+remain archived.
+Playwright/Chromium served the current frontend source with mocked account and
+price data. These checks validate rendered layout and interactions, not a real
+provider connection or an account order. Repeatable acceptance steps are in the
+[test guide](TEST_GUIDE.md#chart-and-view-acceptance-checks).
 
-- Pending/upcoming segments omit unavailable prices, probabilities and countdowns.
-- Identical segment refreshes cause no tracked price/text/class/label writes;
-  disconnected live comparisons clear while completed results remain visible.
-- Benchmark recovery rejects malformed rows, retries truncated JSON and keeps the
-  same product/minute through wider requests. Permanent HTTP 404 is not retried.
-- Thirty-two parallel cached benchmark reads across four boundaries use zero
-  provider requests; exact values remain isolated by product and minute.
-- All five missing maintenance-script procedure docstrings found by the first
-  full run are fixed; source documentation coverage now passes.
+- Both plots are 180 pixels high at desktop width and 150 pixels high on phones.
+  Checked at 1440, 390, and 320 pixels in both themes for Hour and all four
+  interval lengths. Restored green up/red down arrows align with completed
+  candle centers in a compact 16-pixel summary row. The plots retain their
+  reduced heights, and UTC labels follow the summary.
+- Past intervals show completed summaries; upcoming intervals stay neutral.
+  Current-minute markers advance with the clock. The shared renderer loads
+  through bootstrap and is included in the public allowlist and static export.
+- Thin alternating red/yellow time dots retain 12-pixel spacing, full-height
+  coverage, time-coordinate alignment, and clock movement across both views,
+  aligned rows, and wrapped/scrolled card markers. Historical markers remain
+  hidden and orange prediction cutoffs keep their dashed appearance.
+- Single-click selection stays in Hour. Double-clicking a card opens its exact
+  interval; double-clicking Interval returns to the containing hour, including
+  browsed past intervals. Hour clears duration/card highlights. Interactive
+  action buttons do not invoke the shortcut.
 
-## Build and browser checks
+## Documentation and build checks
 
-- `python3 scripts/build-static.py` refreshed the public-only static export.
-- `python3 doc/conf.py` regenerated Python/JavaScript source references.
-- `git diff --check` passed.
-- Earlier maintenance review: headless Firefox standalone segment fixtures inspected at 1366×768 (dark and
-  light), 390×844 and 320×844. Checked wrapped headers, readable prices/status,
-  44-pixel phone buttons, and movement labels above arrows. Fixture prices and
-  probabilities are illustrative; these are not full app or live-order tests.
+Sphinx 8.2.3 built with warnings treated as errors:
 
-Sphinx HTML was not built: the optional Sphinx dependency is not installed in
-this environment. Generated source references and documentation coverage were
-checked. Public Coinbase product metadata was checked for LINK-USD, AVAX-USD and SUI-USD:
-all reported online with trading enabled. This does not establish live prediction
-or settlement behavior. No paid feed test, container rollout, VPS load test or
-production restart was performed. Socket timeout settings bound individual
-provider operations, not total end-to-end order latency.
+```bash
+python -m sphinx -W --keep-going -b html doc doc/_build/html
+```
 
-See [test procedures](TEST_GUIDE.md) and [performance review](VPS_PERFORMANCE.md)
-for repeatable checks and remaining capacity limits. Earlier logs remain in
-`doc/test-results/` for historical evidence.
+The build succeeded without warnings, including the generated reference for
+the restored summary renderer. Open `doc/_build/html/index.html` locally. Generated HTML
+and source-reference files remain ignored by Git. The README, user guide,
+design/architecture notes, contribution guide, and acceptance guide describe the
+compact layout and remaining chart indicators.
+
+`python3 scripts/build-static.py` regenerated the public frontend export. The
+local development image was rebuilt and `http://localhost:18085/healthz` returned
+HTTP 200; served chart assets and `dist/` match the current source.
+
+Provider availability, paid feeds, live prediction execution, VPS capacity and
+recovery, and prize delivery were not established by this run.

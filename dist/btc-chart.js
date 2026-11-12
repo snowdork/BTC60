@@ -12,6 +12,7 @@
   const /** Read the instrument quote freshness limit, falling back to fifteen seconds. */ maxAge=()=>coin.maxPriceAgeMs||15000;
   const /** Name the active quote provider for the chart and observation banner. */ sourceLabel=()=>coin.feed==='oilpriceapi'?'OilPriceAPI spot assessments':coin.feed==='twelvedata'?'Twelve Data live oil':simulated()?'Simulated oil':'Coinbase';
   const /** Format a monetary display value using the module currency formatter. */ money=v=>window.PredictCoins.formatPrice(v,coin.symbol);
+  const hourlyPercent=new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:4});
   const /** Round epoch milliseconds down to the beginning of the UTC hour. */ hourOf=t=>Math.floor(t/3600000)*3600000;
   const /** Format the current time value as UTC hour and minute. */ time=t=>new Date(t).toISOString().slice(11,16);
   const /** Format an epoch-millisecond timestamp as a UTC clock including seconds. */ clock=t=>new Date(t).toISOString().slice(11,19);
@@ -290,32 +291,9 @@
     draw(currentTime());
   }
   let annotationCandles=null,annotationHour=null,annotationMinute=null,annotationMode=null,annotationHistorical=null;
-  /** Render sixty minute direction cells from exact candle opens and closes. */
-  function renderMinuteHeatmap(displayTime){
-    const map=$('minute-heatmap'),currentMinute=Math.max(0,Math.min(59,Math.floor((displayTime-hour)/60000)));
-    const minuteCandles=new Map(candles.filter(c=>c[0]*1000>=hour&&c[0]*1000<hour+3600000).map(c=>[Math.floor((c[0]*1000-hour)/60000),c]));
-    const moves=[...minuteCandles.values()].map(c=>Math.abs((Number(c[4])-Number(c[3]))/Number(c[3]))).filter(Number.isFinite);
-    const scale=Math.max(...moves,0.000001);
-    const dots=Array.from({length:60},(_,minute)=>{
-      const dot=document.createElement('span'),candle=minuteCandles.get(minute),start=hour+minute*60000;
-      dot.className='minute-dot';
-      dot.style.left=`${(minute+1)/60*100}%`;
-      if(candle&&start+60000<=displayTime){
-        const open=Number(candle[3]),close=Number(candle[4]),move=(close-open)/open,direction=move>=0?'up':'down';
-        const heat=Math.max(.15,Math.min(1,Math.abs(move)/scale));
-        dot.className+=` ${direction}`;dot.style.setProperty('--heat-glow',`${2+heat*5}px`);dot.style.setProperty('--heat-opacity',String(.45+heat*.55));
-        dot.title=`${time(start)}–${time(start+60000)} UTC · ${direction==='up'?'Up':'Down'} ${Math.abs(move*100).toFixed(3)}%`;
-        dot.setAttribute('aria-label',dot.title);
-      }else if(!historical&&minute===currentMinute){
-        dot.className+=' current';dot.title=`${time(start)} UTC · Current minute`;dot.setAttribute('aria-label',dot.title);
-      }else{
-        dot.title=`${time(start)} UTC · ${start>=displayTime?'Upcoming':'No minute data'}`;dot.setAttribute('aria-label',dot.title);
-      }
-      return dot;
-    });
-    map.replaceChildren(...dots);
-    const up=dots.filter(dot=>dot.className.includes(' up')).length,down=dots.filter(dot=>dot.className.includes(' down')).length;
-    map.setAttribute('aria-label',`Minute-by-minute direction for this hour: ${up} up, ${down} down, ${60-up-down} pending or unavailable`);
+  /** Render minute summary arrows beneath the corresponding candle centers. */
+  function renderMinuteTrend(displayTime){
+    window.PredictMinuteTrend.render($('minute-heatmap'),{candles,startsAt:hour,endsAt:hour+3600000,now:displayTime,historical,label:'this hour'});
   }
   /** Mark completed quarters only when both exact settlement boundary candles exist. */
   function renderSegmentResults(displayTime){
@@ -338,6 +316,10 @@
     $('hour-overview').dataset.state=historical?'completed':'live';
     $('chart-pair-label').textContent=`${coin.symbol} · ${time(hour)} – ${time(hour+3600000)} UTC · FULL HOUR`;
     const duration=Number($('hour-overview').dataset.duration)||15;
+    $('hour-cutoffs').setAttribute('d',Array.from({length:60/duration},(_,index)=>{
+      const x=((index+1)*duration*60000-30000)/3600000*1000;
+      return `M${x} 0V130`;
+    }).join(' '));
     const selected=model.markets.find(m=>m.minutes===duration&&m.status==='open');
     const chance=selected&&(mode==='demo'||model.dataStatus(model,selected,Date.now(),{allowLocked:true}).ready)?model.estimateChances(selected,model.spot,now,model.volatility):null;
     $('overview-up-chance').textContent=`↑ Up ${chance?chance.up+'%':'—'}`;
@@ -349,7 +331,8 @@
     $('market-heading').textContent=historical?'Settlement history · results':'Choose your market';
     const fraction=Math.max(0,Math.min(1,(now-hour)/3600000));
     const stack=$('timeline-stack'),chart=$('btc-chart'),bounds=chart.getBoundingClientRect(),stackBounds=stack.getBoundingClientRect();
-    // Pixel geometry keeps one vertical line aligned on every duration row.
+    // Match the hourly chart's live marker to its plot bounds.
+    stack.style.setProperty('--hour-progress',`${fraction*100}%`);
     stack.style.setProperty('--cursor-x',`${bounds.left-stackBounds.left+fraction*bounds.width}px`);
     stack.style.setProperty('--cursor-top',`${bounds.top-stackBounds.top}px`);
     $('time-cursor-label').textContent=clock(now);
@@ -373,7 +356,7 @@
     const hasPoints=minutePlot?!!minutePlot.line:valid.length>0;
     const annotationMinuteNow=Math.floor(displayTime/60000);
     if(annotationCandles!==candles||annotationHour!==hour||annotationMinute!==annotationMinuteNow||annotationMode!==mode||annotationHistorical!==historical){
-      renderMinuteHeatmap(displayTime);
+      renderMinuteTrend(displayTime);
       renderSegmentResults(displayTime);
       annotationCandles=candles;annotationHour=hour;annotationMinute=annotationMinuteNow;
       annotationMode=mode;annotationHistorical=historical;
@@ -381,8 +364,9 @@
     $('chart-empty').hidden=hasPoints;
     $('chart-empty').textContent=historical?(historyFailed?'Data Not Available for this hour.':'Loading the selected hour…'):model.spotStatus==='unavailable'?'Data Not Available · retrying automatically…':coin.feed==='oilpriceapi'&&mode==='live'?'Checking latest spot assessment every 5 seconds…':mode==='demo'?'Starting synthetic preview…':lastPriceAt?'Waiting for history…':`Loading ${coin.symbol}/USD prices…`;
     const opening=candleIndex().get(hour-60000)?.[4];
-    const change=(historical||model.spotStatus==='ready')&&Number.isFinite(lastPrice)&&Number.isFinite(opening)?lastPrice-opening:null;
-    $('btc-change').textContent=change===null?(model.spotStatus==='unavailable'?'Retrying price feed…':'Waiting for price data'):`${change>=0?'+':'−'}${money(Math.abs(change))} ${historical?'that hour':'this hour'}`;
+    const change=(historical||model.spotStatus==='ready')&&Number.isFinite(lastPrice)&&Number.isFinite(opening)&&opening>0?lastPrice-opening:null;
+    const sign=change<0?'−':'+';
+    $('btc-change').textContent=change===null?(model.spotStatus==='unavailable'?'Retrying price feed…':'Waiting for price data'):`${sign}${money(Math.abs(change))} (${sign}${hourlyPercent.format(Math.abs(change)/opening*100)}%) ${historical?'that hour':'this hour'}`;
     $('btc-change').style.color=change!==null&&change<0?'var(--red)':'var(--green)';
     if(!hasPoints){$('btc-line').removeAttribute('d');$('btc-area').removeAttribute('d');$('btc-tip').setAttribute('visibility','hidden');return;}
     if(minutePlot){
@@ -399,7 +383,7 @@
     $('btc-line').setAttribute('d',path);
     $('btc-area').setAttribute('d',`${path} L${x(last.t)},130 L${x(first.t)},130 Z`);
     $('btc-tip').setAttribute('cx',x(last.t));$('btc-tip').setAttribute('cy',y(last.price));$('btc-tip').setAttribute('visibility','visible');
-    $('chart-description').textContent=historical?`${coin.name} historical price from ${time(hour)} to ${time(hour+3600000)} UTC on ${new Date(hour).toISOString().slice(0,10)}. Last available price ${money(last.price)}. Outcomes are settlement proxies.`:`${mode==='demo'?'Simulated':coin.feed==='oilpriceapi'?'Polled spot assessment (observation times, not market ticks)':sourceLabel()} ${coin.symbol}/USD hourly price. Latest ${money(last.price)}. Red dashed cursor at ${clock(now)} UTC.`;
+    $('chart-description').textContent=historical?`${coin.name} historical price from ${time(hour)} to ${time(hour+3600000)} UTC on ${new Date(hour).toISOString().slice(0,10)}. Last available price ${money(last.price)}. Outcomes are settlement proxies.`:`${mode==='demo'?'Simulated':coin.feed==='oilpriceapi'?'Polled spot assessment (observation times, not market ticks)':sourceLabel()} ${coin.symbol}/USD hourly price. Latest ${money(last.price)}. Alternating red and yellow dots mark the current time at ${clock(now)} UTC.`;
   }
   /** Advance chart time and repaint when needed without issuing a draw for every unchanged frame. */ function frame(stamp) {
     if(stopped)return;
@@ -440,7 +424,12 @@
   /** Switch instrument, persist its category preference, and reset feed/history state. */ function selectCoin(symbol){
     coin=window.PredictCoins.getCoin(symbol);model.coin=coin;
     document.querySelectorAll('[data-coin]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.coin===coin.symbol)));
-    $('price-coin-icon').hidden=!coin.icon;$('price-coin-icon').onerror=/** Handle the error event for the current transport or resource. */ ()=>{$('price-coin-icon').hidden=true;};if(coin.icon)$('price-coin-icon').src=coin.icon;$('price-coin-icon').alt=`${coin.name} logo`;
+    for(const id of ['spot-coin-icon','price-coin-icon']){
+      const icon=$(id);icon.hidden=!coin.icon;
+      icon.onerror=/** Hide an unavailable coin icon. */ ()=>{icon.hidden=true;};
+      if(coin.icon)icon.src=coin.icon;
+      icon.alt=`${coin.name} logo`;
+    }
     $('coin-name').textContent=coin.name.toUpperCase();
     $('market-pair-label').textContent=`${coin.symbol} / USD · PREDICTION MARKETS`;
     $('chart-pair-label').textContent=`${coin.symbol} / USD · 1H · 1m candles`;
@@ -455,10 +444,16 @@
     setMode(mode,historical?hour:undefined);broadcast('coin-change');
   }
   /** Navigate historical hours while preventing selection beyond the current hour. */ function navigateHour(target){setMode(mode,Math.min(target,hourOf(currentTime())));}
+  window.addEventListener('market-hour-select',event=>{
+    const target=event.detail?.hour;
+    if(Number.isFinite(target)&&target%3600000===0)navigateHour(target);
+  });
   $('previous-hour').addEventListener('click',()=>navigateHour(hour-3600000));
   $('next-hour').addEventListener('click',()=>navigateHour(hour+3600000));
   $('current-hour').addEventListener('click',()=>navigateHour(hourOf(currentTime())));
   window.addEventListener('market-overview',()=>draw(currentTime(),true));
+  window.addEventListener('market-duration-change',()=>draw(currentTime(),true));
+  window.addEventListener('resize',()=>draw(currentTime(),true));
   document.querySelectorAll('[data-coin]').forEach(button=>button.addEventListener('click',()=>{if(button.dataset.coin!==coin.symbol)selectCoin(button.dataset.coin);}));
   let savedCoin=window.PredictCoins.available[0].symbol;try{const preference=localStorage.getItem(`predict_selected_coin_${window.Predict60Category?.id||'crypto'}`)||localStorage.getItem('predict_selected_coin');if(window.PredictCoins.available.some(coin=>coin.symbol===preference))savedCoin=preference;}catch{}
   selectCoin(savedCoin);frameId=setTimeout(()=>frame(performance.now()),1000);

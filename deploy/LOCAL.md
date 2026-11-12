@@ -87,10 +87,23 @@ does not disable its boot startup; use `sudo systemctl disable predict60` if
 Docker will permanently replace the host service.
 
 
-Open **http://localhost:8085** (use this hostname to match the configured origin).
+Open **http://localhost:8085** by default, or `http://localhost:<P60_PORT>`
+when you changed the port in `.env.local`. Use the `localhost` hostname to match
+the configured origin.
 This path needs Docker Engine but not Compose. It builds before replacing the
 container, keeps accounts in `p60-local-data`, limits logs, and uses a read-only
 root filesystem with a writable data volume and 64 MiB temporary filesystem.
+
+Local Docker and Compose both build `p60:local-dev`, separate from the VPS
+image. If a VPS container already publishes port 8085, choose another
+`P60_PORT` in `.env.local` (for example, `18085`) before starting locally.
+The restart helper reports Docker port conflicts before replacing a container.
+For example, `P60_PORT=18085` uses `http://localhost:18085`. The production
+`compose.yaml` reads `.env` and does not use the local signup code; use the
+`--local` helper or `compose.local.yaml` for development.
+Authorize `http://localhost:<P60_PORT>` in your Google web client's JavaScript
+origins. Set `GOOGLE_CLIENT_ID` in `.env.local` to use your own client; the server
+updates all three Google sign-in pages automatically.
 
 ```bash
 docker logs --tail=100 -f p60-local

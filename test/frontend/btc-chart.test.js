@@ -7,7 +7,7 @@ function chartHarness({oil=false,live=false,spotError=false,historyError=false,t
  let now=startTime;
  const elements=new Map(),hour=Math.floor(now/3600000)*3600000;
  function element(id){
-  if(!elements.has(id))elements.set(id,{textContent:'',hidden:false,dataset:{},style:{setProperty(){}},classList:{},listeners:{},
+  if(!elements.has(id))elements.set(id,{textContent:'',hidden:false,dataset:{},style:{setProperty(key,value){this[key]=value;}},classList:{},listeners:{},get ownerDocument(){return context.document;},
    addEventListener(type,fn){this.listeners[type]=fn;},setAttribute(k,v){this[k]=v;},removeAttribute(k){delete this[k];},
    getBoundingClientRect(){return {left:0,width:1000};},replaceChildren(...children){this.children=children;}});
   return elements.get(id);
@@ -34,7 +34,7 @@ function chartHarness({oil=false,live=false,spotError=false,historyError=false,t
  };
  class FakeDate extends Date{static now(){return now;}}
  class Socket{constructor(){this.readyState=1;socket=this;}close(){}send(){}}
- const window={PredictModel:model,PredictCoins:{available:coins,getCoin:symbol=>coins.find(c=>c.symbol===symbol)||coin,formatPrice:v=>'$'+v.toFixed(2)},dispatchEvent(){},addEventListener:(name,fn)=>{events[name]=fn;}};
+ const window={PredictMinuteTrend:require('../../src/frontend/minute-trend.js'),PredictModel:model,PredictCoins:{available:coins,getCoin:symbol=>coins.find(c=>c.symbol===symbol)||coin,formatPrice:v=>'$'+v.toFixed(2)},dispatchEvent(){},addEventListener:(name,fn)=>{events[name]=fn;}};
  const context={window,document:{getElementById:element,querySelector:s=>s.startsWith('[data-remaining')?null:element(s),querySelectorAll:s=>s==='[data-coin]'?buttons:[],addEventListener(){},createElement:()=>({dataset:{},style:{setProperty(){}},setAttribute(k,v){this[k]=v;}})},Date:FakeDate,Intl,URLSearchParams,fetch,AbortController,WebSocket:Socket,Event:class{},localStorage:{getItem(){return null;},setItem(){}},setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout(){},performance:{now:()=>frameStamp},console};
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../../src/frontend/btc-chart.js'),'utf8'),context);
  return {element,pending,model,hour,requests,events,select(symbol){element(`coin-${symbol}`).listeners.click();},step(){now+=1000;frameStamp+=1000;timers.at(-1)();},tick(price,elapsed=0){now+=elapsed;frameStamp+=Math.max(1000,elapsed);socket.onmessage({data:JSON.stringify({type:'ticker',product_id:model.coin.product,price:String(price),time:new Date(now).toISOString()})});timers.at(-1)();}};
@@ -70,6 +70,53 @@ test('live price, chart and clock refresh on each one-second tick',async()=>{
   assert.equal(h.model.now,h.model.priceUpdatedAt);
   previousPath=h.element('btc-line').d;previousClock=h.element('workspace-clock').textContent;
  }
+});
+
+test('hourly banner pairs the dollar move with its signed percentage, including small changes',async()=>{
+ for(const [spot,label,color] of [
+  [110,'+$10.00 (+10.00%) this hour','var(--green)'],
+  [90,'−$10.00 (−10.00%) this hour','var(--red)'],
+  [100,'+$0.00 (+0.00%) this hour','var(--green)'],
+  [100.0015,'+$0.00 (+0.0015%) this hour','var(--green)']
+ ]){
+  const h=chartHarness({quote:({now})=>({price:String(spot),time:new Date(now).toISOString()})});await flush();
+  assert.equal(h.element('btc-change').textContent,label);
+  assert.equal(h.element('btc-change').style.color,color);
+ }
+});
+
+test('hourly banner waits for the exact opening benchmark before showing a percentage',async()=>{
+ const opening=Date.UTC(2026,9,12,16,59)/1000;
+ for(const value of [null,0]){
+  const h=chartHarness({transformCandles:rows=>value===null?rows.filter(c=>c[0]!==opening):rows.map(c=>c[0]===opening?[...c.slice(0,4),value,1]:c)});await flush();
+  assert.equal(h.element('btc-change').textContent,'Waiting for price data');
+ }
+});
+
+test('historical banner calculates the percentage from the selected hour opening and close',async()=>{
+ const closing=Date.UTC(2026,9,12,16,59)/1000;
+ const h=chartHarness({transformCandles:rows=>rows.map(c=>[...c.slice(0,4),c[0]===closing?110:100,1])});await flush();
+ h.element('previous-hour').listeners.click();await flush();
+ assert.equal(h.element('btc-change').textContent,'+$10.00 (+10.00%) that hour');
+});
+
+test('full-hour rows and graph share a moving time axis after resize and hide it for history',async()=>{
+ const h=chartHarness();await flush();
+ const stack=h.element('timeline-stack'),chart=h.element('btc-chart');
+ stack.getBoundingClientRect=()=>({left:20,top:100,width:1000});
+ chart.getBoundingClientRect=()=>({left:75,top:180,width:890});
+ h.events.resize();
+ const fraction=(h.model.now-h.hour)/3600000;
+ assert.equal(stack.style['--hour-progress'],`${fraction*100}%`);
+ assert.equal(stack.style['--cursor-x'],`${55+fraction*890}px`);
+ assert.equal(stack.style['--cursor-top'],'80px');
+ const before=parseFloat(stack.style['--hour-progress']);
+ h.step();
+ assert(parseFloat(stack.style['--hour-progress'])>before);
+ assert.equal(h.element('time-cursor').hidden,false);
+ h.element('previous-hour').listeners.click();await flush();
+ assert.equal(h.element('hour-overview').dataset.state,'completed');
+ assert.equal(h.element('time-cursor').hidden,true);
 });
 
 test('chart history falls back to the server when the browser cannot reach the provider',async()=>{
@@ -212,17 +259,16 @@ test('initial current hour backfills to its start before pricing history complet
  assert.equal(h.model.pricingHistoryStatus,'error');
 });
 
-test('minute heat map renders sixty time-aligned candle directions',async()=>{
+test('minute summary arrows align with the hour candle centers',async()=>{
  const h=chartHarness();await flush();
- const map=h.element('minute-heatmap'),dots=map.children;
- assert.equal(dots.length,60);
- assert.equal(dots[14].style.left,'25%');
- assert.equal(dots[29].style.left,'50%');
- assert.equal(dots[44].style.left,'75%');
- assert.equal(dots[59].style.left,'100%');
- assert.equal(dots.filter(dot=>dot.className.includes(' up')).length,25);
- assert.equal(dots[25].className,'minute-dot current');
- assert.match(dots[0].title,/17:00–17:01 UTC · Up/);
+ const map=h.element('minute-heatmap'),markers=map.children;
+ assert.equal(markers.length,60);
+ const candleCenters=[...h.element('minute-bars-up').d.matchAll(/M([-\d.]+),[-\d.]+V/g)].map(match=>Number(match[1]));
+ assert.equal(candleCenters.length,25);
+ candleCenters.forEach((center,index)=>assert(Math.abs(parseFloat(markers[index].style.left)*10-center)<.001,'each summary arrow sits below its candle wick'));
+ assert.equal(markers.filter(marker=>marker.className.includes(' up')).length,25);
+ assert.equal(markers[25].className,'minute-arrow current');
+ assert.match(markers[0].title,/17:00–17:01 UTC · Up/);
  assert.match(map['aria-label'],/25 up, 0 down, 35 pending or unavailable/);
 });
 
@@ -237,6 +283,17 @@ test('returning to current hour restores history and ignores old pricing respons
  const currentPath=h.element('btc-line').d;
  h.pending[0]({ok:true,json:async()=>({candles:[]})});await flush();
  assert.equal(h.element('btc-line').d,currentPath);
+});
+
+test('returning from an interval can select its containing hour without accepting malformed times',async()=>{
+ const h=chartHarness();await flush();
+ h.events['market-hour-select']({detail:{hour:h.hour-3600000}});await flush();
+ assert.equal(h.model.displayHour,h.hour-3600000);
+ assert.equal(h.model.isHistorical,true);
+ for(const hour of [null,NaN,h.hour-1])h.events['market-hour-select']({detail:{hour}});
+ assert.equal(h.model.displayHour,h.hour-3600000);
+ h.events['market-hour-select']({detail:{hour:h.hour+3600000}});await flush();
+ assert.equal(h.model.displayHour,h.hour,'future hours remain clamped to the current hour');
 });
 
  test('banner fractional digits follow price moves and reset on navigation',async()=>{
@@ -302,7 +359,7 @@ test('missing oil credentials show an actionable error without simulated substit
  assert(!Number.isFinite(h.model.spot));
 });
 
-test('completed quarters show a green direction arrow with an outcome-colored dot',async()=>{
+test('completed quarters show a green direction arrow with an outcome-colored marker',async()=>{
  const h=chartHarness();await flush();
  const markers=h.element('segment-results').children;
  assert.equal(markers.length,1);assert.equal(markers[0].textContent,'↑');
@@ -371,11 +428,11 @@ test('a newly opened five-minute market refreshes its benchmark just after the m
 
 test('price ticks reuse minute annotations until the minute changes',async()=>{
  const h=chartHarness();await flush();
- const dots=h.element('minute-heatmap').children,results=h.element('segment-results').children;
+ const markers=h.element('minute-heatmap').children,results=h.element('segment-results').children;
  h.tick(109,1000);
- assert.equal(h.element('minute-heatmap').children,dots);
+ assert.equal(h.element('minute-heatmap').children,markers);
  assert.equal(h.element('segment-results').children,results);
  h.tick(110,30000);
- assert.notEqual(h.element('minute-heatmap').children,dots);
+ assert.notEqual(h.element('minute-heatmap').children,markers);
  assert.notEqual(h.element('segment-results').children,results);
 });

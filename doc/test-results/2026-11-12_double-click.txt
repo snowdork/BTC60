@@ -1,0 +1,6 @@
+Double-click card navigation browser checks
+2026-11-12 · Playwright/Chromium · mocked account and candle data
+
+1440px: single-click selection, double-click both ways, exact interval times, past-hour return, and action-button protection passed.
+390px: single-click selection, double-click both ways, exact interval times, past-hour return, and action-button protection passed.
+320px: single-click selection, double-click both ways, exact interval times, past-hour return, and action-button protection passed.

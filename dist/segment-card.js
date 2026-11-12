@@ -28,6 +28,7 @@
       <p data-detail-result class="detail-result"><span data-detail-movement class="segment-movement" hidden></span><span data-detail-chances class="segment-chances"><span data-detail-up-chance class="segment-odds-up">Up —</span> · <span data-detail-down-chance class="segment-odds-down">Down —</span></span><span data-detail-summary class="segment-summary" hidden></span></p>
       <button type="button" class="segment-action" ${detail?`data-detail-predict="${index}"`:`data-segment-action="${escape(m.id)}" aria-haspopup="dialog" aria-controls="prediction-dialog"`}><span class="segment-action-label">${closed?'Result':queued?'Details':'Predict...'}</span></button>
       ${detail?'':'<span class="segment-direction" data-direction-indicator hidden role="img"><span class="segment-direction-change" hidden></span><span class="segment-direction-arrow" aria-hidden="true"></span></span>'}
+      ${detail?'':`<span class="segment-time-markers" aria-hidden="true"><span class="prediction-cutoff-marker" style="left:${100-50/m.minutes}%"></span><span class="segment-now-line" data-segment-now hidden></span></span>`}
     </article>`;
   }
   if(typeof module!=='undefined'&&module.exports)module.exports={markup,priceMovement};

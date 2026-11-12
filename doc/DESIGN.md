@@ -2,38 +2,96 @@
 
 ## Workspace and visual language
 
-The primary view presents a complete UTC hour: one 60-minute card, two aligned 30-minute cards, four aligned 15-minute cards, twelve five-minute cards, and sixty one-minute cards. The two shortest tiers use separate horizontal scrollers. On desktop, one red dashed UTC cursor crosses the hourly chart and the aligned 60/30/15-minute tiers. Both short scrollers have their own time labels and Now / Detail controls.
+The title bar contains the stacked P60/Predict60 brand, selected coin icon,
+current USD price, hourly dollar and percentage change, contest credits,
+UTC/local clocks, and **Interval | Hour** controls. Interval is the default and
+shows one 5-, 15-, 30-, or 60-minute play. Hour shows one 60-minute card, two
+30-minute cards, four 15-minute cards, and twelve 5-minute cards. One-minute
+candles are data resolution, not a tradable duration.
 
-The Last / Current / Next view offers 1/5/15/30/60-minute duration controls and three interval cards with one-minute OHLC charts. It follows the current UTC interval, including neighbors across hour and day boundaries. Historical mode centers the final interval in the selected hour. Exact minute boundaries determine benchmarks; missing candles remain gaps. The live price is provisional and never replaces a closing benchmark. Chart history includes the previous hour and, for historical views, the following hour when available, within Coinbase's 300-candle request limit.
+The title-bar controls and card-body double-clicks change modes. Double-clicking
+an Hour card opens its exact start and duration; double-clicking an Interval card
+returns to Hour. A past interval returns to its containing UTC hour. Interactive
+buttons/links/form fields do not trigger the shortcut. Entering Hour clears
+duration and segment selection highlights. Choosing a duration or segment while in Hour keeps it visible and
+prepares the selected interval; selecting Interval then opens it. In Interval,
+left/right arrows move by one play and Back to live resumes following. In Hour,
+left/right arrows move by one UTC hour and Back to now restores the live hour.
 
-The ticket opens in a dialog from each segment action or the detail view's open interval. On screens up to 850 pixels, the chart fits the viewport and each duration row scrolls independently. Detail cards stack below 1000 pixels. Account and welcome pages reflow to the viewport.
+Both graph backgrounds stay black in either theme and across live, completed,
+and upcoming states. Hour has a white price line and green/red candles.
+Interval's line, grid, and endpoint use the duration palette: 60 purple, 30 blue,
+15 pink, and 5 amber. Alternating red/yellow dotted markers show current time;
+orange dashed markers show prediction cutoffs 30 seconds before the end. Historical views hide current
+time markers. The theme applies to the surrounding controls and cards, not the
+black plot background.
 
-Dark surfaces use near-black tones with emerald Up/selection, crimson Down, amber data warnings, and cyan explanatory cues. Light and dark themes use shared variables. Financial values use monospace styling with native font fallbacks. Theme preference is applied before rendering, stored locally, and synchronized across tabs. Coin logos are local SVGs; the welcome page links a static terminal preview.
+The Hour graph and unwrapped duration rows share their left/right bounds. On
+phones, 15-minute cards wrap into two rows; 5-minute cards scroll independently.
+Those cards use a local time marker rather than projecting a full-hour marker
+onto a different scale. Time markers span the full graph or card height. Coin
+controls remain pinned above the scrolling playfield.
 
 ## Segment layout and refresh
 
-Segment layout lives in the final, shared segment section of `responsive.css`;
-`styles.css` supplies the reusable arrow shape. Keep viewport/state changes in
-that section rather than appending successive overrides. Time range, bold model
-probabilities and status lead; benchmark → current/closing price follows;
-action and countdown share the control row. Open uses blue, price direction
-uses green/red, and benchmark text contrasts with the actual card background.
-Completed cards use darker direction colors against their pale surfaces.
+`segment-card.js` supplies the shared card markup. `responsive.css` owns the
+final state and viewport layout. Keep new state/viewport rules with their existing section
+instead of appending competing overrides.
 
-The lower-right arrow has its signed movement percentage above it. This measures
-`(current - benchmark) / benchmark`, not the model's chance of winning. Phones
-wrap probabilities below time/status and use buttons at least 44 pixels tall.
-Upcoming and pending-result cards omit price, odds and countdown markup entirely.
+Cards include UTC range, coin, status, starting and live/closing prices, actual
+movement, available model estimates, saved bet amount/execution percentage, and
+the relevant action. Hour cards place the coin below the time. Actual movement
+is `(current - starting price) / starting price`; it is separate from Up/Down
+probabilities. Completed results have an outcome-colored heading arrow only
+when both exact settlement benchmarks are available. Missing values remain
+placeholders. Live cards use a duration tint, completed cards use a light gray
+surface, and upcoming cards use light yellow.
 
-`renderMarkets` builds structural state only when the market view changes.
-`renderChances` reuses indexed nodes and writes text, direction attributes and
-accessible labels only when values change. It calculates quote freshness once
-per refresh. Disconnected or paused live prices clear the live comparison;
-completed prices remain based on their exact historical close.
+`renderMarkets` rebuilds structural state on market/view changes and preserves
+horizontal scroll. `renderChances` reuses indexed nodes and avoids rewriting
+unchanged values. Disconnected or paused live quotes clear live comparisons;
+completed comparisons retain their exact historical close. Explicit Hour card
+selection is kept in the grid's dataset and survives a structural refresh, but
+is cleared on entering Hour or changing the displayed instrument/hour.
+
+## Compact charts
+
+`market-model.js` projects valid minute OHLC bars at each minute's midpoint and
+closes at minute ends. It merges those closes with observed one-second prices.
+The live endpoint uses display time so quote arrival timing does not pull the
+line backwards. Missing observations leave gaps; synthetic and incomplete data
+do not replace settlement candles.
+
+Both views inherit `--price-chart-height` from the workspace: 180 pixels on
+desktop and 150 pixels at widths of 700 pixels or less. The Hour cursor uses
+that same height so it spans the entire plot. Time labels sit directly below
+the chart and its compact minute summary. Header probability estimates remain
+available.
+
+`minute-trend.js` renders a 16-pixel summary row beneath each graph. Its arrows
+align with candle midpoints and use the same OHLC validity rules as `minutePlot`.
+Completed minutes are green Up when close is at least open, otherwise red Down.
+Current minutes use an amber dash; missing/upcoming minutes remain neutral.
+The renderer caches candle identity, interval bounds, minute, and historical
+state so price ticks reuse the row. Common arrow styles live in `styles.css`;
+`responsive.css` aligns the row with the corresponding chart gutters.
+
+The title-bar hourly movement uses the exact close before the UTC hour starts.
+Live views compare a valid quote with that benchmark; historical views compare
+the selected hour's close. The percentage is `100 * dollar change / opening
+benchmark`, displayed with two to four decimals. Quotes refresh the model
+immediately; displayed prices coalesce to one-second updates. Missing quotes or
+opening benchmarks leave the change unavailable.
 
 ## Market state and navigation
 
-Selecting a card changes the ticket without rebuilding the playfield. Open intervals support orders when data is ready; upcoming and completed intervals support inspection. UTC dates distinguish midnight boundaries. Previous hour, Next, and Current hour navigate history; switching coins preserves the selected hour. Historical charts cover the full hour, label the close, and hide the live cursor. Missing candles leave affected benchmarks or results unavailable.
+Selecting a segment highlights it and updates the ticket without changing views.
+Predict opens the review workflow for an available live interval; Result and
+Details inspect completed or upcoming intervals. The five-minute row's Now
+control scrolls to the current card and Select chooses its duration. Neither
+control changes the chart view. Historical navigation preserves the selected
+instrument and does not switch modes. Dates distinguish midnight boundaries.
+Missing candles leave affected benchmarks or results unavailable.
 
 Crypto is the only active category. Oil and Weather render as non-navigable
 **Coming soon** cards. Direct Oil/Weather terminal requests are redirected, and
@@ -104,7 +162,10 @@ The terminal lists unsettled predictions with countdowns and marks account wager
 | Component | Responsibility |
 | --- | --- |
 | `bootstrap.js`, `coins.js` | Catalog loading, coin controls, startup errors |
-| `market-model.js` | Pure quote, estimate, volatility, and readiness logic |
+| `market-model.js` | Pure quote, estimate, volatility, readiness, and minute-plot logic |
+| `market-detail.js` | Explicit view controls, interval selection, and range-history loading |
+| `minute-trend.js` | Shared candle-aligned summary arrows with cached DOM updates |
+| `segment-card.js` | Shared interval cards and observed price-movement labels |
 | `app.js` | Market selection, ticket, live review, wager displays |
 | `btc-chart.js` | Feed, candle history, chart, UTC market lifecycle |
 | `account.js`, `auth.js`, `password.js` | Session/account API, authentication UI, and password changes |

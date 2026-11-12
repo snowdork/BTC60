@@ -11,7 +11,7 @@ function detailHarness({predictions=[],user={id:1}}={}){
   candles:Array.from({length:87},(_,i)=>[(hour/1000)-3660+i*60,98,103,100,100,1])};
  model.markets=base.adjacentMarkets(15,now,now,model.candles);
  const elements=new Map(),events=new Map(),dispatched=[];
- const node=()=>({hidden:false,dataset:{},style:{},listeners:{},attrs:{},textContent:'',children:[],
+ const node=()=>({hidden:false,dataset:{},style:{setProperty(key,value){this[key]=value;}},listeners:{},attrs:{},textContent:'',children:[],get ownerDocument(){return document;},
   replaceChildren(...children){this.children=children;},
   addEventListener(name,fn){this.listeners[name]=fn;},setAttribute(k,v){this.attrs[k]=v;}});
  const cards=Array.from({length:1},()=>{
@@ -24,7 +24,7 @@ function detailHarness({predictions=[],user={id:1}}={}){
  let wallTime=null;
  class FakeDate extends Date{static now(){return wallTime??model.now;}}
  const account={user,predictions};
- const window={PredictSegmentCard:require('../../src/frontend/segment-card.js'),PredictModel:model,Predict60Account:account,PredictCoins:{formatPrice:v=>'$'+v.toFixed(2)},
+ const window={PredictMinuteTrend:require('../../src/frontend/minute-trend.js'),PredictSegmentCard:require('../../src/frontend/segment-card.js'),PredictModel:model,Predict60Account:account,PredictCoins:{formatPrice:v=>'$'+v.toFixed(2)},
   addEventListener(name,fn){events.set(name,fn);},dispatchEvent(event){dispatched.push(event);events.get(event.type)?.(event);}};
  const document={getElementById:get,querySelectorAll:()=>durations,createElement:node};
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../../src/frontend/market-detail.js'),'utf8'),
@@ -40,8 +40,6 @@ test('single play aligns chart, coin and red timer to the selected interval',()=
  assert.equal((h.get('detail-cards').innerHTML.match(/data-detail-index=/g)||[]).length,1);
  assert.equal(h.field(0,'coin-name').textContent,'BTC · 15 MIN');
  assert.match(h.get('play-line').attrs.d,/^M/);
- assert.match(h.get('play-now').attrs.d,/^M700/);
- assert.equal(h.get('play-now').attrs.visibility,'visible');
  assert.equal(h.get('play-timeframe').textContent,'BTC · 17:15 – 17:30 UTC · 15 MIN');
  assert.equal(h.get('play-cursor').hidden,false);
  assert.equal(h.get('play-cursor').style.left,'70%');
@@ -60,6 +58,96 @@ test('above-chart percentages follow live estimates and clear when data becomes 
  h.model.feedConnection='disconnected';h.events.get('btc-chances-update')();
  assert.equal(h.get('play-up-chance').textContent,'↑ Up —');
  assert.equal(h.get('play-down-chance').textContent,'↓ Down —');
+});
+
+test('single-click interval selections keep the chosen view; Hour clears selection until the user chooses again',()=>{
+ const h=detailHarness();
+ h.click('show-overview');
+ assert.equal(h.get('hour-overview').hidden,false);
+ assert(h.durations.every(button=>button.attrs['aria-pressed']==='false'));
+ assert.equal(h.get('hour-overview').dataset.duration,'60');
+ h.durations[2].listeners.click();
+ assert.equal(h.get('hour-overview').hidden,false,'a duration choice must keep Hour active');
+ assert.equal(h.durations[2].attrs['aria-pressed'],'true');
+ const startsAt=h.model.displayHour+5*60000;
+ h.events.get('market-interval-select')({detail:{minutes:5,startsAt}});
+ assert.equal(h.get('hour-overview').hidden,false,'a segment selection must keep Hour active');
+ assert.equal(h.durations[0].attrs['aria-pressed'],'true');
+ h.click('show-detail');
+ assert.equal(h.get('hour-overview').hidden,true);
+ assert.equal(h.get('play-timeframe').textContent,'BTC · 17:05 – 17:10 UTC · 5 MIN');
+ h.click('show-overview');
+ assert(h.durations.every(button=>button.attrs['aria-pressed']==='false'));
+ h.click('show-detail');
+ assert.equal(h.get('play-timeframe').textContent,'BTC · 17:25 – 17:30 UTC · 5 MIN','clearing a selection returns Interval to the current play');
+});
+
+test('double-clicking a card moves between Hour and its exact interval',()=>{
+ const h=detailHarness();
+ h.click('show-overview');
+ const target={closest:selector=>selector==='[data-market]'?{dataset:{market:'15-0'}}:null};
+ h.get('market-grid').listeners.dblclick({target});
+ assert.equal(h.get('hour-overview').hidden,true);
+ assert.equal(h.get('show-detail').attrs['aria-pressed'],'true');
+ assert.equal(h.get('play-timeframe').textContent,'BTC · 17:00 – 17:15 UTC · 15 MIN');
+ h.get('detail-cards').listeners.dblclick({target:{closest:selector=>selector==='[data-detail-index]'?{dataset:{detailIndex:'0'}}:null}});
+ assert.equal(h.get('hour-overview').hidden,false);
+ assert.equal(h.get('show-overview').attrs['aria-pressed'],'true');
+ assert(h.durations.every(button=>button.attrs['aria-pressed']==='false'));
+});
+
+test('double-click shortcuts ignore card action buttons and non-card areas',()=>{
+ const h=detailHarness();
+ const action={target:{closest:()=>({})}};
+ h.get('detail-cards').listeners.dblclick(action);
+ assert.equal(h.get('hour-overview').hidden,true);
+ h.get('detail-cards').listeners.dblclick({target:{closest:()=>null}});
+ assert.equal(h.get('hour-overview').hidden,true);
+ h.click('show-overview');
+ h.get('market-grid').listeners.dblclick(action);
+ assert.equal(h.get('hour-overview').hidden,false);
+ h.get('market-grid').listeners.dblclick({target:{closest:()=>null}});
+ assert.equal(h.get('hour-overview').hidden,false);
+});
+
+test('double-clicking a browsed past interval requests its containing UTC hour',()=>{
+ const h=detailHarness();
+ h.click('play-previous');h.click('play-previous');
+ h.get('detail-cards').listeners.dblclick({target:{closest:selector=>selector==='[data-detail-index]'?{dataset:{detailIndex:'0'}}:null}});
+ assert.equal(h.get('hour-overview').hidden,false);
+ const navigation=h.dispatched.find(event=>event.type==='market-hour-select');
+ assert.equal(navigation.detail.hour,h.model.displayHour-3600000);
+});
+
+test('minute summary arrows follow the selected interval and wait for completed, valid candles',()=>{
+ const h=detailHarness(),start=h.model.displayHour+15*60000;
+ const markers=()=>h.get('play-minute-heatmap').children;
+ assert.equal(markers().length,15);
+ assert.equal(markers().filter(marker=>marker.className==='minute-arrow up').length,10);
+ assert.equal(markers()[10].className,'minute-arrow current');
+ h.model.candles=h.model.candles.filter(c=>c[0]*1000!==start+5*60000).map(c=>{
+  if(c[0]*1000===start+60000)return [...c.slice(0,4),99,1];
+  if(c[0]*1000===start+3*60000)return [c[0],c[1],c[2],0,c[4],1];
+  return c;
+ });
+ h.events.get('btc-market-update')();
+ assert.equal(markers()[1].className,'minute-arrow down');
+ assert.equal(markers()[3].className,'minute-arrow');
+ assert.equal(markers()[5].className,'minute-arrow');
+ assert.equal(markers()[12].className,'minute-arrow');
+ const previous=markers();h.events.get('btc-price-update')();
+ assert.equal(markers(),previous,'price ticks preserve the summary');
+ h.model.now+=60000;h.model.priceUpdatedAt=h.model.now;h.events.get('btc-market-update')();
+ assert.equal(markers()[10].className,'minute-arrow up');
+ assert.equal(markers()[11].className,'minute-arrow current');
+ for(const button of h.durations){
+  button.listeners.click();
+  assert.equal(markers().length,Number(button.dataset.detailDuration));
+  assert.equal(parseFloat(markers().at(-1).style.left),(markers().length-.5)/markers().length*100);
+ }
+ h.click('play-next');
+ assert(markers().every(marker=>marker.className==='minute-arrow'),'upcoming intervals clear previous trend colors');
+ assert(markers().every(marker=>marker.title.includes('Upcoming')));
 });
 
 test('the selected segment separates colored odds from the actual percentage move since its start',()=>{
@@ -117,9 +205,9 @@ test('the graph never retracts when quotes arrive between timer ticks or the con
   if(elapsed%1000){h.model.priceUpdatedAt=baseTime+elapsed;h.model.spot+=.1;}
   else h.model.now=baseTime+elapsed;
   h.events.get('btc-price-update')();
-  const tip=Number(h.get('play-tip').attrs.cx),cursor=Number(h.get('play-now').attrs.d.match(/^M([\d.]+)/)[1]);
+  const tip=Number(h.get('play-tip').attrs.cx),cursor=parseFloat(h.get('play-cursor').style.left)*10;
   assert(tip>=previousX,'the endpoint must move forward across quote and timer updates');
-  assert.equal(tip,cursor,'live endpoint and timer must use the same time');
+  assert(Math.abs(tip-cursor)<1e-9,'live endpoint and timer must use the same time');
   previousX=tip;
  }
  h.model.feedConnection='disconnected';h.events.get('btc-chances-update')();
@@ -134,7 +222,6 @@ test('arrows move one duration and live restores automatic following',()=>{
  assert.equal(h.get('market-detail').dataset.state,'completed');
  assert.equal(h.field(0,'predict').hidden,false);
  assert.equal(h.field(0,'predict').disabled,false);
- assert.equal(h.get('play-now').attrs.visibility,'hidden');
  assert.equal(h.get('play-cursor').hidden,true);
  h.click('play-next');h.click('play-next');
  assert.match(h.get('detail-cards').innerHTML,/17:30 – 17:45 UTC/);
