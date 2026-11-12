@@ -1,9 +1,0 @@
-Red/yellow current-time dots browser checks
-2026-11-12
-
-1440px dark: alternating red/yellow dots in Hour, all four intervals, row/card markers, and legend; full-height alignment and clock movement passed.
-1440px light: alternating red/yellow dots in Hour, all four intervals, row/card markers, and legend; full-height alignment and clock movement passed.
-390px dark: alternating red/yellow dots in Hour, all four intervals, row/card markers, and legend; full-height alignment and clock movement passed.
-390px light: alternating red/yellow dots in Hour, all four intervals, row/card markers, and legend; full-height alignment and clock movement passed.
-320px dark: alternating red/yellow dots in Hour, all four intervals, row/card markers, and legend; full-height alignment and clock movement passed.
-320px light: alternating red/yellow dots in Hour, all four intervals, row/card markers, and legend; full-height alignment and clock movement passed.

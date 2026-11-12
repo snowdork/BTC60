@@ -4,8 +4,11 @@ oilpriceapi.key
 .env.*
 __pycache__/
 *.pyc
+.pytest_cache/
+.mypy_cache/
 doc/_build/
 doc/_generated/
 doc/node_modules/
+doc/test-results/
 
 .venv/
