@@ -1,31 +1,50 @@
 # Latest regression test results
 
-**PASS — 332 passed, 0 failed, 0 skipped.**
+**PASS — 333 passed, 0 failed, 0 skipped.**
 
 ## Run identification
 
-- Started November 12, 2026 at 02:29:40 PM MST (`America/Denver`, UTC−07:00).
+- Started November 12, 2026 at 8:22:09 PM MST (`America/Denver`, UTC−07:00).
 - Command: `.venv/bin/python scripts/run_tests.py` from the repository root.
-- Branch: `Phase-10`; base commit: `3d69370`; working tree includes the current
-  chart, view-selection, local deployment, authentication, and documentation changes.
-- Linux, Python 3.14.4, Node.js 24.22.2. HTTP and lifecycle tests use temporary
-  databases, mocked providers, and isolated process/container fixtures.
+- Branch: `Phase-10`; base commit: `42b718b`; working tree includes the splash,
+  account layouts, circular interval controls, segment odds, and five-second cutoff.
+- Linux, Python 3.12.3, Node.js 24.22.1. HTTP tests use temporary databases;
+  provider calls are mocked. Google signed-token verification tests are included.
 
 ## Suite results
 
 | Suite | Tests | Passed | Failed | Skipped | Duration |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| JavaScript | 177 | 177 | 0 | 0 | 0.19 s |
-| Python application | 116 | 116 | 0 | 0 | 4.57 s |
-| Python scripts | 39 | 39 | 0 | 0 | 16.05 s |
-| **Total** | **332** | **332** | **0** | **0** | **20.81 s** |
+| JavaScript | 178 | 178 | 0 | 0 | 0.44 s |
+| Python application | 116 | 116 | 0 | 0 | 9.26 s |
+| Python scripts | 39 | 39 | 0 | 0 | 17.99 s |
+| **Total** | **333** | **333** | **0** | **0** | **27.68 s** |
 
-[Complete regression log](test-results/2026-11-12_14-29-40.txt), with ANSI colors removed.
-Original local log: `/tmp/test_results/test_result_2026-11-12_14-29-40_579213.log`.
-Restored summary tests cover exact candle alignment, invalid/missing data,
-minute rollover, duration changes, and DOM reuse on price ticks. Expected negative cases produce provider,
-health, and reset messages. Python 3.14 also reports resource warnings from
-temporary test fixtures; no test failed. Historical logs remain in `doc/test-results/`.
+Local log: `/tmp/test_results/test_result_2026-11-12_20-22-09_614191.log`.
+
+## Deployment verification
+
+- Removed unused generated background variants and obsolete preview/estimate styles.
+  Refreshed `dist/` from the public source allowlist.
+- Five-second cutoff assertions cover the browser boundary for all four durations,
+  the server hour boundary, and all twelve five-minute intervals.
+- Chromium checked welcome, login, signup, and terminal layouts at 1440×900,
+  1366×768, 390×844, and 320×720. No horizontal page overflow; interval circles
+  remain 72×72 pixels; coin buttons stay within the viewport. Demo opens and closes
+  with Escape. These layout checks block external services and use coin fixtures;
+  they do not verify live quotes or a real Google account flow.
+- `docker compose --env-file deploy/docker.env.example config --quiet` passes.
+  Restart/start/stop scripts pass Bash syntax checks.
+- Built `p60:deployment-check` (image `a6ae5f60baa8`). An automatically removed,
+  unprivileged container passes `/healthz` and serves the updated account pages,
+  splash script/styles and both new backgrounds. It uses a read-only filesystem,
+  temporary data, no external network, and no published ports.
+- No running deployment was restarted. Before a VPS rollout, preserve the current
+  database backup, verify that host's private `.env`, then use the normal restart
+  script. Confirm public HTTPS, live quote freshness, and sign-in after rollout.
+
+The following sections describe earlier browser/operational checks; they were not
+repeated as part of the deployment verification above.
 
 ## Compact chart and interaction checks
 

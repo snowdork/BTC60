@@ -404,12 +404,12 @@ test('minute chart keeps straight closes and separates missing minutes',async()=
  assert.match(h.element('chart-description').textContent,/one-minute OHLC/);
 });
 
-test('segment countdown shows Locked exactly in the final thirty seconds',async()=>{
- const h=chartHarness({startTime:Date.UTC(2026,9,12,17,59,29)});await flush();
+test('segment countdown shows Locked exactly in the final five seconds',async()=>{
+ const h=chartHarness({startTime:Date.UTC(2026,9,12,17,59,54)});await flush();
  const market=h.model.markets.find(m=>m.id==='60-0');
- assert.equal(market.remaining,'0m 31s');
- h.step();assert.equal(market.remaining,'0m 30s - Locked');
- for(let i=0;i<29;i++)h.step();
+ assert.equal(market.remaining,'0m 06s');
+ h.step();assert.equal(market.remaining,'0m 05s - Locked');
+ for(let i=0;i<4;i++)h.step();
  assert.equal(market.remaining,'0m 01s - Locked');
  h.step();assert.equal(market.remaining.includes('Locked'),false);
 });

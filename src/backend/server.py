@@ -57,6 +57,8 @@ PUBLIC_ASSETS = {
     'assets/previews/prediction-playfield.png',
     'assets/previews/welcome-splash.png',
     'assets/backgrounds/hourly-markets.webp',
+    'assets/backgrounds/icy-coins-color.webp',
+    'assets/backgrounds/sea-islands.webp',
     'assets/backgrounds/playfield.webp',
     'assets/brand/p60-mark.svg',
     'assets/fonts/manrope-latin.woff2',
@@ -94,7 +96,9 @@ PUBLIC_FILES = {
     'theme.css',
     'theme.js',
     'orientation.js',
+    'island-auth.css',
     'welcome.css',
+    'welcome.js',
     'welcome.html',
 }
 
@@ -1207,9 +1211,9 @@ class Handler(SimpleHTTPRequestHandler):
         start = now // 3600 * 3600 + index * duration * 60
         end = start + duration * 60
         requested_start = data.get('startsAt')
-        if isinstance(requested_start, (int, float)) and time.time() >= requested_start / 1000 + duration * 60 - 30:
-            raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
-        if not start <= now < end - 30 or data.get('startsAt') != start * 1000:
+        if isinstance(requested_start, (int, float)) and time.time() >= requested_start / 1000 + duration * 60 - 5:
+            raise ValueError('Betting closed. Bets must be placed at least 5 seconds before the interval ends.')
+        if not start <= now < end - 5 or data.get('startsAt') != start * 1000:
             raise ValueError('This market is closed or changed. Review again.')
         source=instrument_source(coin)
         strike = candle_close(coin, start, source=source)
@@ -1218,8 +1222,8 @@ class Handler(SimpleHTTPRequestHandler):
         # benchmark/history or displayed quote changed during confirmation.
         up = market_up(coin, strike, spot, now, start, end, source=source)
         cents = up if side == 'up' else 100 - up
-        if not start <= time.time() < end - 30:
-            raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
+        if not start <= time.time() < end - 5:
+            raise ValueError('Betting closed. Bets must be placed at least 5 seconds before the interval ends.')
         cost = int((Decimal(str(budget))*100).to_integral_value(rounding=ROUND_CEILING))
         contracts = cost / cents
         created = False
@@ -1228,8 +1232,8 @@ class Handler(SimpleHTTPRequestHandler):
             if conn.execute('SELECT id FROM predictions WHERE user_id=? AND request_id=?', (session['user_id'], request_id)).fetchone():
                 pass
             else:
-                if time.time() >= end - 30:
-                    raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
+                if time.time() >= end - 5:
+                    raise ValueError('Betting closed. Bets must be placed at least 5 seconds before the interval ends.')
                 prediction_id = secrets.token_hex(16)
                 conn.execute('INSERT INTO predictions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', (prediction_id, session['user_id'], request_id, coin, market_id, side, start, end, strike, cents, contracts, cost, now))
                 conn.execute('INSERT INTO prediction_sources VALUES(?,?,?)', (prediction_id, source['feed'], source['product']))

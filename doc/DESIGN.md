@@ -22,7 +22,7 @@ Both graph backgrounds stay black in either theme and across live, completed,
 and upcoming states. Hour has a white price line and green/red candles.
 Interval's line, grid, and endpoint use the duration palette: 60 purple, 30 blue,
 15 pink, and 5 amber. Alternating red/yellow dotted markers show current time;
-orange dashed markers show prediction cutoffs 30 seconds before the end. Historical views hide current
+orange dashed markers show prediction cutoffs 5 seconds before the end. Historical views hide current
 time markers. The theme applies to the surrounding controls and cards, not the
 black plot background.
 
@@ -133,7 +133,7 @@ Up = clamp(round(100 × probability), 1, 99)
 Down = 100 − Up
 ```
 
-The first second responds to live price movement. The 30-second betting cutoff does not change time to settlement. Ties resolve Up. Upcoming cards hide probabilities; completed cards show confirmed 100/0 outcomes. Quotes remain simulated prices, not exchange order-book prices.
+The first second responds to live price movement. The 5-second betting cutoff does not change time to settlement. Ties resolve Up. Upcoming cards hide probabilities; completed cards show confirmed 100/0 outcomes. Quotes remain simulated prices, not exchange order-book prices.
 
 The server caches 24 hours of Coinbase candles per product per minute. Cold loads fetch six batches with three concurrent requests and eight-second request timeouts; subsequent minutes fetch only the missing delta from a recent snapshot. Each batch stays below Coinbase's 300-candle request limit. The browser uses this history alongside its chart history. Python and JavaScript implement equivalent algorithms, with parity tests. Execution recalculates using authoritative live prices, so a displayed quote can move before confirmation.
 

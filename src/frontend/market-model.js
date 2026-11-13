@@ -76,7 +76,7 @@
     if(!model.quoteReady||!Number.isInteger(market.up))return {ready:false,reason:'Purchase quote unavailable',age};
     // Reject invalid order state before any monetary arithmetic.
     if(market.status!=='open'||!Number.isFinite(market.endsAt)||now>=market.endsAt)return {ready:false,reason:'Market closed',age};
-    if(!allowLocked&&now>=market.endsAt-30000)return {ready:false,reason:'Betting closed · final 30 seconds',age};
+    if(!allowLocked&&now>=market.endsAt-5000)return {ready:false,reason:'Betting closed · final 5 seconds',age};
     return {ready:true,reason:'Ready',age};
   }
   /** Validate server purchase quote configuration before enabling model quotes. */ function configure(config){

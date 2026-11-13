@@ -57,11 +57,11 @@
     $('confirm-prediction').disabled=exhausted||submitting||!state.ready||reviewExpired();
     if(review&&!reviewExpired()&&!state.ready&&!submitting){review=null;$('review-dialog').close();notify('Data unavailable. Wait for reconnection and review again.');}
   }
-  /** Check whether the reviewed interval has reached its final thirty-second order cutoff. */ function reviewExpired(){return !!review&&Date.now()>=review.endsAt-30000;}
+  /** Check whether the reviewed interval has reached its final five-second order cutoff. */ function reviewExpired(){return !!review&&Date.now()>=review.endsAt-5000;}
   /** Render review timing from the latest account, market, and interface state. */ function renderReviewTiming(){
     if(!review)return;
-    const seconds=Math.max(0,Math.ceil((review.endsAt-30000-Date.now())/1000));
-    $('review-time').textContent=seconds?`${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s to betting cutoff`:'Betting closed · final 30 seconds';
+    const seconds=Math.max(0,Math.ceil((review.endsAt-5000-Date.now())/1000));
+    $('review-time').textContent=seconds?`${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s to betting cutoff`:'Betting closed · final 5 seconds';
     $('review-time').classList.toggle('expired',!seconds);
     if(!seconds){$('confirm-prediction').disabled=true;if(!submitting)$('confirm-prediction').textContent='Too late to place';}
   }
@@ -116,7 +116,7 @@
         setText(nodes.strike,m.status==='queued'?'Set at open':Number.isFinite(m.strike)?price(m.strike):'—');
         const queued=m.status==='queued',boundary=queued?m.startsAt:m.endsAt;
         const seconds=Math.max(0,Math.ceil((boundary-model.now)/1000));
-        setText(nodes.countdown,m.status==='settled'?'Interval ended':Number.isFinite(seconds)?`${queued?'Starts in':'Ends in'} ${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s${!queued&&seconds<=30?' · Betting closed':''}`:'Waiting for interval time');
+        setText(nodes.countdown,m.status==='settled'?'Interval ended':Number.isFinite(seconds)?`${queued?'Starts in':'Ends in'} ${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s${!queued&&seconds<=5?' · Betting closed':''}`:'Waiting for interval time');
       }
       if(nodes.reference){
         if(nodes.reference.hidden===assessment)nodes.reference.hidden=!assessment;
@@ -124,8 +124,8 @@
       }
       const ready=!assessment&&(m.status!=='open'||model.feedMode!=='live'||model.dataStatus(model,m,Date.now(),{allowLocked:true}).ready);
       const chances=ready?model.estimateChances(m,model.spot,model.now,model.volatility):null;
-      setText(nodes.up,`Up ${chances?chances.up+'%':'—'}`);
-      setText(nodes.down,`Down ${chances?chances.down+'%':'—'}`);
+      window.PredictSegmentCard.updateOdds(nodes.up,chances?.up,'Up');
+      window.PredictSegmentCard.updateOdds(nodes.down,chances?.down,'Down');
       if(nodes.summary){
         const readOnly=m.status!=='open';nodes.chances.hidden=readOnly;nodes.summary.hidden=!readOnly;
         setText(nodes.summary,m.status==='queued'?'Benchmark is set when this interval opens.':Number.isFinite(m.strike)&&Number.isFinite(m.close)?`${m.close>=m.strike?'↑ Up':'↓ Down'} wins · ${price(m.strike)} → ${price(m.close)}`:'Awaiting exact settlement candles');
@@ -231,7 +231,7 @@
     $('down-price').textContent=open&&chance?`${(chance.down/100).toFixed(2)} credits`:'—';
     $('contract-price').textContent=q?`at ${(q.cents/100).toFixed(2)} credits each`:'';
     $('contracts').textContent=q?shares(q.contracts):'—';$('cost').textContent=q?money(q.cost):'—';$('return').textContent=q?money(q.payout):'—';$('profit').textContent=q?'+'+money(q.profit):'—';
-    if(open)$('ticket-note').textContent=q?'Bets close 30s before interval end · No real money':(side===null?'Choose Up or Down to review your prediction.':'Enter 1–1,000 credits within your available balance.');
+    if(open)$('ticket-note').textContent=q?'Bets close 5s before interval end · No real money':(side===null?'Choose Up or Down to review your prediction.':'Enter 1–1,000 credits within your available balance.');
     return q;
   }
   /** Render interval details from the latest account, market, and interface state. */ function renderIntervalDetails(){
@@ -280,7 +280,7 @@
     const q=currentQuote();
     $('submit-prediction').classList.toggle('bear',side==='down');
     $('submit-prediction').classList.toggle('pick-direction',side===null);
-    $('ticket-note').textContent=!open?(queued?'Select an open market to make a prediction.':Number.isFinite(market.strike)&&Number.isFinite(market.close)?`Settlement: ${outcome(market.strike,market.close)==='up'?'Up':'Down'} at ${price(market.close)}.`:'Waiting for market history.'):!q?(side===null?'Choose Up or Down to review your prediction.':'Enter 1–1,000 credits within your available balance.'):'Bets close 30s before interval end · No real money';
+    $('ticket-note').textContent=!open?(queued?'Select an open market to make a prediction.':Number.isFinite(market.strike)&&Number.isFinite(market.close)?`Settlement: ${outcome(market.strike,market.close)==='up'?'Up':'Down'} at ${price(market.close)}.`:'Waiting for market history.'):!q?(side===null?'Choose Up or Down to review your prediction.':'Enter 1–1,000 credits within your available balance.'):'Bets close 5s before interval end · No real money';
     $('settlement-description').textContent=!Number.isFinite(market.strike)&&!queued?'Waiting for a benchmark from minute history.':queued?'The starting benchmark is set when this interval opens.':`Up wins if the closing minute-candle close is at least ${price(market.strike)}. An unchanged price resolves Up.${window.PredictModel.coin.feed==='twelvedata'?' Twelve Data oil minute close · USD/barrel.':window.PredictModel.coin.feed==='simulated'?' Simulated oil benchmark · USD/barrel.':''}`;
     $('balance').textContent=money(balance());
     renderExecutionState();

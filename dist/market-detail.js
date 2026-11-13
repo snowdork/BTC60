@@ -141,8 +141,6 @@
     const fresh=quoteFresh&&(model.feedMode==='demo'||model.feedConnection==='connected');
     const ready=model.dataStatus(model,selected,Date.now(),{allowLocked:true}).ready;
     const chance=selected.status==='open'&&(ready||model.feedMode==='demo')?model.estimateChances(selected,model.spot,now,model.volatility):null;
-    $('play-up-chance').textContent=`↑ Up ${chance?chance.up+'%':'—'}`;
-    $('play-down-chance').textContent=`↓ Down ${chance?chance.down+'%':'—'}`;
     const timelineLive=!model.isHistorical&&quoteFresh?{t:model.priceUpdatedAt,price:model.spot}:null;
     const timeline=model.minutePlot(candles,selected.startsAt,selected.endsAt,now,timelineLive,model.secondPoints);
     window.PredictMinuteTrend.render($('play-minute-heatmap'),{candles,startsAt:selected.startsAt,endsAt:selected.endsAt,now,historical:model.isHistorical,label:'this interval'});
@@ -152,7 +150,7 @@
     const cursor=Math.max(0,Math.min(1000,(now-intervals[0].startsAt)/(minutes*60000)*1000));
     $('play-cursor').hidden=selected.status!=='open';
     $('play-cursor').style.left=`${cursor/10}%`;
-    $('play-cutoff').style.left=`${100-50/minutes}%`;
+    $('play-cutoff').style.left=`${100-5/(minutes*60)*100}%`;
     $('play-now-label').textContent=intervals[0].status==='open'?'LIVE · NOW':intervals[0].status==='queued'?'UPCOMING':'PAST PLAY';
     $('play-live').hidden=selectedStart===null&&!model.isHistorical;
     $('play-previous').disabled=selected.startsAt-minutes*60000-60000<Date.now()-30*86400000;
@@ -171,14 +169,14 @@
       get('coin-name').textContent=`${model.coin.symbol} · ${minutes} MIN`;
       get('status').textContent=queued?'UPCOMING':closed?(result?'COMPLETED':'PENDING'):'OPEN';
       get('status').className=`badge ${queued?'neutral':closed?(result==='up'?'green':result==='down'?'red':'neutral'):'green'}`;
-      get('countdown').textContent=closed?'Interval ended':`${queued?'Starts in':'Ends in'} ${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s${!queued&&seconds<=30?' · Betting closed':''}`;
+      get('countdown').textContent=closed?'Interval ended':`${queued?'Starts in':'Ends in'} ${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s${!queued&&seconds<=5?' · Betting closed':''}`;
       get('strike').textContent=queued?'Set at open':price(m.strike);
       get('price-label').textContent=closed?'Closing price':'Live price';get('price').textContent=closed?price(m.close):live?price(live.price):'—';
       const displayedPrice=closed?m.close:live?.price;
       get('price').dataset.direction=Number.isFinite(displayedPrice)&&Number.isFinite(m.strike)?(displayedPrice>=m.strike?'up':'down'):'';
       get('chances').hidden=!chance;
-      get('up-chance').textContent=`Up ${chance?chance.up+'%':'—'}`;
-      get('down-chance').textContent=`Down ${chance?chance.down+'%':'—'}`;
+      window.PredictSegmentCard.updateOdds(get('up-chance'),chance?.up,'Up');
+      window.PredictSegmentCard.updateOdds(get('down-chance'),chance?.down,'Down');
       get('summary').hidden=!!chance;
       get('summary').textContent=queued?'Benchmark is set when this interval opens.':result?`${result==='up'?'↑ Up':'↓ Down'} wins · ${price(m.strike)} → ${price(m.close)}`:closed?'Awaiting exact settlement candles':'Waiting for fresh price and benchmark data';
       const movement=queued?null:window.PredictSegmentCard.priceMovement(m.strike,displayedPrice);

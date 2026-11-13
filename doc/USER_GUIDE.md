@@ -87,7 +87,7 @@ Both graphs have black backgrounds in either theme, green up candles, red down
 candles, and alternating red/yellow dotted current-time markers. Hour has a white price line. Interval's
 line, grid, and endpoint use its duration color: purple for 60 minutes, blue for
 30, pink for 15, and amber for 5. Orange dashed markers indicate the prediction
-cutoff, 30 seconds before each interval ends.
+cutoff, 5 seconds before each interval ends.
 
 Both plots use a compact height: 180 pixels on desktop and 150 pixels on phones.
 A compact row beneath each graph shows green up/red down arrows for completed
@@ -107,7 +107,7 @@ confirmed results; upcoming or missing-data fields use placeholders.
 1. Sign in, select an open interval, and check that the status strip says data is ready.
 2. Choose Up or Down and enter a budget from 1 to 1,000 credits within your available balance.
 3. Review the contract price, fractional share count, exact cost, possible return, and potential profit.
-4. Confirm before the betting countdown expires. Bets close 30 seconds before the interval ends to allow final processing.
+4. Confirm before the betting countdown expires. Bets close 5 seconds before the interval ends to allow final processing.
 
 Review updates live. Confirmation buys at the server's current model price within your budget, so the final contract count, cost, and possible return can differ from the displayed review. Check the saved prediction for executed terms. A prediction is saved only when the server accepts it; errors appear in the review.
 

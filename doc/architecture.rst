@@ -26,7 +26,7 @@ ignores superseded asynchronous history responses. Browser times use millisecond
 
 ``market-model.js`` computes display quotes and readiness. ``app.js`` coordinates
 selection, review and pending predictions. The server validates all executable
-orders again, including the thirty-second cutoff, CSRF, budget and authoritative
+orders again, including the five-second cutoff, CSRF, budget and authoritative
 provider quote. Database transactions protect balance changes and duplicate
 request IDs. Prediction-source snapshots preserve original settlement semantics.
 

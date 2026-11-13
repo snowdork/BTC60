@@ -390,7 +390,7 @@ class AccountsTest(unittest.TestCase):
                 prediction = next(p for p in saved['predictions'] if p['market_id'] == f'5-{index}')
                 self.assertEqual(prediction['starts_at'], start)
                 self.assertEqual(prediction['ends_at'], start + 300)
-            with patch('server.time.time', return_value=start + 270):
+            with patch('server.time.time', return_value=start + 295):
                 status, error, _ = self.request('POST', '/api/predictions',
                     dict(order, requestId=f'five-minute-locked-{index:04}'), cookie, csrf)
                 self.assertEqual(status, 400)
@@ -499,7 +499,7 @@ class AccountsTest(unittest.TestCase):
         csrf = self.request('GET', '/api/account', cookie=cookie)[1]['csrf']
         start = int(server.time.time()) // 3600 * 3600
         order = {'coin': 'BTC', 'marketId': '60-0', 'side': 'up', 'budget': 50, 'requestId': 'live-request-00000001', 'startsAt': start * 1000, 'strike': 99, 'cents': 10}
-        with patch('server.time.time', return_value=start + 3569), patch('server.candle_close', return_value=100), patch('server.fresh_spot', return_value=101), patch('server.market_up', return_value=70):
+        with patch('server.time.time', return_value=start + 3594), patch('server.candle_close', return_value=100), patch('server.fresh_spot', return_value=101), patch('server.market_up', return_value=70):
             status, account, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
             self.assertEqual(status, 201, account)
             with server.connect() as conn:
@@ -509,7 +509,7 @@ class AccountsTest(unittest.TestCase):
                 self.assertAlmostEqual(saved['contracts'], 5000/70)
                 self.assertEqual(saved['cost_cents'], 5000)
             balance = account['user']['balance_cents']
-        with patch('server.time.time', return_value=start + 3570):
+        with patch('server.time.time', return_value=start + 3595):
             order['requestId'] = 'live-request-00000002'
             status, _, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
             self.assertEqual(status, 400)

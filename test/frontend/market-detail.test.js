@@ -47,17 +47,16 @@ test('single play aligns chart, coin and red timer to the selected interval',()=
  assert.equal(h.dispatched.at(-1).detail.id,'15-1');
 });
 
-test('above-chart percentages follow live estimates and clear when data becomes unavailable',()=>{
+test('segment odds follow estimates and hide when data becomes unavailable',()=>{
  const h=detailHarness();
  h.model.estimateChances=()=>({up:61,down:39});h.events.get('btc-chances-update')();
- assert.equal(h.get('play-up-chance').textContent,'↑ Up 61%');
- assert.equal(h.get('play-down-chance').textContent,'↓ Down 39%');
+ assert.equal(h.field(0,'up-chance').textContent,'61');
+ assert.equal(h.field(0,'down-chance').textContent,'39');
  h.model.estimateChances=()=>({up:34,down:66});h.events.get('btc-price-update')();
- assert.equal(h.get('play-up-chance').textContent,'↑ Up 34%');
- assert.equal(h.get('play-down-chance').textContent,'↓ Down 66%');
+ assert.equal(h.field(0,'up-chance').textContent,'34');
+ assert.equal(h.field(0,'down-chance').textContent,'66');
  h.model.feedConnection='disconnected';h.events.get('btc-chances-update')();
- assert.equal(h.get('play-up-chance').textContent,'↑ Up —');
- assert.equal(h.get('play-down-chance').textContent,'↓ Down —');
+ assert.equal(h.field(0,'chances').hidden,true);
 });
 
 test('single-click interval selections keep the chosen view; Hour clears selection until the user chooses again',()=>{
@@ -153,8 +152,8 @@ test('minute summary arrows follow the selected interval and wait for completed,
 test('the selected segment separates colored odds from the actual percentage move since its start',()=>{
  const h=detailHarness();
  h.model.estimateChances=()=>({up:61,down:39});h.events.get('btc-chances-update')();
- assert.equal(h.field(0,'up-chance').textContent,'Up 61%');
- assert.equal(h.field(0,'down-chance').textContent,'Down 39%');
+ assert.equal(h.field(0,'up-chance').textContent,'61');
+ assert.equal(h.field(0,'down-chance').textContent,'39');
  assert.equal(h.field(0,'movement').textContent,'↑ Up +1.00% from start');
  assert.equal(h.field(0,'movement').dataset.direction,'up');
  h.model.spot=99;h.events.get('btc-price-update')();
@@ -286,7 +285,7 @@ test('stale prices and cutoff cannot place predictions',()=>{
  h.model.feedConnection='disconnected';h.events.get('btc-chances-update')();
  assert.equal(h.field(0,'price').textContent,'—');
  assert.equal(h.field(0,'predict').disabled,true);
- h.model.feedConnection='connected';h.model.now=h.model.displayHour+1770000;h.model.priceUpdatedAt=h.model.now;
+ h.model.feedConnection='connected';h.model.now=h.model.displayHour+1795000;h.model.priceUpdatedAt=h.model.now;
  h.events.get('btc-chances-update')();
  assert.equal(h.field(0,'predict').disabled,true);
  assert.match(h.field(0,'countdown').textContent,/Betting closed/);

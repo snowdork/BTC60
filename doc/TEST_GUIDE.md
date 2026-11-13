@@ -72,8 +72,8 @@ selection is restored when the class finishes.
 
 Order scenarios use a mocked open point within the hour where appropriate.
 Keep cutoff-specific cases separate: an order is accepted before the final
-30 seconds and rejected at the cutoff. Do not make a successful-order assertion
-depend on the wall clock being outside the last 30 seconds of the hour.
+5 seconds and rejected at the cutoff. Do not make a successful-order assertion
+depend on the wall clock being outside the last 5 seconds of the hour.
 
 ## Credit limits
 
@@ -217,7 +217,7 @@ and order execution require separate checks.
    grid, and endpoint follow the duration color. Completed card backgrounds must
    not turn the graph gray.
 5. Check alternating red/yellow dotted time markers at the graph and card bounds
-   and orange cutoffs 30 seconds before interval ends. Aligned rows share the
+   and orange cutoffs 5 seconds before interval ends. Aligned rows share the
    graph axis; scrolled five-minute cards and the two rows of phone fifteen-minute cards use their
    own moving local markers. Historical views hide current-time markers.
 6. Verify both plots are 180 pixels high on desktop and 150 pixels high at

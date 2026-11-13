@@ -10,6 +10,23 @@
     const percent=(current-start)/start*100,direction=percent>=0?'up':'down';
     return {direction,percent,label:`${direction==='up'?'↑ Up +':'↓ Down −'}${changeFormatter.format(Math.abs(percent))}% from start`};
   }
+  const oddsStates=new WeakMap();
+  /** Animate a displayed percentage change once; unchanged odds stay still. */
+  function updateOdds(node,value,side){
+    if(!node)return;
+    const next=Number.isFinite(value)?value:null,previous=oddsStates.get(node);
+    if(previous&&previous.value===next)return;
+    previous?.animation?.cancel();
+    node.textContent=next===null?'—':String(next);
+    node.setAttribute('aria-label',next===null?`${side} chance unavailable`:`${side} ${next}% estimated chance`);
+    const state={value:next};oddsStates.set(node,state);
+    if(next===null||previous?.value==null||root.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+    state.animation=node.animate?.([
+      {transform:'translateY(0) scale(1)',filter:'brightness(1)',textShadow:'0 0 0 currentColor'},
+      {transform:'translateY(-3px) scale(1.1)',filter:'brightness(1.6)',textShadow:'0 0 18px currentColor',offset:.3},
+      {transform:'translateY(0) scale(1)',filter:'brightness(1)',textShadow:'0 0 0 currentColor'}
+    ],{duration:650,easing:'ease-out',iterations:1});
+  }
   /** Escape template text while leaving instrument names and prices to DOM text updates. */
   function escape(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   /** Build one interval card with identical layout and view-specific control identifiers. */
@@ -25,12 +42,12 @@
       <div class="segment-identity"><img data-detail-coin width="48" height="48" alt=""><div><strong data-detail-coin-name></strong><strong class="detail-range">${escape(m.start)} – ${escape(m.end)} UTC</strong><span class="detail-date">${date}</span></div></div>
       <p data-detail-countdown ${detail?'':`data-remaining="${escape(m.id)}"`} class="detail-countdown">${escape(m.remaining)}</p>
       <div class="detail-prices"><div><span>Starting price</span><strong data-detail-strike class="segment-benchmark-price">—</strong></div><div><span data-detail-price-label>${closed?'Closing price':'Live price'}</span><strong data-detail-price class="segment-current-price">—</strong></div><span data-reference-price="${escape(m.id)}" hidden></span></div>
-      <p data-detail-result class="detail-result"><span data-detail-movement class="segment-movement" hidden></span><span data-detail-chances class="segment-chances"><span data-detail-up-chance class="segment-odds-up">Up —</span> · <span data-detail-down-chance class="segment-odds-down">Down —</span></span><span data-detail-summary class="segment-summary" hidden></span></p>
+      <p data-detail-result class="detail-result"><span data-detail-movement class="segment-movement" hidden></span><span data-detail-chances class="segment-chances"><span data-detail-up-chance class="segment-odds-up" aria-label="Up chance unavailable">—</span><span class="segment-odds-vs" aria-hidden="true">vs.</span><span data-detail-down-chance class="segment-odds-down" aria-label="Down chance unavailable">—</span></span><span data-detail-summary class="segment-summary" hidden></span></p>
       <button type="button" class="segment-action" ${detail?`data-detail-predict="${index}"`:`data-segment-action="${escape(m.id)}" aria-haspopup="dialog" aria-controls="prediction-dialog"`}><span class="segment-action-label">${closed?'Result':queued?'Details':'Predict...'}</span></button>
       ${detail?'':'<span class="segment-direction" data-direction-indicator hidden role="img"><span class="segment-direction-change" hidden></span><span class="segment-direction-arrow" aria-hidden="true"></span></span>'}
-      ${detail?'':`<span class="segment-time-markers" aria-hidden="true"><span class="prediction-cutoff-marker" style="left:${100-50/m.minutes}%"></span><span class="segment-now-line" data-segment-now hidden></span></span>`}
+      ${detail?'':`<span class="segment-time-markers" aria-hidden="true"><span class="prediction-cutoff-marker" style="left:${100-5/(m.minutes*60)*100}%"></span><span class="segment-now-line" data-segment-now hidden></span></span>`}
     </article>`;
   }
-  if(typeof module!=='undefined'&&module.exports)module.exports={markup,priceMovement};
-  else root.PredictSegmentCard={markup,priceMovement};
+  if(typeof module!=='undefined'&&module.exports)module.exports={markup,priceMovement,updateOdds};
+  else root.PredictSegmentCard={markup,priceMovement,updateOdds};
 })(typeof window!=='undefined'?window:globalThis);

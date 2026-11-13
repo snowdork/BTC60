@@ -91,10 +91,10 @@ test('purchase prices are configured by server, independently of model chances',
  assert.throws(()=>configure({quotes:{}}));
 });
 
-test('betting closes exactly 30 seconds before every interval ends',()=>{
+test('betting closes exactly 5 seconds before every interval ends',()=>{
  const now=100000,model={feedMode:'live',feedConnection:'connected',spot:101,priceUpdatedAt:now,historyStatus:'ready',quoteReady:true};
  for(const minutes of [5,15,30,60]){
-  const market={status:'open',strike:100,up:62,minutes,endsAt:now+30001};
+  const market={status:'open',strike:100,up:62,minutes,endsAt:now+5001};
   assert.equal(dataStatus(model,market,now).ready,true);
   assert.equal(dataStatus(model,market,now+1).ready,false);
   assert.match(dataStatus(model,market,now+1).reason,/Betting closed/);
@@ -115,7 +115,7 @@ test('prediction cap accepts 1000 credits and rejects larger budgets even with s
 });
 
 test('locked segments retain display probabilities without allowing bets',()=>{
- const now=100000,market={status:'open',strike:100,up:62,endsAt:now+30000};
+ const now=100000,market={status:'open',strike:100,up:62,endsAt:now+5000};
  const model={feedMode:'live',feedConnection:'connected',spot:101,priceUpdatedAt:now,historyStatus:'ready',quoteReady:true};
  assert.equal(dataStatus(model,market,now).ready,false);
  assert.equal(dataStatus(model,market,now,{allowLocked:true}).ready,true);

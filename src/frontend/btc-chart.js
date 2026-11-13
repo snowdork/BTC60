@@ -98,7 +98,7 @@
       const strike=marketStatus==='queued'?null:opening?Number(opening[4]):null;
       const close=marketStatus==='settled'&&closing?Number(closing[4]):null;
       const changed=m.status!==marketStatus||m.strike!==strike||m.close!==close||m.start!==time(start);
-      Object.assign(m,{start:time(start),end:time(end),status:marketStatus,strike,close,startsAt:start,endsAt:end,remaining:remaining(end-now)+(marketStatus==='open'&&now>=end-30000?' - Locked':'')});
+      Object.assign(m,{start:time(start),end:time(end),status:marketStatus,strike,close,startsAt:start,endsAt:end,remaining:remaining(end-now)+(marketStatus==='open'&&now>=end-5000?' - Locked':'')});
       if(m.up===null)m.up=50;
       state.push(changed);
       const label=document.querySelector(`[data-remaining="${m.id}"]`);if(label)label.textContent=m.remaining;
@@ -317,13 +317,9 @@
     $('chart-pair-label').textContent=`${coin.symbol} · ${time(hour)} – ${time(hour+3600000)} UTC · FULL HOUR`;
     const duration=Number($('hour-overview').dataset.duration)||15;
     $('hour-cutoffs').setAttribute('d',Array.from({length:60/duration},(_,index)=>{
-      const x=((index+1)*duration*60000-30000)/3600000*1000;
+      const x=((index+1)*duration*60000-5000)/3600000*1000;
       return `M${x} 0V130`;
     }).join(' '));
-    const selected=model.markets.find(m=>m.minutes===duration&&m.status==='open');
-    const chance=selected&&(mode==='demo'||model.dataStatus(model,selected,Date.now(),{allowLocked:true}).ready)?model.estimateChances(selected,model.spot,now,model.volatility):null;
-    $('overview-up-chance').textContent=`↑ Up ${chance?chance.up+'%':'—'}`;
-    $('overview-down-chance').textContent=`↓ Down ${chance?chance.down+'%':'—'}`;
     $('time-cursor').hidden=historical;
     $('next-hour').disabled=!historical;$('current-hour').hidden=!historical;$('chart-pause').disabled=historical;
     $('hour-date').textContent=`${new Date(hour).toISOString().slice(0,10)} · UTC`;
@@ -337,7 +333,7 @@
     stack.style.setProperty('--cursor-top',`${bounds.top-stackBounds.top}px`);
     $('time-cursor-label').textContent=clock(now);
     const wallTime=Date.now();
-    $('workspace-clock').textContent=`${clock(wallTime)} UTC`;
+    $('workspace-clock').textContent=`${clock(wallTime)} GMT`;
     $('workspace-local-clock').textContent=localClock.format(wallTime);
     $('workspace-local-clock').title=`Local time · ${localTimezone}`;
     $('hour-window-label').textContent=`${time(hour)} — ${time(hour+3600000)}`;

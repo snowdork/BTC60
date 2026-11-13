@@ -1,6 +1,6 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {markup,priceMovement}=require('../../src/frontend/segment-card.js');
+const {markup,priceMovement,updateOdds}=require('../../src/frontend/segment-card.js');
 const market={id:'15-0',minutes:15,status:'settled',start:'17:00',end:'17:15',strike:100,close:110};
 
 test('both card views show the confirmed green Up or red Down result, including ties as Up',()=>{
@@ -28,4 +28,24 @@ test('price movement uses the starting price, including small moves and an uncha
  assert.equal(priceMovement(100,100.0015).label,'↑ Up +0.0015% from start');
  assert.equal(priceMovement(100,100).label,'↑ Up +0.00% from start');
  for(const [start,current] of [[null,100],[0,100],[100,NaN],[100,0]])assert.equal(priceMovement(start,current),null);
+});
+
+test('odds bump only on numeric changes, without repeating for unchanged values or missing data',()=>{
+ const animations=[];let cancelled=0;
+ const node={setAttribute(name,value){this[name]=value;},animate(frames,options){animations.push(options);return {cancel(){cancelled++;}};}};
+ updateOdds(node,1,'Up');
+ assert.equal(node.textContent,'1');
+ assert.equal(node['aria-label'],'Up 1% estimated chance');
+ assert.equal(animations.length,0);
+ updateOdds(node,2,'Up');
+ assert.equal(animations.length,1);
+ assert.equal(animations[0].iterations,1);
+ updateOdds(node,2,'Up');
+ assert.equal(animations.length,1);
+ updateOdds(node,1,'Up');
+ assert.equal(animations.length,2);
+ assert.equal(cancelled,1);
+ updateOdds(node,null,'Up');
+ updateOdds(node,99,'Up');
+ assert.equal(animations.length,2);
 });
