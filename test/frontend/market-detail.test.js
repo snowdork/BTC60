@@ -319,3 +319,21 @@ test('play reuses history across price ticks and refreshes replaced candles',()=
  assert.notEqual(inputs[2],inputs[0]);
  assert.equal(h.field(0,'strike').textContent,'$101.00');
 });
+
+test('detail direction shortcuts carry the chosen side and disable at the cutoff',()=>{
+ const h=detailHarness();
+ for(const side of ['up','down']){
+  const button=h.field(0,side+'-chance');
+  assert.equal(button.disabled,false);
+  h.get('detail-cards').listeners.click({target:{closest:()=>({dataset:{detailPredict:'0',predictSide:side},disabled:button.disabled})}});
+  assert.equal(h.dispatched.at(-1).detail.side,side);
+  assert.equal(h.dispatched.at(-1).detail.id,'15-1');
+ }
+ h.model.now=h.model.displayHour+1795000;h.model.priceUpdatedAt=h.model.now;
+ h.events.get('btc-chances-update')();
+ assert.equal(h.field(0,'up-chance').disabled,true);
+ assert.equal(h.field(0,'down-chance').disabled,true);
+ const count=h.dispatched.length;
+ h.get('detail-cards').listeners.click({target:{closest:()=>({dataset:{detailPredict:'0',predictSide:'up'},disabled:true})}});
+ assert.equal(h.dispatched.length,count);
+});

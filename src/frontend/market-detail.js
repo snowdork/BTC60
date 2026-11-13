@@ -186,6 +186,7 @@
       get('result').style.color=result==='up'?'var(--green)':result==='down'?'var(--red)':'var(--muted)';
       const action=get('predict');action.hidden=false;
       action.disabled=!closed&&!queued&&(!model.markets.some(item=>item.id===m.id&&item.startsAt===m.startsAt)||!model.dataStatus(model,m,Date.now()).ready);
+      for(const node of [get('up-chance'),get('down-chance')])node.disabled=closed||queued||action.disabled;
     });
   }
   window.addEventListener('market-interval-select',event=>selectInterval(event.detail?.minutes,event.detail?.startsAt));
@@ -213,9 +214,9 @@
     selectInterval(Number(button.dataset.detailDuration));
   }));
   $('detail-cards').addEventListener('click',event=>{
-    const button=event.target.closest('[data-detail-predict]');if(!button)return;
+    const button=event.target.closest('[data-detail-predict]');if(!button||button.disabled)return;
     const m=intervals[Number(button.dataset.detailPredict)];
-    if(m)window.dispatchEvent(new CustomEvent('detail-predict',{detail:{id:m.id,startsAt:m.startsAt,market:m}}));
+    if(m)window.dispatchEvent(new CustomEvent('detail-predict',{detail:{id:m.id,startsAt:m.startsAt,market:m,side:button.dataset.predictSide}}));
   });
   const /** Move the selected play by one interval in either direction. */ move=direction=>{
     const current=intervals[0];if(!current)return;

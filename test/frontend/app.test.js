@@ -19,8 +19,8 @@ test('segments expose prediction, result, and upcoming details actions without n
   assert.match(grid.innerHTML,/data-segment-action="15-0"[^>]*>[\s\S]*?<span class="segment-action-label">Details<\/span><\/button>/);
   for(const minutes of [60,30,15])assert.ok(grid.innerHTML.includes(`<span>${minutes}m</span>`));
   assert.ok(icons.every(icon=>icon.src==='assets/coins/eth.svg'&&icon.alt==='ETH'));
-  assert.equal((grid.innerHTML.match(/data-segment-action=/g)||[]).length,3);
-  assert.equal((grid.innerHTML.match(/aria-controls="prediction-dialog"/g)||[]).length,3);
+  assert.equal((grid.innerHTML.match(/data-segment-action=/g)||[]).length,9);
+  assert.equal((grid.innerHTML.match(/aria-controls="prediction-dialog"/g)||[]).length,9);
 });
 
 test('segment action selects its market and opens the popup',()=>{
@@ -43,6 +43,25 @@ test('segment action selects its market and opens the popup',()=>{
   assert.equal(dispatched[0].type,'market-interval-select');
   assert.equal(dispatched[0].detail.minutes,30);
   assert.equal(dispatched[0].detail.startsAt,selected.startsAt);
+});
+
+test('segment direction shortcuts preselect Up or Down without placing an order',()=>{
+ const start=source.indexOf("$('market-grid').addEventListener('click'");
+ const end=source.indexOf('  let directionHintTimer;',start);
+ let click;
+ const grid={dataset:{},addEventListener(_,fn){click=fn;}};
+ const dialog={open:false,showModal(){this.open=true;}};
+ const selected={id:'15-0',status:'open',minutes:15,startsAt:1800000000000};
+ const context={markets:[selected],market:null,side:null,review:null,marketElements:new Map(),renderTicket(){},
+  window:{dispatchEvent(){}},CustomEvent:class{},$:id=>id==='market-grid'?grid:id==='prediction-dialog'?dialog:{close(){}}};
+ vm.runInNewContext(source.slice(start,end),context);
+ for(const side of ['up','down',null]){
+  click({target:{closest:selector=>selector==='[data-market]'?{dataset:{market:'15-0'}}:selector==='[data-predict-side]'?(side?{dataset:{predictSide:side}}:null):selector==='[data-segment-action]'?{}:null}});
+  assert.equal(context.side,side);
+  assert.equal(context.market,selected);
+  assert.equal(dialog.open,true);
+  assert.equal(context.review,null,'choosing a direction must not confirm or submit a bet');
+ }
 });
 
 test('overview exposes all twelve five-minute prediction and detail actions in a scrollable region',()=>{

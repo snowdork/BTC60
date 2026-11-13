@@ -1139,3 +1139,26 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
  .terminal-page .play-controls .coin-selection .play-duration-picker{padding-right:8px}
  .terminal-page .play-controls .coin-selection .coin-button{font-size:9px;padding:3px;gap:2px}
 }
+
+/* Put Predict directly before the two direction shortcuts in each segment. */
+:is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls{grid-column:1/-1;grid-row:5;display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}
+:is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-action{grid-column:auto;grid-row:auto;flex:0 0 auto;width:auto;min-height:64px;margin:0;padding:10px 16px;align-self:stretch}
+:is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-chances{margin:0}
+:is(#market-detail,#hour-overview) .play-segment .segment-chances button{font:inherit;line-height:inherit;cursor:pointer}
+:is(#market-detail,#hour-overview) .play-segment .segment-chances button:disabled{cursor:not-allowed;opacity:.5}
+:is(#market-detail,#hour-overview) .play-segment .segment-chances button:not(:disabled):hover{box-shadow:0 0 0 2px currentColor}
+@container(max-width:740px){:is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls{grid-row:6}}
+@container(max-width:300px){
+ :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls{gap:8px}
+ :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-action{min-height:52px;padding:8px;font-size:12px}
+ :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-chances{font-size:22px;gap:6px}
+ :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls :is(.segment-odds-up,.segment-odds-down){padding:6px;min-height:44px}
+}
+@media(max-width:700px){#market-detail .detail-cards{margin-inline:0}}
+@container(max-width:240px){
+ :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls{gap:6px;flex-wrap:nowrap}
+ :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-action{font-size:11px;padding:6px}
+ :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-chances{font-size:18px;gap:4px}
+ :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls :is(.segment-odds-up,.segment-odds-down){padding:4px;min-width:0}
+ :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-odds-vs{font-size:12px}
+}

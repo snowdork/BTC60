@@ -126,6 +126,7 @@
       const chances=ready?model.estimateChances(m,model.spot,model.now,model.volatility):null;
       window.PredictSegmentCard.updateOdds(nodes.up,chances?.up,'Up');
       window.PredictSegmentCard.updateOdds(nodes.down,chances?.down,'Down');
+      for(const node of [nodes.up,nodes.down])if(node)node.disabled=m.status!=='open'||!model.dataStatus(model,m,Date.now()).ready;
       if(nodes.summary){
         const readOnly=m.status!=='open';nodes.chances.hidden=readOnly;nodes.summary.hidden=!readOnly;
         setText(nodes.summary,m.status==='queued'?'Benchmark is set when this interval opens.':Number.isFinite(m.strike)&&Number.isFinite(m.close)?`${m.close>=m.strike?'↑ Up':'↓ Down'} wins · ${price(m.strike)} → ${price(m.close)}`:'Awaiting exact settlement candles');
@@ -313,7 +314,9 @@
   }
   $('market-grid').addEventListener('click',event=>{
     const button=event.target.closest('[data-market]');if(!button)return;
-    market=markets.find(m=>m.id===button.dataset.market);side=null;
+    const direction=event.target.closest('[data-predict-side]')?.dataset?.predictSide;
+    market=markets.find(m=>m.id===button.dataset.market);if(!market)return;
+    side=market.status==='open'&&['up','down'].includes(direction)?direction:null;
     $('market-grid').dataset.selection=`${market.id}:${market.startsAt}`;
     review=null;$('review-dialog').close();
     marketElements.forEach(({card},id)=>{const selected=id===market.id;card.classList.toggle('selected',selected);});
@@ -409,7 +412,7 @@
     const selected=markets.find(m=>m.id===event.detail.id&&m.startsAt===event.detail.startsAt)||
       (inspected&&inspected.id===event.detail.id&&inspected.startsAt===event.detail.startsAt&&['settled','queued'].includes(inspected.status)?inspected:null);
     if(!selected)return;
-    market=selected;side=null;review=null;$('review-dialog').close();
+    market=selected;side=selected.status==='open'&&['up','down'].includes(event.detail.side)?event.detail.side:null;review=null;$('review-dialog').close();
     marketElements.forEach(({card},id)=>card.classList.toggle('selected',id===market.id));
     renderTicket();if(!$('prediction-dialog').open)$('prediction-dialog').showModal();
   });
