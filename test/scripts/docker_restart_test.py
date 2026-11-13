@@ -66,7 +66,7 @@ if sys.argv[1] == 'stop' and os.environ['SERVICE_STOP_FAIL'] == '1':
         build = next(i for i, call in enumerate(calls) if 'build app' in call)
         up = next(i for i, call in enumerate(calls) if 'up -d' in call)
         self.assertLess(build, up)
-        self.assertIn('--no-build --no-deps --wait', calls[up])
+        self.assertIn('--no-build --no-deps --force-recreate --wait', calls[up])
         self.assertTrue(calls[up].endswith(' app'))
         self.assertFalse(any('down' in call.split() for call in calls))
 

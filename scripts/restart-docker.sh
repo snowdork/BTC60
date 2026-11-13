@@ -118,7 +118,9 @@ fi
 stop_host_service
 
 echo 'Starting the app behind the shared VPS proxy...'
-if ! "${compose[@]}" up -d --no-build --no-deps --wait --wait-timeout 120 app; then
+# Replace stale containers even when Compose considers their configuration current.
+# A removed image can leave a startable container whose image cannot run DB tools.
+if ! "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 120 app; then
   "${compose[@]}" ps -a >&2
   echo 'Startup failed. Inspect: sudo docker compose logs --tail=100 app' >&2
   exit 1
