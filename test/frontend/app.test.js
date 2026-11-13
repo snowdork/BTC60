@@ -14,7 +14,7 @@ test('segments expose prediction, result, and upcoming details actions without n
     markets,market:markets[0],$:()=>grid,marketElements:new Map(),window:{PredictSegmentCard:require('../../src/frontend/segment-card.js'),PredictModel:{coin:{feed:'coinbase',icon:'assets/coins/eth.svg',symbol:'ETH'}}},
     outcome:()=> 'up',price:String,renderSegmentPredictions(){},renderChances(){}
   });
-  assert.match(grid.innerHTML,/data-segment-action="60-0"[^>]*>[\s\S]*?<span class="segment-action-label">Predict\.\.\.<\/span><\/button>/);
+  assert.match(grid.innerHTML,/data-segment-action="60-0"[^>]*>[\s\S]*?<span class="segment-action-label">Predict<\/span><\/button>/);
   assert.match(grid.innerHTML,/data-segment-action="30-0"[^>]*>[\s\S]*?<span class="segment-action-label">Result<\/span><\/button>/);
   assert.match(grid.innerHTML,/data-segment-action="15-0"[^>]*>[\s\S]*?<span class="segment-action-label">Details<\/span><\/button>/);
   for(const minutes of [60,30,15])assert.ok(grid.innerHTML.includes(`<span>${minutes}m</span>`));

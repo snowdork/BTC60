@@ -40,7 +40,12 @@ instead of appending competing overrides.
 
 Cards include UTC range, coin, status, starting and live/closing prices, actual
 movement, available model estimates, saved bet amount/execution percentage, and
-the relevant action. Hour cards place the coin below the time. Actual movement
+the relevant action. Hour cards place the coin below the time.
+Each card leads with green Up and red Down percentage shortcuts at the top left
+and a highlighted Predict button. The shortcuts retain direction selection and
+the normal freshness/cutoff gates. Narrow cards stack the action and price
+details with touch targets of at least 44 pixels; wider cards share the header
+row and arrange identity and prices side by side. Actual movement
 is `(current - starting price) / starting price`; it is separate from Up/Down
 probabilities. Completed results have an outcome-colored heading arrow only
 when both exact settlement benchmarks are available. Missing values remain

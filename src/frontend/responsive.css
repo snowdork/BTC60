@@ -1140,25 +1140,53 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
  .terminal-page .play-controls .coin-selection .coin-button{font-size:9px;padding:3px;gap:2px}
 }
 
-/* Put Predict directly before the two direction shortcuts in each segment. */
-:is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls{grid-column:1/-1;grid-row:5;display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}
-:is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-action{grid-column:auto;grid-row:auto;flex:0 0 auto;width:auto;min-height:64px;margin:0;padding:10px 16px;align-self:stretch}
-:is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-chances{margin:0}
-:is(#market-detail,#hour-overview) .play-segment .segment-chances button{font:inherit;line-height:inherit;cursor:pointer}
+/* Lead with probabilities and the prediction action in both segment views. */
+:is(#market-detail,#hour-overview) .play-segment{
+ grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:10px 20px;
+}
+:is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls{
+ grid-column:1/-1;grid-row:1;display:flex;align-items:center;justify-content:space-between;
+ gap:12px;flex-wrap:wrap;min-width:0;padding-bottom:12px;border-bottom:1px solid var(--border);
+}
+:is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-chances{
+ margin:0;gap:8px;font-size:clamp(24px,3vw,36px);line-height:1.1;
+}
+:is(#market-detail,#hour-overview) .play-segment .segment-chances button{
+ display:block;min-width:64px;min-height:56px;padding:8px 12px;font:inherit;font-weight:800;
+ line-height:inherit;cursor:pointer;font-variant-numeric:tabular-nums;
+}
+:is(#market-detail,#hour-overview) .play-segment .segment-chances button::after{
+ content:'%';margin-left:2px;font-size:.6em;
+}
+.segment-odds-up::before{content:'↑ UP'}
+.segment-odds-down::before{content:'↓ DOWN'}
+:is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-action{
+ grid-column:auto;grid-row:auto;flex:0 0 auto;width:auto;min-width:100px;min-height:48px;
+ margin:0;padding:12px 18px;font-size:15px;font-weight:800;align-self:center;
+}
 :is(#market-detail,#hour-overview) .play-segment .segment-chances button:disabled{cursor:not-allowed;opacity:.5}
 :is(#market-detail,#hour-overview) .play-segment .segment-chances button:not(:disabled):hover{box-shadow:0 0 0 2px currentColor}
-@container(max-width:740px){:is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls{grid-row:6}}
+:is(#market-detail,#hour-overview) .play-segment :is(.segment-chances button,.segment-action):focus-visible{outline:2px solid var(--text);outline-offset:3px}
+:is(#market-detail,#hour-overview) .play-segment .detail-card-heading{grid-column:1/-1;grid-row:2}
+:is(#market-detail,#hour-overview) .play-segment .segment-identity{grid-column:1;grid-row:3/5}
+:is(#market-detail,#hour-overview) .play-segment .detail-prices{grid-column:2;grid-row:3}
+:is(#market-detail,#hour-overview) .play-segment .detail-countdown{grid-column:2;grid-row:4}
+:is(#market-detail,#hour-overview) .play-segment .detail-result{grid-column:1/-1;grid-row:5}
+@container(max-width:560px){
+ :is(#market-detail,#hour-overview) .play-segment .segment-identity{grid-column:1/-1;grid-row:3}
+ :is(#market-detail,#hour-overview) .play-segment .detail-prices{grid-column:1/-1;grid-row:4;grid-template-columns:repeat(2,minmax(0,1fr))}
+ :is(#market-detail,#hour-overview) .play-segment .detail-countdown{grid-column:1/-1;grid-row:5}
+ :is(#market-detail,#hour-overview) .play-segment .detail-result{grid-column:1/-1;grid-row:6}
+}
 @container(max-width:300px){
  :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls{gap:8px}
- :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-action{min-height:52px;padding:8px;font-size:12px}
- :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-chances{font-size:22px;gap:6px}
- :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls :is(.segment-odds-up,.segment-odds-down){padding:6px;min-height:44px}
+ :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-chances{font-size:24px;gap:6px}
+ :is(#market-detail,#hour-overview) .play-segment .segment-chances button{min-width:54px;min-height:52px;padding:7px}
+ :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-action{min-width:76px;padding:10px;font-size:13px}
+}
+@container(max-width:240px){
+ :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-chances{flex:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));font-size:22px}
+ :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-action{flex-basis:100%;width:100%;min-height:44px}
+ :is(#market-detail,#hour-overview) .play-segment .detail-prices{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:700px){#market-detail .detail-cards{margin-inline:0}}
-@container(max-width:240px){
- :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls{gap:6px;flex-wrap:nowrap}
- :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-action{font-size:11px;padding:6px}
- :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-chances{font-size:18px;gap:4px}
- :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls :is(.segment-odds-up,.segment-odds-down){padding:4px;min-width:0}
- :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-odds-vs{font-size:12px}
-}
