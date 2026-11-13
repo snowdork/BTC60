@@ -5,6 +5,10 @@ and private ports. Start with [the shared VPS address plan](VPS.md).
 
 ## Choose an operating mode
 
+For guided environment configuration and rollout, start with
+[local testing and VPS setup](SETUP.md). Use `bash scripts/setup-local.sh` for
+`.env.local` or `bash scripts/setup-vps.sh` for `.env`; add `--start` to deploy.
+
 | Environment | Start/update | Persistent data | Logs |
 | --- | --- | --- | --- |
 | Local Python | `python3 src/backend/server.py` | `data/p60.sqlite3` by default | Terminal |

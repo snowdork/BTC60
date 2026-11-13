@@ -91,6 +91,10 @@ Open http://127.0.0.1:8000 for the welcome page or http://127.0.0.1:8000/index.h
 
 ### Run locally with Docker
 
+Use [guided local and VPS setup](deploy/SETUP.md) to configure testing or
+production: `bash scripts/setup-local.sh` or `bash scripts/setup-vps.sh`.
+Add `--start` to build and launch the selected deployment.
+
 Without the Compose plugin, use the plain-Docker restart script:
 
 ```bash

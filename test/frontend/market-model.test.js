@@ -146,14 +146,37 @@ test('one-second movement survives minute backfills instead of collapsing into m
  assert.equal(settled.tip.x,1000);
 });
 
-test('one-second trails omit invalid and future samples and leave gaps between unobserved seconds',()=>{
+test('one-second trails omit invalid and future samples without breaking for missed browser ticks',()=>{
  const {minutePlot}=require('../../src/frontend/market-model.js');
  const plot=minutePlot([],0,10000,6000,null,[{t:1000,price:100},{t:2000,price:101},
   {t:6000,price:99},{t:7000,price:200},{t:6500,price:100},{t:3000,price:0},null]);
  assert.equal(plot.secondCount,3);
- assert.equal((plot.line.match(/M/g)||[]).length,2);
- assert.equal((plot.line.match(/L/g)||[]).length,1);
+ assert.equal((plot.line.match(/M/g)||[]).length,1);
+ assert.equal((plot.line.match(/L/g)||[]).length,2);
  assert.equal(plot.tip.price,99);
+});
+
+test('a fractional live playhead stays connected after a delayed one-second recording',()=>{
+ const {minutePlot}=require('../../src/frontend/market-model.js');
+ const seconds=[{t:1000,price:100},{t:2000,price:101}];
+ const plot=minutePlot([],0,300000,3250,{t:3200,price:102},seconds);
+ assert.equal((plot.line.match(/M/g)||[]).length,1);
+ assert.equal(plot.tip.x,3250/300000*1000);
+ assert.equal(plot.tip.price,102);
+ assert.deepEqual(seconds,[{t:1000,price:100},{t:2000,price:101}],'drawing does not fabricate observations');
+});
+
+test('minute backfills reconnect trails after navigation while missing minute history stays separated',()=>{
+ const {minutePlot}=require('../../src/frontend/market-model.js');
+ const candles=Array.from({length:4},(_,i)=>[(i-1)*60,98,104,100,100+i]);
+ const seconds=[{t:10000,price:100},{t:11000,price:101},{t:195000,price:103},{t:196000,price:102}];
+ const plot=minutePlot(candles,0,300000,196250,{t:196000,price:102},seconds);
+ assert.equal((plot.line.match(/M/g)||[]).length,1,'confirmed minute closes reconnect the unobserved period');
+ assert.equal(plot.secondCount,4,'recorded movement remains in the chart');
+ const missing=minutePlot(candles.filter(c=>c[0]!==60),0,300000,196250,{t:196000,price:102},seconds);
+ assert.equal((missing.line.match(/M/g)||[]).length,2,'a genuinely unavailable minute still leaves a gap');
+ const unavailable=minutePlot([],0,300000,196250,null,seconds);
+ assert.equal((unavailable.line.match(/M/g)||[]).length,2,'a long outage without history is not filled');
 });
 test('minute plots reject malformed and unaligned candles rather than inventing continuity',()=>{
  const {minutePlot}=require('../../src/frontend/market-model.js');

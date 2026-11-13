@@ -59,8 +59,11 @@ is cleared on entering Hour or changing the displayed instrument/hour.
 `market-model.js` projects valid minute OHLC bars at each minute's midpoint and
 closes at minute ends. It merges those closes with observed one-second prices.
 The live endpoint uses display time so quote arrival timing does not pull the
-line backwards. Missing observations leave gaps; synthetic and incomplete data
-do not replace settlement candles.
+line backwards. Samples up to one minute apart stay connected, including when
+coin switches, page returns, or delayed browser timers skip second recordings.
+Minute backfills reconnect longer absences; gaps longer than a minute without
+history remain visible. No second observations are invented, and synthetic and
+incomplete data do not replace settlement candles.
 
 Both views inherit `--price-chart-height` from the workspace: 180 pixels on
 desktop and 150 pixels at widths of 700 pixels or less. The Hour cursor uses

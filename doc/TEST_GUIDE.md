@@ -60,6 +60,7 @@ manual procedure explicitly says to use a live feed.
 | `test/scripts/build_static_test.py`, `test/scripts/database_test.py` | Public-only static builds, preservation after a missing source, database initialization/backup/reset and process locking. |
 | `test/scripts/server_control_test.py`, `test/scripts/docker_restart_test.py` | Watchdog crash/stop lifecycle and Docker restart command ordering/container options. Docker calls are mocked. |
 | `test/scripts/run_tests_test.py` | Timestamped result filenames and Node/Python summary parsing. |
+| `test/scripts/setup_env_test.py` | Isolated local/VPS configuration, signup validation, private backups, legacy migration, read-only checks and mocked rollout selection. |
 
 ## Account test isolation and deterministic time
 
@@ -109,7 +110,9 @@ The tests substitute a fake Docker executable and exercise
 
 - A failed build leaves the running deployment untouched: no stop, remove,
   recreate or run command occurs afterward.
-- VPS mode builds before `up -d --no-build --wait` and never calls `down`.
+- VPS mode builds before `up -d --no-build --no-deps --wait` and never calls `down`.
+  `--recreate` adds `--force-recreate`; the default leaves replacement decisions
+  to Compose. The initial-start wrapper forwards the flag too.
 - Both modes stop an installed `predict60.service` after the build and before
   replacing/starting Docker. An absent service is skipped; a failed service stop
   aborts Docker replacement. The systemctl commands are mocked.

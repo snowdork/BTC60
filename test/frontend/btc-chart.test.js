@@ -37,7 +37,7 @@ function chartHarness({oil=false,live=false,spotError=false,historyError=false,t
  const window={PredictMinuteTrend:require('../../src/frontend/minute-trend.js'),PredictModel:model,PredictCoins:{available:coins,getCoin:symbol=>coins.find(c=>c.symbol===symbol)||coin,formatPrice:v=>'$'+v.toFixed(2)},dispatchEvent(){},addEventListener:(name,fn)=>{events[name]=fn;}};
  const context={window,document:{getElementById:element,querySelector:s=>s.startsWith('[data-remaining')?null:element(s),querySelectorAll:s=>s==='[data-coin]'?buttons:[],addEventListener(){},createElement:()=>({dataset:{},style:{setProperty(){}},setAttribute(k,v){this[k]=v;}})},Date:FakeDate,Intl,URLSearchParams,fetch,AbortController,WebSocket:Socket,Event:class{},localStorage:{getItem(){return null;},setItem(){}},setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout(){},performance:{now:()=>frameStamp},console};
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../../src/frontend/btc-chart.js'),'utf8'),context);
- return {element,pending,model,hour,requests,events,select(symbol){element(`coin-${symbol}`).listeners.click();},step(){now+=1000;frameStamp+=1000;timers.at(-1)();},tick(price,elapsed=0){now+=elapsed;frameStamp+=Math.max(1000,elapsed);socket.onmessage({data:JSON.stringify({type:'ticker',product_id:model.coin.product,price:String(price),time:new Date(now).toISOString()})});timers.at(-1)();}};
+ return {element,pending,model,hour,requests,events,advance(elapsed){now+=elapsed;frameStamp+=elapsed;},select(symbol){element(`coin-${symbol}`).listeners.click();},step(){now+=1000;frameStamp+=1000;timers.at(-1)();},tick(price,elapsed=0){now+=elapsed;frameStamp+=Math.max(1000,elapsed);socket.onmessage({data:JSON.stringify({type:'ticker',product_id:model.coin.product,price:String(price),time:new Date(now).toISOString()})});timers.at(-1)();}};
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 
@@ -69,6 +69,30 @@ test('live price, chart and clock refresh on each one-second tick',async()=>{
   assert.notEqual(h.element('workspace-clock').textContent,previousClock);
   assert.equal(h.model.now,h.model.priceUpdatedAt);
   previousPath=h.element('btc-line').d;previousClock=h.element('workspace-clock').textContent;
+ }
+});
+
+test('switching back to a coin reconnects its chart after short and long absences',async()=>{
+ for(const elapsed of [4000,20000,120000]){
+  const h=chartHarness({quote:({url,now})=>({price:url.includes('ETH-USD')?'208':'108',time:new Date(now).toISOString()})});
+  await flush();h.tick(110,1000);h.tick(111,1000);
+  const trail=h.model.secondPoints;
+  h.select('ETH');await flush();h.tick(210,elapsed);
+  h.select('BTC');await flush();
+  assert.equal(h.model.secondPoints,trail);
+  assert(trail.some(p=>p.price===110)&&trail.some(p=>p.price===111),'observed movement survives navigation');
+  assert(trail.every(p=>p.price<200),'other coin prices do not enter the restored chart');
+  assert.equal((h.element('btc-line').d.match(/M/g)||[]).length,1,`${elapsed}ms away does not break the line`);
+ }
+});
+
+test('returning from another page reconnects the chart without losing recorded prices',async()=>{
+ for(const elapsed of [5000,120000]){
+  const h=chartHarness();await flush();h.tick(110,1000);
+  h.events.pagehide();h.advance(elapsed);
+  h.events.pageshow({persisted:true});await flush();
+  assert(h.model.secondPoints.some(p=>p.price===110));
+  assert.equal((h.element('btc-line').d.match(/M/g)||[]).length,1);
  }
 });
 

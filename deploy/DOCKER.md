@@ -42,13 +42,13 @@ Do not remove volumes. Existing app data and old certificate volumes are retaine
 The app trusts the host via Docker gateway `172.30.60.1`; keep that subnet free.
 
 ```bash
-cp -n deploy/docker.env.example .env
-chmod 600 .env
-# Edit .env and set P60_DOMAIN to your real domain.
+bash scripts/setup-vps.sh
 sudo systemctl enable --now docker
 bash deploy/start-docker.sh
 docker compose logs --tail=100 app
 ```
+
+See [guided setup](SETUP.md) for saved-profile checks, updates, and automation.
 
 `start-docker.sh` delegates to `scripts/restart-docker.sh`; both can be called
 from any directory. They explicitly use this checkout's `compose.yaml` and
@@ -126,7 +126,9 @@ uses the VPS `compose.yaml` and `.env`, checks configuration and Docker access
 before building, and retains all database and certificate volumes. Existing
 containers continue serving during the build. If the build fails, they remain
 untouched. After a successful build, Compose recreates changed services and waits
-for readiness. Expect a brief interruption while the single app instance is
+for readiness. Recreation is not forced by default. Use
+`sudo bash scripts/restart-docker.sh --recreate` to force replacement of the VPS
+app even when its image and configuration are unchanged. Expect a brief interruption while the single app instance is
 replaced; this is not a zero-downtime deployment. The shared host proxy continues running. It does not restart the Docker daemon or
 stop unrelated containers. This command does not use `compose.local.yaml`.
 

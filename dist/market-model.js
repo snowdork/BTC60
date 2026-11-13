@@ -100,7 +100,7 @@
   function minutePlot(candles,start,end,now,live=null,secondPoints=[]){
     const rows=[...new Map(candles.filter(c=>Array.isArray(c)&&c.length>=5&&c.slice(0,5).every(Number.isFinite)&&c.slice(1,5).every(v=>v>0)&&c[0]%60===0&&c[1]<=Math.min(c[3],c[4])&&c[2]>=Math.max(c[3],c[4])&&c[0]*1000>=start-60000&&c[0]*1000<end&&c[0]*1000+60000<=now).map(c=>[c[0],c])).values()].sort((a,b)=>a[0]-b[0]);
     const bars=rows.filter(c=>c[0]*1000>=start),closes=rows.map(c=>({t:c[0]*1000+60000,price:c[4]}));
-    const recorded=[...new Map((secondPoints||[]).filter(p=>p&&Number.isFinite(p.t)&&p.t%1000===0&&Number.isFinite(p.price)&&p.price>0&&p.t>=start&&p.t<=Math.min(now,end)).map(p=>[p.t,{t:p.t,price:p.price,second:true}])).values()];
+    const recorded=[...new Map((secondPoints||[]).filter(p=>p&&Number.isFinite(p.t)&&p.t%1000===0&&Number.isFinite(p.price)&&p.price>0&&p.t>=start&&p.t<=Math.min(now,end)).map(p=>[p.t,{t:p.t,price:p.price}])).values()];
     // Final minute closes remain authoritative at settlement boundaries. Loading
     // those closes never discards the second-by-second observations in between.
     const byTime=new Map(closes.map(p=>[p.t,p]));
@@ -114,7 +114,7 @@
       // differences and gaps between trades must not pull the live edge backwards.
       const price=!lastClose||live.t>lastClose.t?live.price:lastClose.price;
       if(samples.at(-1)?.t===now)samples.pop();
-      samples.push({t:now,price,second:recorded.length>0});
+      samples.push({t:now,price});
     }
     const values=[...bars.flatMap(c=>[c[1],c[2]]),...samples.map(p=>p.price)];
     if(!values.length)return {line:'',up:'',down:'',tip:null,count:0,secondCount:0};
@@ -123,7 +123,10 @@
     const /** Project a timestamp onto the interval's horizontal axis. */ x=t=>(t-start)/(end-start)*1000;
     const /** Project a price using the range of recorded minute highs and lows. */ y=p=>116-(p-low)/(high-low)*102;
     const /** Format an SVG coordinate pair without changing the source values. */ xy=(t,p)=>`${x(t).toFixed(3)},${y(p).toFixed(3)}`;
-    const line=samples.map((p,i)=>`${i&&p.t-samples[i-1].t<=(p.second&&samples[i-1].second?1000:60000)?'L':'M'}${xy(p.t,p.price)}`).join(' ');
+    // Use the history's minute cadence for continuity, including observed seconds.
+    // Navigation and delayed browser timers can skip recordings without missing
+    // market history. Longer outages still split unless minute closes backfill them.
+    const line=samples.map((p,i)=>`${i&&p.t-samples[i-1].t<=60000?'L':'M'}${xy(p.t,p.price)}`).join(' ');
     const paths={up:'',down:''},half=60000/(end-start)*1000*.22;
     for(const c of bars){
       const center=x(c[0]*1000+30000),open=y(c[3]),close=y(c[4]),top=Math.min(open,close),height=Math.max(.8,Math.abs(open-close));

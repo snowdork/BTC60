@@ -2,10 +2,18 @@
 # Rebuild the VPS stack or local container without deleting persistent volumes.
 set -euo pipefail
 
-if [[ $# -gt 1 || (${1:-} != '' && ${1:-} != '--local') ]]; then
-  echo 'Usage: sudo bash scripts/restart-docker.sh [--local]' >&2
-  exit 1
-fi
+local_mode=false
+recreate_args=()
+for arg in "$@"; do
+  case "$arg" in
+    --local) local_mode=true ;;
+    --recreate) recreate_args=(--force-recreate) ;;
+    *)
+      echo 'Usage: sudo bash scripts/restart-docker.sh [--local] [--recreate]' >&2
+      exit 1
+      ;;
+  esac
+done
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
@@ -27,10 +35,10 @@ if ! command -v docker >/dev/null 2>&1; then
   echo 'Install Docker Engine and the Docker Compose plugin first.' >&2
   exit 1
 fi
-if [[ ${1:-} == --local ]]; then
+if [[ $local_mode == true ]]; then
   if [[ ! -f .env.local ]]; then
-    echo 'First run: cp deploy/local.env.example .env.local && chmod 600 .env.local' >&2
-    echo 'Edit .env.local to set your local signup code, then rerun with --local.' >&2
+    echo 'First run: bash scripts/setup-env.sh --local' >&2
+    echo 'Then rerun this script with --local.' >&2
     exit 1
   fi
   if ! docker info >/dev/null 2>&1; then
@@ -97,7 +105,7 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 if [[ ! -f .env ]]; then
-  echo 'Create .env from deploy/docker.env.example and configure your VPS domain and signup code first.' >&2
+  echo 'First run: bash scripts/setup-env.sh --vps to configure .env with your VPS domain and signup code.' >&2
   exit 1
 fi
 compose=(docker compose --project-directory "$root" --env-file "$root/.env" -f "$root/compose.yaml")
@@ -118,9 +126,8 @@ fi
 stop_host_service
 
 echo 'Starting the app behind the shared VPS proxy...'
-# Replace stale containers even when Compose considers their configuration current.
-# A removed image can leave a startable container whose image cannot run DB tools.
-if ! "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 120 app; then
+# Force replacement only when requested; otherwise Compose replaces changed containers.
+if ! "${compose[@]}" up -d --no-build --no-deps "${recreate_args[@]}" --wait --wait-timeout 120 app; then
   "${compose[@]}" ps -a >&2
   echo 'Startup failed. Inspect: sudo docker compose logs --tail=100 app' >&2
   exit 1

@@ -47,6 +47,16 @@ test('single play aligns chart, coin and red timer to the selected interval',()=
  assert.equal(h.dispatched.at(-1).detail.id,'15-1');
 });
 
+test('interval chart reconnects observed prices when returning to a play',()=>{
+ const h=detailHarness();
+ h.model.secondPoints=[{t:h.model.now-5000,price:101},{t:h.model.now-4000,price:102},{t:h.model.now,price:101}];
+ h.events.get('btc-price-update')();
+ assert.equal((h.get('play-line').attrs.d.match(/M/g)||[]).length,1);
+ h.click('show-overview');h.click('show-detail');
+ assert.equal((h.get('play-line').attrs.d.match(/M/g)||[]).length,1);
+ assert.equal(h.model.secondPoints.length,3);
+});
+
 test('segment odds follow estimates and hide when data becomes unavailable',()=>{
  const h=detailHarness();
  h.model.estimateChances=()=>({up:61,down:39});h.events.get('btc-chances-update')();

@@ -73,11 +73,11 @@ need the same accounts in another deployment.
 ## Docker
 
 ```bash
-cp -n deploy/local.env.example .env.local
-chmod 600 .env.local
-# Edit .env.local; change the example signup code if desired.
+bash scripts/setup-local.sh
 bash scripts/restart-docker.sh --local
 ```
+
+See [guided setup](SETUP.md) for validation, updates, and automated rollout.
 
 After a successful build, the restart helper stops `predict60.service` when it
 is installed, before replacing/starting the Docker app. Run the helper with

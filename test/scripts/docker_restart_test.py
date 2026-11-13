@@ -9,7 +9,7 @@ import unittest
 
 class DockerRestartTest(unittest.TestCase):
     def run_restart(self, fail_build=False, local=False, service_present=True, fail_stop=False,
-                    published_ports='', local_port='8085', start=False):
+                    published_ports='', local_port='8085', start=False, args=()):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'scripts').mkdir()
@@ -48,9 +48,9 @@ if sys.argv[1] == 'stop' and os.environ['SERVICE_STOP_FAIL'] == '1':
             env.pop('P60_PORT', None)
             entrypoint = root / ('deploy/start-docker.sh' if start else 'scripts/restart-docker.sh')
             result = subprocess.run(['bash', str(entrypoint),
-                                     *(['--local'] if local else [])], env=env,
+                                     *(['--local'] if local else []), *args], env=env,
                                     capture_output=True, text=True, timeout=10)
-            return result, log.read_text().splitlines()
+            return result, log.read_text().splitlines() if log.exists() else []
 
     def test_failed_build_leaves_running_services_untouched(self):
         for local in (False, True):
@@ -60,15 +60,32 @@ if sys.argv[1] == 'stop' and os.environ['SERVICE_STOP_FAIL'] == '1':
                 for call in calls:
                     self.assertFalse(set(call.split()) & {'down', 'stop', 'rm', 'up', 'run'})
 
-    def test_vps_builds_before_recreating_without_tearing_down_proxy(self):
+    def test_vps_builds_before_up_without_forcing_recreation_or_tearing_down_proxy(self):
         result, calls = self.run_restart()
         self.assertEqual(result.returncode, 0, result.stderr)
         build = next(i for i, call in enumerate(calls) if 'build app' in call)
         up = next(i for i, call in enumerate(calls) if 'up -d' in call)
         self.assertLess(build, up)
-        self.assertIn('--no-build --no-deps --force-recreate --wait', calls[up])
+        self.assertIn('--no-build --no-deps --wait', calls[up])
+        self.assertNotIn('--force-recreate', calls[up])
         self.assertTrue(calls[up].endswith(' app'))
         self.assertFalse(any('down' in call.split() for call in calls))
+
+    def test_recreate_flag_forces_vps_replacement_through_both_entrypoints(self):
+        for start in (False, True):
+            with self.subTest(start=start):
+                result, calls = self.run_restart(start=start, args=('--recreate',))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                up = next(call for call in calls if 'up -d' in call)
+                self.assertIn('--no-build --no-deps --force-recreate --wait', up)
+                self.assertTrue(up.endswith(' app'))
+                self.assertFalse(any('down' in call.split() for call in calls))
+
+    def test_unknown_flag_fails_before_docker_or_service_changes(self):
+        result, calls = self.run_restart(args=('--unknown',))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('[--recreate]', result.stderr)
+        self.assertEqual(calls, [])
 
     def test_local_container_has_bounded_logs_and_read_only_root(self):
         result, calls = self.run_restart(local=True)
