@@ -13,6 +13,22 @@ SPEC.loader.exec_module(build)
 
 
 class StaticBuildTest(unittest.TestCase):
+    def test_signup_code_fields_follow_configured_policy_in_static_exports(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            frontend = root / 'src/frontend'
+            frontend.mkdir(parents=True)
+            page = 'name\n  <!-- signup-code:start --><input required name="signupCode"><!-- signup-code:end -->\npassword\n'
+            (frontend / 'signup.html').write_text(page)
+            with patch.object(build, 'ROOT', root), patch.object(build, 'PUBLIC_FILES', {'signup.html'}), \
+                    patch.object(build, 'PUBLIC_ASSETS', set()), contextlib.redirect_stdout(io.StringIO()):
+                for required in (False, True):
+                    with patch.object(build.CONST, 'SIGNUP_CODE_REQUIRED', required):
+                        build.main()
+                        output = (root / 'dist/signup.html').read_text()
+                        self.assertEqual('signupCode' in output, required)
+                        self.assertIn('password', output)
+
     def test_build_copies_public_files_and_artwork_only_and_refreshes_edits(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

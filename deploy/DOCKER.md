@@ -202,10 +202,12 @@ See the [performance review](../doc/VPS_PERFORMANCE.md) for measurements and lim
 
 ## Signup code configuration
 
-Set `P60_SIGNUP_CODE` in the private environment file. There is no built-in
-default: unset or empty values disable new signups with HTTP 503; existing users
-can still log in. The code is checked server-side and is not included in public
-assets or API responses.
+Registration requires no code by default. Policy and the 100-account cap live
+in `src/backend/CONST.py`; see [registration protections](SETUP.md#registration-abuse-controls).
+To enable invite codes, set `SIGNUP_CODE_REQUIRED = True` and set
+`P60_SIGNUP_CODE` in the private environment file. With the gate enabled,
+unset/empty codes disable new signups with HTTP 503; existing users can still
+log in. The expected code is never included in public assets or API responses.
 
 For Docker, edit the root `.env` and run `docker compose up -d` to recreate the
 app with the new environment. For systemd, edit `/etc/predict60/predict60.env`

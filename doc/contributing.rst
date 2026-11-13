@@ -55,6 +55,21 @@ The runner executes all three unit-test suites and writes a colored result log
 to ``/tmp/test_results/test_result_<date_time>.log``. Read saved logs with
 ``less -R`` to display their PASS/FAIL colors.
 
+Use the project virtual environment for verification dependencies. When an
+installed Node reporter counts test files instead of assertions, run each file
+in its own process with ``--test --test-isolation=none --test-reporter=tap`` and
+record file/assertion totals separately. HTTP and watchdog fixtures need loopback
+sockets; their temporary databases and fake Docker commands are separate from
+runtime maintenance.
+
+For release sequencing, expected UI outcomes and the evidence to preserve, use
+the :download:`test engineer checklist <QA_CHECKLIST.md>` and
+:download:`player guide <USER_GUIDE.md>`. Run
+``node scripts/benchmark-market-model.cjs`` for synthetic chart preparation
+measurements. Keep operation-count regressions separate from machine-dependent
+timings. Account-event cache invalidation, stale data/cutoffs, and idle SQLite
+writer-lock avoidance are correctness requirements as well as performance checks.
+
 For Docker startup, persistence, crash recovery, and restore checks, see the
 `test guide <TEST_GUIDE.md>`_. These require a Docker-capable host and are separate
 from the mocked regression suites.

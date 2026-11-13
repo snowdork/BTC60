@@ -160,16 +160,17 @@ test('pending and upcoming cards share the placeholder layout without invented p
 test('segment refresh preserves stable DOM values and clears stale live movement',()=>{
   let writes=0;
   const node=()=>{
-    const values={textContent:'',className:'',hidden:true},attrs=new Map();
+    const values={textContent:'',className:'',hidden:true,disabled:false,alt:'',src:''},attrs=new Map();
     const element={dataset:new Proxy({},{set(target,key,value){writes++;target[key]=value;return true;}}),
+      style:new Proxy({},{set(target,key,value){writes++;target[key]=value;return true;}}),
       getAttribute:key=>attrs.get(key),setAttribute(key,value){writes++;attrs.set(key,value);}};
     for(const key of Object.keys(values))Object.defineProperty(element,key,{get:()=>values[key],set:value=>{writes++;values[key]=value;}});
     return element;
   };
-  const nodes=()=>Object.fromEntries(['price','up','down','direction','change','arrow','reference'].map(key=>[key,node()]));
+  const nodes=()=>Object.fromEntries(['price','up','down','action','direction','change','arrow','reference','coin','coinName','strike','countdown','chances','summary','movement','now'].map(key=>[key,node()]));
   const open={id:'open',status:'open',strike:100},settled={id:'settled',status:'settled',strike:100,close:99};
   const live=nodes(),closed=nodes(),marketElements=new Map([['open',live],['settled',closed]]);
-  const model={coin:{feed:'coinbase'},feedMode:'live',feedConnection:'connected',priceUpdatedAt:100000,spot:101,
+  const model={coin:{feed:'coinbase',symbol:'BTC',name:'Bitcoin'},feedMode:'live',feedConnection:'connected',priceUpdatedAt:100000,spot:101,now:100000,
     dataStatus:()=>({ready:true}),estimateChances:m=>m.status==='settled'?{up:0,down:100}:{up:60,down:40}};
   const start=source.indexOf('function renderChances()'),end=source.indexOf('  /** Render segment predictions',start);
   const context={window:{PredictSegmentCard:require('../../src/frontend/segment-card.js'),PredictModel:model},markets:[open,settled,{id:'queued'}],marketElements,Date:{now:()=>100000},
@@ -181,6 +182,7 @@ test('segment refresh preserves stable DOM values and clears stale live movement
   assert.equal(live.change.textContent,'Up +1.00%');assert.equal(closed.price.dataset.direction,'down');
   const initialWrites=writes;render();assert.equal(writes,initialWrites,'Unchanged ticks must not rewrite DOM attributes');
   model.feedConnection='disconnected';render();assert.equal(live.price.textContent,'—');assert.equal(live.direction.hidden,true);
+  model.dataStatus=()=>({ready:false});render();assert.equal(live.action.disabled,true);assert.equal(live.up.disabled,true);assert.equal(closed.action.disabled,false);
   assert.equal(live.price.dataset.direction,'');assert.equal(closed.price.textContent,'99');assert.equal(closed.direction.hidden,false);
 });
 

@@ -98,9 +98,26 @@
   }
   /** Combine minute history with observed one-second prices and align the live edge to display time. */
   function minutePlot(candles,start,end,now,live=null,secondPoints=[]){
-    const rows=[...new Map(candles.filter(c=>Array.isArray(c)&&c.length>=5&&c.slice(0,5).every(Number.isFinite)&&c.slice(1,5).every(v=>v>0)&&c[0]%60===0&&c[1]<=Math.min(c[3],c[4])&&c[2]>=Math.max(c[3],c[4])&&c[0]*1000>=start-60000&&c[0]*1000<end&&c[0]*1000+60000<=now).map(c=>[c[0],c])).values()].sort((a,b)=>a[0]-b[0]);
+    const byMinute=new Map();
+    for(const c of candles){
+      if(!Array.isArray(c)||c.length<5||!Number.isFinite(c[0]))continue;
+      const t=c[0]*1000;
+      // Exclude history outside this interval before validating OHLC values.
+      if(!(t>=start-60000&&t<end&&t+60000<=now)||c[0]%60!==0)continue;
+      if(!Number.isFinite(c[1])||!Number.isFinite(c[2])||!Number.isFinite(c[3])||!Number.isFinite(c[4])
+          ||c[1]<=0||c[2]<=0||c[3]<=0||c[4]<=0
+          ||c[1]>Math.min(c[3],c[4])||c[2]<Math.max(c[3],c[4]))continue;
+      byMinute.set(c[0],c);
+    }
+    const rows=[...byMinute.values()].sort((a,b)=>a[0]-b[0]);
     const bars=rows.filter(c=>c[0]*1000>=start),closes=rows.map(c=>({t:c[0]*1000+60000,price:c[4]}));
-    const recorded=[...new Map((secondPoints||[]).filter(p=>p&&Number.isFinite(p.t)&&p.t%1000===0&&Number.isFinite(p.price)&&p.price>0&&p.t>=start&&p.t<=Math.min(now,end)).map(p=>[p.t,{t:p.t,price:p.price}])).values()];
+    const bySecond=new Map(),lastTime=Math.min(now,end);
+    for(const p of secondPoints||[]){
+      if(p&&Number.isFinite(p.t)&&p.t%1000===0&&Number.isFinite(p.price)&&p.price>0&&p.t>=start&&p.t<=lastTime){
+        bySecond.set(p.t,{t:p.t,price:p.price});
+      }
+    }
+    const recorded=[...bySecond.values()];
     // Final minute closes remain authoritative at settlement boundaries. Loading
     // those closes never discards the second-by-second observations in between.
     const byTime=new Map(closes.map(p=>[p.t,p]));
@@ -116,9 +133,10 @@
       if(samples.at(-1)?.t===now)samples.pop();
       samples.push({t:now,price});
     }
-    const values=[...bars.flatMap(c=>[c[1],c[2]]),...samples.map(p=>p.price)];
-    if(!values.length)return {line:'',up:'',down:'',tip:null,count:0,secondCount:0};
-    let low=Math.min(...values),high=Math.max(...values);
+    let low=Infinity,high=-Infinity;
+    for(const c of bars){low=Math.min(low,c[1]);high=Math.max(high,c[2]);}
+    for(const p of samples){low=Math.min(low,p.price);high=Math.max(high,p.price);}
+    if(low===Infinity)return {line:'',up:'',down:'',tip:null,count:0,secondCount:0};
     const pad=Math.max((high-low)*.12,high*.000001);low-=pad;high+=pad;
     const /** Project a timestamp onto the interval's horizontal axis. */ x=t=>(t-start)/(end-start)*1000;
     const /** Project a price using the range of recorded minute highs and lows. */ y=p=>116-(p-low)/(high-low)*102;

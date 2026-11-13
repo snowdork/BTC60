@@ -8,6 +8,11 @@ import server
 
 
 class SignupConfigurationTest(unittest.TestCase):
+    def setUp(self):
+        policy = patch.object(server.CONST, 'SIGNUP_CODE_REQUIRED', True)
+        policy.start()
+        self.addCleanup(policy.stop)
+
     def test_saved_code_is_loaded_by_local_server_without_restart_helper(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(server, 'ROOT', Path(directory)), patch.dict(os.environ, {}, clear=True):
             (Path(directory) / 'data').mkdir()

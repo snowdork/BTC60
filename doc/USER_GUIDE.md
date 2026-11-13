@@ -1,243 +1,195 @@
 # Predict60 user guide
 
-Predict60 lets you make crypto direction predictions with game credits. Prices and results use Coinbase proxies; no real money is traded.
+Predict60 is a crypto direction game using credits. Start with **Crypto**;
+Oil and Weather are marked **Coming soon**. Prices and settlement benchmarks use
+Coinbase minute candles. Credits cannot be purchased or redeemed for cash.
 
 ## Start and sign in
 
-For a hosted installation, open the HTTPS address supplied by your administrator.
-You do not need to install Python or Docker on your own computer. New signups
-require the secret signup code provided by the organizer, an 8–16-character
-password, and a matching verification password. Show/Hide controls reveal or
-conceal the signup code and password fields. Existing accounts can
-log in without the code. Sign up or log in, then choose **Crypto** from the category screen. Players receive 1,000 contest credits each hour, resetting independently
-at each GMT hour boundary. Accounts and saved predictions belong to that installation;
-a separate local installation does not automatically share them.
+1. Open the address supplied by your administrator.
+2. Choose **Sign up** for a new account or **Log in** for an existing one.
+3. Register with a name, email, and matching 8–16-character passwords, or select
+   a verified Google account and enter a display name.
+4. Open **Crypto**, choose a coin and interval, and inspect the current play.
 
-For local use, run `python3 src/backend/server.py` from the project folder and open
-http://127.0.0.1:8000. The default bind address remains local-only. Administrators
-setting up a VPS should follow the [Docker deployment guide](../deploy/DOCKER.md).
+No organizer code is needed by default. If an administrator enables invite codes,
+registration shows an additional code field. Default registration limits are 100
+accounts per installation, 10 attempts per hour per IP, and 3 new accounts per
+24 hours per IP. People using the same network share these limits. Registration
+limits do not prevent existing users from logging in.
 
-Your balance and predictions survive browser refreshes and server restarts when
-the installation retains its database. During a restart, wait for the site to
-return and refresh your portfolio before retrying an uncertain submission.
-Overdue settlements are retried when the server and price history are available.
+A Google account with the same email as an existing password account must be
+linked: sign in to the existing account, then complete the Google-link step.
+Google-only accounts return using Google. Password registration checks email
+format but does not verify mailbox ownership.
 
-The server needs internet access for live prices and settlement. Opening HTML
-files directly or using static hosting alone does not provide a working terminal.
+Each player receives **1,000 contest credits every GMT hour**, shared across all
+coins and intervals. Accounts and predictions belong to the installation where
+you registered; local and VPS databases are separate. Refreshing or restarting
+the app preserves them when its data volume is retained.
 
-After the `p60` naming update, sign in again and reselect your theme. Existing
-accounts and predictions remain in the retained database; do not create a new
-account just because the browser asks you to sign in again.
-
-## Change your password
-
-While signed in, choose **Change password** from Markets, the terminal, or your
-portfolio. Enter your current password, then a new password of 8–16 characters
-and a matching confirmation. After success, the form clears and shows a
-confirmation. Your current session stays signed in; all other sessions must log
-in again with the new password.
-
-An incorrect current password or mismatched confirmation leaves the password
-unchanged. Too many password verification attempts temporarily block further
-attempts; wait a minute before retrying. This form requires your current password;
-self-service recovery for a forgotten password is not available.
-
-Use **Log out** to end the current session and return to the welcome page. Logout
-also completes when another tab has already ended that session.
+For a local installation, use the URL printed by
+[local setup](../deploy/SETUP.md#local-testing). The local Docker port is often
+18085 when a VPS profile also exists. Opening exported HTML files alone cannot
+provide accounts, live orders, or settlement.
 
 ## Read the terminal
 
-Choose a coin in the selector below the title bar. The default catalog enables
-BTC, ETH, SOL, XRP, DOGE, ADA, LTC, LINK, AVAX, and SUI; administrators can change
-availability. Coin selection updates the price, both charts, and prediction
-context. All coins share your hourly contest balance.
+The title bar shows the selected coin's USD price, the displayed hour's dollar
+and percentage movement, your credits, and GMT/local clocks. Choose a coin or
+5-, 15-, 30-, or 60-minute interval using the controls above the playfield.
+The default coins are BTC, ETH, SOL, XRP, DOGE, ADA, LTC, LINK, AVAX, and SUI.
 
-The title bar shows the P60 logo with Predict60 beneath it, the selected coin's
-icon and USD price, and the dollar and percentage change for the displayed UTC
-hour. The hourly change compares the current price with the exact opening
-benchmark; past hours use their closing price. Green means up or unchanged and
-red means down. If the quote or opening benchmark is unavailable, the change
-stays unavailable. Credits and UTC/local clocks are also in the title bar.
+Each compact segment contains:
 
-Price displays refresh at most once per second; clocks and betting countdowns
-update every second. Switching coins shows **Loading…** immediately. If no valid
-recent quote arrives, the price reads **Data Not Available** and retries
-continue automatically. Historical candles do not substitute for a current
-quote, and orders require both a fresh price and an exact opening benchmark.
+| Field | Meaning |
+| --- | --- |
+| Coin, interval, status | The instrument and exact UTC time you are inspecting. |
+| Live price / Closing price | The current usable quote, or the confirmed close for a completed play. |
+| Starting price | The exact opening benchmark used to determine the result. |
+| Change from start | Actual price movement relative to that benchmark. |
+| Up % / Down % | Model estimates for the interval outcome, separate from actual price movement. |
+| Predict / Result / Details | Review an open play, inspect its result, or view an upcoming play. |
+| Countdown | Time until the interval opens or ends; betting closes five seconds before its end. |
 
-The title-bar controls are **Interval** followed by **Hour**. Interval is the
-default and shows one 5-, 15-, 30-, or 60-minute play. The arrows beside its graph
-move by one interval; **Back to live** resumes the current interval.
+The live/closing price is prominent; the starting price is smaller. Up is green,
+Down is red, and Predict is highlighted. Saved prediction tags show the executed
+side, credit amount, and execution percentage. Completed cards retain their date;
+live and upcoming cards use a compact time display.
 
-Hour shows one 60-minute interval, two 30-minute intervals, four 15-minute
-intervals, and twelve 5-minute intervals. Switching to Hour clears the duration
-and segment selection highlights. Clicking a segment highlights its time and
-duration without changing views. Select **Interval** to inspect that chosen
-segment. You can also **double-click the card body or time range** to open that
-exact interval directly. Double-click the Interval card to return to Hour; when
-browsing a past interval, its containing UTC hour opens. Buttons and other
-interactive controls keep their normal actions and do not trigger this shortcut.
+**Outcome estimates and purchase quotes are different values.** The Up/Down
+percentages estimate outcomes from price, time and volatility. The order review
+shows the actual contract quote and possible return. Do not infer your execution
+price from a displayed probability.
 
-Single-click selections and duration buttons keep the current view. Use the
-**Interval / Hour** controls or the card double-click shortcut to switch views.
-In the five-minute row, **Now** scrolls to the current
-card and **Select** chooses that duration without leaving Hour.
+Price displays and countdowns update about once per second. **Loading…** or
+**Data Not Available** means a usable current quote has not arrived. Available
+history remains visible, while stale or incomplete data blocks new predictions.
 
-Both graphs have black backgrounds in either theme, green up candles, red down
-candles, and alternating red/yellow dotted current-time markers. Hour has a white price line. Interval's
-line, grid, and endpoint use its duration color: purple for 60 minutes, blue for
-30, pink for 15, and amber for 5. Orange dashed markers indicate the prediction
-cutoff, 5 seconds before each interval ends.
+## Interval and Hour views
 
-Both plots use a compact height: 180 pixels on desktop and 150 pixels on phones.
-A compact row beneath each graph shows green up/red down arrows for completed
-minute candles. Each arrow aligns with its candle and compares the minute's
-close with its open; unchanged closes count as Up. The current minute uses an
-amber dash, and missing/upcoming minutes stay neutral. Hover for the UTC minute
-and movement. The row takes 16 pixels; Up/Down model estimates remain in the
-chart header.
+**Interval** is the default. It shows one selected play and its price history.
+Use the graph arrows to move by one interval; **Back to live** resumes the current
+play. Changing duration or coin keeps the chosen view.
 
-Model percentages are uncalibrated estimates and set simulated contract prices:
-70% Up means an Up contract costs 0.70 credits. Percentages change with price,
-time remaining, and recent volatility. Available completed intervals show
-confirmed results; upcoming or missing-data fields use placeholders.
+**Hour** shows one 60-minute, two 30-minute, four 15-minute, and twelve 5-minute
+segments. Selecting Hour clears previous duration/card highlights. Single-click
+a card to choose its exact time without changing views. Select Interval to
+inspect it, or double-click the card body to open it directly. Double-click the
+Interval card body to return to Hour. Buttons retain their normal actions.
+
+In Hour, the graph arrows move by UTC hour and **Back to now** returns to the
+current hour. The five-minute row scrolls horizontally; **Now** finds its active
+card and **Select** chooses that duration. Past intervals are read-only, and
+upcoming intervals have no opening benchmark until they start.
+
+Both graphs have black backgrounds in either theme. Hour uses a white price
+line; Interval uses its duration color: purple for 60 minutes, blue for 30, pink
+for 15, and amber for 5. Green/red candles and the compact arrows beneath them
+show completed minute movements. A current minute has an amber marker; missing
+history stays unavailable. Minute candles are data resolution, not one-minute
+tradable plays. Orange dashed markers indicate the five-second betting cutoff.
+
+Recorded second-by-second prices survive coin navigation and page returns.
+Minute backfills reconnect longer absences when history is available. Missing
+history is never replaced with invented observations or settlement values.
 
 ## Make a prediction
 
-1. Sign in, select an open interval, and check that the status strip says data is ready.
-2. Choose Up or Down and enter a budget from 1 to 1,000 credits within your available balance.
-3. Review the contract price, fractional share count, exact cost, possible return, and potential profit.
-4. Confirm before the betting countdown expires. Bets close 5 seconds before the interval ends to allow final processing.
+1. Choose an open play with a fresh price and starting benchmark.
+2. Use **Predict** to open its ticket, or tap **Up % / Down %** to preselect a
+   direction. These buttons open a review; they do not immediately place an order.
+3. Enter **1–1,000 credits**, within your remaining hourly balance.
+4. Check the side, interval, contract quote, shares, cost, possible return and
+   potential profit. The review remains live as the market changes.
+5. Confirm before the final five seconds. Check the saved prediction for its
+   executed terms.
 
-Review updates live. Confirmation buys at the server's current model price within your budget, so the final contract count, cost, and possible return can differ from the displayed review. Check the saved prediction for executed terms. A prediction is saved only when the server accepts it; errors appear in the review.
+The server validates the current market again at confirmation. The executed
+contract count and return can differ from an earlier review. If a submission
+times out, refresh your account/history before retrying an uncertain order;
+network retries are not proof that a new order is needed.
 
-The full bet amount is deducted. For example, 10 credits at 0.70 credits buys about 14.285714 shares. A win returns 14.29 credits, for 4.29 credits profit; a loss returns 0 credits and loses 10 credits. Winning payouts round up to the next hundredth of a credit. There are no demo fees.
+For example, 10 credits at a quote of 0.70 credits buys about 14.285714 shares.
+A win returns 14.29 credits; a loss returns zero. Winning payouts round upward
+to the next hundredth of a credit. Settled returns can be reused during the same
+hour, subject to the 1,000-credit limit per prediction.
 
 ## Results and portfolio
 
-The opening benchmark is the close of the minute candle immediately before the interval begins. The closing benchmark is the close immediately before it ends. Up wins when closing is equal to or greater than opening; Down wins when closing is lower. This is a minute-close proxy, not a 60-second average or an official exchange settlement.
+The starting benchmark is the minute close immediately before the interval
+begins. The closing benchmark is the minute close immediately before it ends.
+**Up wins when closing is at least starting; Down wins when closing is lower.**
+Missing exact candles leave the result pending until history can be recovered.
 
-The terminal shows unsettled predictions and countdowns. Use the portfolio icon to open prediction history, filter All/Pending/Wins/Losses, and inspect cost, return, and profit/loss. An expired prediction may say awaiting settlement while price history is missing. Winning contracts credit 1 credit each once settlement completes.
+The terminal shows pending predictions. Open prediction history from the menu
+or portfolio control to filter All/Pending/Wins/Losses and inspect cost, return
+and profit/loss. Realized profit/loss and win rate use settled predictions only;
+pending credit commitments are shown separately.
 
-Portfolio realized profit/loss counts only settled predictions. Pending committed funds are shown separately; they are not realized losses. Win rate includes settled orders only. Use Refresh settlements to request another check. Visible account pages also check every 15 seconds, and the server worker checks every 30 seconds. Overdue orders are retried after a server restart.
-
-## History and display controls
-
-In Hour, the graph arrows navigate previous/next UTC hours and **Back to now**
-returns to the live hour. In Interval, they navigate individual plays. Dates
-help distinguish intervals across midnight. Switching coins preserves the
-hour context. Past intervals are read-only; missing history leaves their
-benchmarks or results unavailable. Time navigation does not switch views.
-
-The sun/moon button switches themes and saves your preference across tabs.
-Use **Menu** for categories, prediction history, contest results, logout, and
-phone rotation controls. Price and credits stay visible while the playfield
-scrolls.
-
-## Troubleshooting
-
-| Message or symptom | Action |
-| --- | --- |
-| Coins unavailable / terminal offline | On a hosted site, refresh and contact the administrator if it persists. For local use, start `python3 src/backend/server.py` and open the localhost URL. |
-| Price feed disconnected or stale | Check internet access and wait for the automatic retry and a fresh live update. |
-| Data Not Available | No valid current quote was received. Automatic retries continue; check internet access if it persists. Available chart history can still be viewed. |
-| History or opening benchmark unavailable | The server automatically retries the exact minute using wider history windows and reuses matching cached history. If it still fails, wait for provider recovery and review a new prediction. Logging out does not repair missing provider data; orders stay blocked until the exact benchmark is available. |
-| Historical market | Use **Back to now** in Hour or **Back to live** in Interval to return to the current market. |
-| Too late to place | Select an open interval and review a new prediction. |
-| Insufficient credits | Reduce the budget and check pending commitments in your portfolio. |
-| Site temporarily unavailable | Wait for the service to recover, then refresh. Contact the administrator if it remains unavailable. |
-| Awaiting settlement | Keep the server running with internet access; missing candles are retried automatically. |
-
-For setup and checks, see [README.md](../README.md). For backups and database maintenance, see [Database maintenance](DATABASE_MAINTENANCE.md). A database reset removes accounts and predictions; it is not a routine troubleshooting step.
-
-## Choose a market
-
-Open the entry screen and select **Crypto** to use the 60 minute playfield, with
-5-, 15-, 30-, and 60-minute prediction intervals. Oil and Weather are shown as
-**Coming soon** and cannot open a prediction terminal. Use **Categories** in the
-terminal header to return to the market list.
-
-Oil has five planned crude types: WTI, Brent, Dubai, Oman, and Bonny Light. Its amber
-card distinguishes it from Crypto's green background. Oil predictions are paused
-until a verified, settlement-capable data feed is ready.
-WTI and Brent have verified feed mappings. Dubai, Oman, and Bonny Light show
-unavailable until a matching feed is connected. The category screen does not
-request quotes while Oil is dormant. Development diagnostics can still exercise
-the feed adapters. If the key or subscription
-is missing, oil prices remain unavailable. The adapter expects minute updates and
-rejects closed sessions and stale quotes during diagnostics. Old simulated bets
-retain their original source. Crypto continues to use Coinbase prices when connected.
-
-Your account balance is shared. Portfolio history identifies the category of each
-prediction; choose a category to filter history and statistics. Log in or sign up,
-then choose the category you want to play. No real money is used.
-
-OilPriceAPI mode shows dated physical spot assessments for all five crudes. These series do not provide minute settlement benchmarks, so hourly oil predictions are unavailable; Crypto continues normally.
-
-## Laptop and phone displays
-
-The coin selector and 60/30/15/5-minute controls remain above the playfield. The
-coin selector uses two rows of five on smaller screens. The active coin has a
-blue outline. Green/red outer rings indicate your saved pending Up/Down
-predictions for that coin and hour; these are separate from the current duration
-selection highlight.
-
-In Hour, the graph and the 60/30-minute rows share a horizontal time axis. The
-15-minute cards share it on wide screens and wrap into two rows on phones. The
-five-minute cards scroll horizontally. Wrapped or scrolling intervals have a
-moving time marker inside the active card; it need not line up with the Hour
-graph's marker. Markers span the full graph or card height and hide in historical
-views.
-
-Graph backgrounds remain black when a play completes or is upcoming. Card
-surfaces describe state instead: live cards use their duration tint, completed
-cards are light gray, and upcoming cards are light yellow. A confirmed Up/Down
-result has a green/red arrow in the card heading. Missing settlement candles do
-not produce a result arrow. Hour cards place the coin icon below the UTC time.
-
-Cards show starting and live/closing prices, the actual percentage move from
-the starting price, model estimates where available, and saved bet amounts with
-their executed percentage. The actual movement is not a probability. Stale,
-paused, or disconnected live quotes clear the live comparison; confirmed closes
-remain historical. Missing values use placeholders.
-
-Both charts retain one observed price per second for up to two hours per coin
-while the terminal is open. That detail survives minute-history refreshes,
-view changes, coin changes, and hour rollover. Earlier history uses minute
-closes. Missing observations leave gaps, and minute closes remain the settlement
-reference.
-
-Tap **Predict...** on an open segment to open the prediction popup, select Up or
-Down, enter a budget, and review before confirming. **Result** shows a completed
-play; **Details** describes an upcoming one. Popups scroll on short screens and
-close with the close button or Escape. The top title bar keeps credits and
-navigation accessible. Pending predictions, market status, and last-hour contest
-results appear below the playfield.
-
-On a phone, open **Menu → Rotate** to request landscape view. If the browser
-permits it, the page enters full screen and rotates. **Auto rotate** releases
-the lock and leaves full screen. Otherwise follow the prompt to turn the phone
-sideways and disable its rotation lock. The button reads **Landscape** when the
-phone is already sideways.
+Account pages check settlement every 15 seconds while visible, and the server
+worker retries every 30 seconds. Restarting the app retries overdue predictions.
+Use **Refresh settlements** for another check. Missing market data can delay a
+result; it does not turn a pending prediction into a loss.
 
 ## Hourly contests
 
-The game uses **Hourly contest** only. Each user starts with 1,000 credits
-per GMT hour across all instruments and intervals. Settled payouts refill the
-balance and can be spent again that hour. Losses reduce the balance; the final
-score is ending credits minus 1,000. Unspent
-credits do not carry forward.
+At every GMT hour boundary your hourly allowance resets to 1,000 credits,
+independently of older pending settlements. Late payouts belong to their original
+hour. Contest scores reflect settled net profit/loss; pending entries keep an
+hour provisional. Final winners appear only after all of its entries settle,
+and equal scores share the same rank.
 
-At HH:00 GMT the contest closes. Final winners and results are saved after all
-predictions settle. Every player starts the next GMT hour with a fresh 1,000 credits.
-If a price benchmark is unavailable, results wait while the new hour continues;
-no winner is guessed. A trophy marked Winner appears in Last hour for finalized
-first-place results, including ties. GMT is
-UTC+00:00 year-round. The highest net tally wins, including when all tallies are
-negative. Ties share first place; an empty hour has no winner.
+The terminal's previous-hour summary and contest pages show your standing.
+Any configured gift-card prize remains subject to organizer review; automated
+external prize delivery is not implemented.
 
-Open **Contests & winners** to see your current tally, **Last hour**, and your
-hourly gain/loss history. **Older hours** pages through all stored results;
-use the GMT date/hour lookup to jump directly to an earlier hour. Pending results
-are labeled provisional. Daily contests are disabled; old records are retained.
-Only announced gift-card pools award prizes, subject to operator review.
+## Change your password
+
+While signed in, choose **Change password**, enter your current password, and
+confirm a new 8–16-character password. Show/Hide controls let you inspect the
+entry. Success keeps the current session and revokes other sessions. An incorrect
+current password leaves credentials unchanged. Google-only users should continue
+using Google; forgotten-password recovery is not currently available.
+
+Use **Log out** to end the current session. If another tab already ended it,
+logout still returns to the welcome page.
+
+## Laptop and phone displays
+
+Cards place prices and prediction controls together when space allows and stack
+them on narrow screens. Interactive controls retain at least 44-pixel touch
+sizes. Coin controls wrap to fit; five-minute cards scroll rather than shrinking
+all twelve into the viewport. Phones may wrap the 15-minute row, so its card
+markers use their own interval scale rather than the graph's full-hour scale.
+
+Use the sun/moon control to switch themes. The menu contains market navigation,
+prediction history, contest results, logout and phone rotation controls. Graphs
+retain their black backgrounds. For a small phone, horizontal card scrolling and
+rotation are available without changing your selected coin or prediction.
+
+## History and display controls
+
+Historical cards include dates to distinguish hours across midnight. Switching
+coins retains the viewed hour. Use Back to live/Back to now before making a new
+prediction. A completed card's Result action remains available when the live
+feed disconnects; an open play requires fresh data before Predict is enabled.
+
+## Troubleshooting
+
+| Symptom | Next step |
+| --- | --- |
+| Registration is full | The installation reached its account cap. Existing players can still log in; ask the administrator about capacity. |
+| Too many signup attempts / network signup limit | Wait for the hourly/daily allowance to expire. People sharing a network share the limit. |
+| Organizer code requested | This installation enabled invite codes. Obtain its code from the organizer. |
+| Signup is currently unavailable | Ask the administrator to check the optional invite-code configuration for this deployment. |
+| Price unavailable, stale or disconnected | Wait for automatic retries and a fresh quote. Check your connection if it persists. |
+| Starting benchmark unavailable / awaiting settlement | Exact minute history is missing; the server retries. Logging out or creating a new account does not repair provider data. |
+| Too late to place | Choose a currently open interval and review a new prediction. |
+| Insufficient credits | Reduce the stake or wait for current-hour returns or the next hourly reset. |
+| Uncertain submission after a timeout | Refresh history and inspect saved predictions before trying again. |
+| Site unavailable after maintenance | Wait for the app to return, then refresh. Contact the administrator if it persists. |
+
+Administrators: use [setup](../deploy/SETUP.md) and
+[database maintenance](DATABASE_MAINTENANCE.md). A database reset removes accounts
+and game history; normal upgrades use migrations and retain existing data.

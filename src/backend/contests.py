@@ -126,6 +126,17 @@ def standings(conn, contest):
     return rows
 
 
+def ready_to_finalize(conn, now=None):
+    """Find a closed hourly contest with no pending entries without taking SQLite's writer lock."""
+    now = int(time.time()) if now is None else now
+    return conn.execute("""SELECT 1 FROM contests c
+      WHERE c.kind='hourly' AND c.ends_at<=? AND c.finalized_at IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM contest_entries e LEFT JOIN settlements s ON s.prediction_id=e.prediction_id
+        WHERE e.hourly_id=c.id AND s.prediction_id IS NULL)
+      LIMIT 1""", (now,)).fetchone() is not None
+
+
 def finalize(conn, now=None):
     """Snapshot closed, fully settled contests and allocate reserved pools once."""
     now = int(time.time()) if now is None else now

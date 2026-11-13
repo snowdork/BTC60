@@ -3,9 +3,9 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../../src/frontend/google-onboarding.js'),'utf8');
-function setup(mode,respond){
+function setup(mode,respond,{codeRequired=true}={}){
  const nodes=new Map(),calls=[],destinations=[];
- function get(id){if(!nodes.has(id))nodes.set(id,{hidden:false,textContent:'',value:'',handlers:{},focus(){this.focused=true;},addEventListener(event,fn){this.handlers[event]=fn;},querySelector(){return get('submit-button');}});return nodes.get(id);}
+ function get(id){if(id==='google-signup-code'&&!codeRequired)return null;if(!nodes.has(id))nodes.set(id,{hidden:false,textContent:'',value:'',handlers:{},focus(){this.focused=true;},addEventListener(event,fn){this.handlers[event]=fn;},querySelector(){return get('submit-button');}});return nodes.get(id);}
  const context={document:{querySelector:()=>({dataset:{googleOnboarding:mode}}),getElementById:get},window:{location:{assign:value=>destinations.push(value)}},fetch:async(path,options)=>{
   calls.push({path,options});
   if(path==='/api/auth/google/csrf')return {ok:true,json:async()=>({csrf:'login-csrf'})};
@@ -23,9 +23,16 @@ test('new Google signup collects organizer code before creating an account',asyn
  assert.equal(s.calls.some(call=>call.path.endsWith('/signup')),false);
  s.get('google-name').value='New player';s.get('google-signup-code').value='777';await s.submit();
  const signup=s.calls.find(call=>call.path.endsWith('/signup'));
- assert.deepEqual(JSON.parse(signup.options.body),{credential:'verified-token',name:'New player',signupCode:'777'});
+ assert.deepEqual(JSON.parse(signup.options.body),{credential:'verified-token',name:'New player',signupCode:'777',website:''});
  assert.equal(signup.options.headers['X-CSRF-Token'],'login-csrf');
  assert.deepEqual(s.destinations,['/categories.html']);
+});
+test('open Google registration works when the signup-code field is absent',async()=>{
+ const s=setup('signup',path=>path.endsWith('/signup')?{redirect:'/categories.html'}:{ok:false,code:'SIGNUP_REQUIRED'},{codeRequired:false});
+ await s.select();s.get('google-name').value='New player';await s.submit();
+ assert.equal(s.calls.some(call=>call.path.endsWith('/signup')),true);
+ assert.deepEqual(s.destinations,['/categories.html']);
+ assert(!s.get('google-onboarding-status').textContent.includes('organizer'));
 });
 test('rejected signup code stays on the form for correction',async()=>{
  const s=setup('signup',path=>path.endsWith('/signup')?{ok:false,error:'Invalid signup code.'}:{ok:false,code:'SIGNUP_REQUIRED'});

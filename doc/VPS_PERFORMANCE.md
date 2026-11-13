@@ -1,7 +1,77 @@
 # VPS performance review
 
-Reviewed October 19, 2026. Changes were checked locally with temporary databases
-and mocked providers; this is not a production VPS load test.
+The latest review is November 13, 2026. Earlier dated sections are retained as
+historical evidence. Measurements below use temporary databases and synthetic
+or mocked provider data; they do not establish production VPS capacity.
+
+## November 13, 2026 runtime and local development cleanup
+
+Reviewed the Phase-10 worktree based on `62efaea`, including the existing local
+setup, reset, registration and compact-segment changes. Focused on reducing
+repeated browser work and idle SQLite contention without changing quote or
+settlement semantics.
+
+- `minutePlot` rejects out-of-range candles before OHLC checks, validates rows
+  without per-candle slices, deduplicates seconds in one pass, and reduces the
+  price range without temporary flattened arrays. Exact-boundary closes,
+  duplicate/unsorted input behavior, gaps and incomplete-candle rejection remain.
+- The detail view caches stable elements and card fields separately. Identical
+  properties and serialized attributes are not rewritten. Saved predictions are
+  indexed once per account snapshot/event instead of scanning complete history
+  on each price update. Account events invalidate the index, including in-place
+  fixture changes; freshness and cutoff gates still run every refresh.
+- The main Predict field is separate from direction shortcuts, so it receives
+  the correct disabled state. Overview updates also avoid unchanged disabled,
+  image-alt, summary and movement writes and share one wall-clock sample.
+- Finalization first reads whether an ended hourly contest has no unsettled
+  entries. Idle passes and unresolved contests do not take the SQLite writer
+  lock. Actual finalization rechecks and commits normally, retaining empty
+  contests, ties, pending-data recovery and payout idempotence.
+- Player instructions, design invariants and the test engineer checklist now
+  match optional signup codes, the 100-account policy, compact segments, separate
+  local/VPS settings and destructive reset semantics.
+
+### Local evidence
+
+Node.js 24.22.2 and Python 3.14.4; values are local computations on this machine.
+The baseline is the source snapshot before this cleanup, not a public endpoint.
+
+| Check | Before | After |
+| --- | ---: | ---: |
+| Median chart preparation per interval | 0.3927 ms | 0.3185 ms |
+| DOM writes on an identical detail refresh | 45 | 0 |
+| Detail element/field lookups on that refresh | 26 | 0 |
+| SQLite `BEGIN IMMEDIATE` on an idle settlement pass | 1 | 0 |
+
+The chart fixture has 1,440 minute candles and 3,600 recorded seconds, cycling
+through 5/15/30/60-minute intervals. Seven runs of 400 plots follow warm-up;
+medians improved about 19%. Complete outputs compared equal. A separate 1,000-case
+deterministic mixed-data comparison also preserved complete outputs, including
+unsorted/duplicate samples and invalid/missing observations. A 1,000-order detail
+fixture shows no repeated history scan between account updates.
+
+The DOM counts use instrumented fixtures; the actual browser renderer also
+passed a MutationObserver check for zero unchanged mutations. Offline Firefox
+fixtures passed at 1366, 390 and 320 pixels in dark and light themes, checking
+changed prices, disconnected controls, direction events, fit and 44-pixel action
+heights. They do not exercise live Google login, provider calls or accepted orders.
+
+Reproduce the chart comparison from the repository root:
+
+```bash
+git show 62efaea:src/frontend/market-model.js > /tmp/btc60-before-market-model.js
+node scripts/benchmark-market-model.cjs /tmp/btc60-before-market-model.js
+```
+
+Use operation-count regressions as correctness gates rather than CI time limits.
+Keep one app process, the existing 32-handler default and SQLite durability
+settings. Full account-history responses and live standings remain growth
+limits. Public p95 latency, memory and production throughput were not measured.
+No production service was rebuilt/restarted and no real database was reset.
+
+See [current verification](TEST_RESULTS.md), [test commands](TEST_GUIDE.md), and
+[release acceptance](QA_CHECKLIST.md). The older Docker-availability notes below
+refer to their dated reviews, not the current environment.
 
 ## Implemented improvements
 

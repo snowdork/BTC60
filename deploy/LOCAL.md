@@ -10,9 +10,6 @@ is needed for JavaScript tests. The full test runner and watchdog target Linux.
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 
-# Read a signup code without storing it in shell history (Bash).
-read -rs -p 'Local signup code: ' P60_SIGNUP_CODE
-export P60_SIGNUP_CODE
 .venv/bin/python src/backend/server.py --bind 127.0.0.1 --port 8000
 ```
 
@@ -20,8 +17,10 @@ The restart helper automatically uses `.venv/bin/python` when it exists.
 For Google testing, use `http://localhost:8000` and register that origin in Google.
 
 Open http://127.0.0.1:8000. Stop with Ctrl-C; restart after Python changes.
-Refresh the browser after HTML/CSS/JS changes. An empty signup code disables new
-signups but existing accounts can log in. Local Python launches read the signup
+Refresh the browser after HTML/CSS/JS changes. Signup is open without a code by
+default; see [registration policy](SETUP.md). When the code gate is enabled in
+`src/backend/CONST.py`, an empty signup code disables new signups but existing
+accounts can log in. Local Python launches read the signup
 code from `.env.local` when neither an environment override nor a saved code exists.
 Leave `P60_HOST` unset for the default local HTTP origin, or set it to the exact
 origin you use. Do not carry the production HTTPS origin into a local session.

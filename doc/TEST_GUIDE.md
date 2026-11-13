@@ -3,14 +3,22 @@
 Run commands from the repository root. Use disposable accounts and data for
 crash and restore checks; do not run destructive tests on the live service.
 
+For a release-oriented sequence with explicit expected outcomes, use the
+[test engineer checklist](QA_CHECKLIST.md). The [player guide](USER_GUIDE.md)
+defines visible behavior; [design notes](DESIGN.md) define implementation
+invariants. Keep measurements and execution evidence in
+[test results](TEST_RESULTS.md), rather than marking unperformed checks complete.
+
 ## Automated regression tests
 
 Install Python 3.10+ and Node.js. The documentation coverage tests also need the
 Acorn dependency (Sphinx is only needed to build the reference documentation):
 
 ```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 npm ci --prefix doc
-python3 scripts/run_tests.py
+.venv/bin/python scripts/run_tests.py
 ```
 
 The runner executes JavaScript tests, root Python application tests, and Python
@@ -18,6 +26,23 @@ script tests. It prints suite totals and saves a colored log under
 `/tmp/test_results/test_result_<date_time>.log`; inspect it with `less -R`.
 A missing `acorn` module means the documentation dependency must be installed.
 Tests mock provider calls and do not prove live Coinbase or paid-feed access.
+Use the project virtual environment so Google verification dependencies are
+available. A skipped Google verifier check is not equivalent to verified signup.
+HTTP and watchdog tests need loopback sockets; a socket permission error is an
+execution-environment failure. The watchdog fixture creates its own temporary
+checkout and fake Docker executable, leaving real deployments alone.
+
+Node reporter totals can count files instead of individual assertions on some
+installed runtimes. Preserve the raw report and label the unit being counted.
+For assertion-level troubleshooting with this project's Node 24 runtime, run
+one file in isolation, for example:
+
+```bash
+node --test --test-isolation=none --test-reporter=tap test/frontend/market-detail.test.js
+```
+
+Run separate files in separate processes when collecting assertion totals;
+the test harnesses can mutate cached model modules.
 
 For focused checks:
 
@@ -61,6 +86,8 @@ manual procedure explicitly says to use a live feed.
 | `test/scripts/server_control_test.py`, `test/scripts/docker_restart_test.py` | Watchdog crash/stop lifecycle and Docker restart command ordering/container options. Docker calls are mocked. |
 | `test/scripts/run_tests_test.py` | Timestamped result filenames and Node/Python summary parsing. |
 | `test/scripts/setup_env_test.py` | Isolated local/VPS configuration, signup validation, private backups, legacy migration, read-only checks and mocked rollout selection. |
+| `test/scripts/reset_profile_database_test.py` | Profile isolation, explicit confirmation, image fallback, preflight failures, and reset/restart ordering with Docker mocked. |
+| `signup_protection_test.py` | Optional signup-code gate, concurrent 100-player cap, shared password/Google IP quotas, persistent attempts, expiration, bot trap and proxy/IPv6 handling. |
 
 ## Account test isolation and deterministic time
 
@@ -236,6 +263,14 @@ and order execution require separate checks.
 8. Ensure one-minute plays, the old view toolbar, and the removed trend title do
    not reappear. History, predictions, menu navigation, themes, and rotation
    controls remain usable.
+9. Inspect a compact segment: coin/interval/status header, prominent live/closing
+   price, smaller starting price, actual percentage movement, Up/Down estimates,
+   Predict/Result/Details and a short countdown footer. Live/upcoming cards omit
+   repeated dates; historical cards retain them. At 320/390 pixels, prices and
+   controls must remain readable and all action targets at least 44 pixels high.
+   Both the main Predict action and direction shortcuts must disable on stale
+   data, disconnect, pause, or the final five seconds; result/details actions
+   remain inspectable.
 
 ## Contest and sponsor acceptance checks
 
@@ -267,7 +302,8 @@ Passing browser fixtures does not establish live order, contest, or delivery beh
 
 ## Signup access code
 
-New account creation requires the organizer's signup code. API tests cover
+New account creation is code-free by default. The optional gate is controlled
+by `SIGNUP_CODE_REQUIRED` in `src/backend/CONST.py`. With that gate enabled, API tests cover
 missing, incorrect, non-string, and whitespace-altered codes, ensuring rejected
 requests create neither an account nor a session. Login remains code-free.
 The signup form sends the code to the server; it does not embed the expected
@@ -280,13 +316,29 @@ passwords can still log in; login requires neither confirmation nor signup code.
 
 ## VPS resource regressions
 
+Run `node scripts/benchmark-market-model.cjs` for a repeatable synthetic chart
+measurement. An optional earlier module path compares outputs and timings:
+`node scripts/benchmark-market-model.cjs /path/to/earlier/market-model.js`.
+The fixture uses 1,440 candles and 3,600 recorded seconds across 5/15/30/60-minute
+intervals. Record medians and input equality; do not set a CI timing threshold
+or infer public HTTP latency from this CPU-only benchmark.
+
+`market-detail.test.js` verifies zero mutations/selectors on an identical update
+and no repeated scan of a 1,000-order history between account updates.
+`performance_test.ResourceTest` also holds an independent SQLite writer lock
+while idle settlement polling and a pending contest run: those reads must
+complete without another writer transaction. Closed empty contests must still
+finalize, and existing settlement/payout idempotence checks remain required.
+
 `PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest performance_test` checks database closure/rollback, read-only
 contest polling under a writer lock, concurrent history request sharing, failed
 settlement deduplication, and HTTP overload recovery. These use temporary data
 and mocked providers; see [local performance measurements](VPS_PERFORMANCE.md).
 
-Signup tests configure `P60_SIGNUP_CODE` explicitly, verify code changes, and
-verify that missing/empty configuration disables signup without blocking login.
+Legacy gate tests explicitly enable it and configure `P60_SIGNUP_CODE`, verify
+code changes, and check that missing/empty configuration disables signup without
+blocking login. Protection tests use the default open gate and verify capacity,
+IP limits, concurrent registration, bot traps, and expiration.
 
 ## Password changes and logout
 

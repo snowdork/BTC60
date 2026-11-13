@@ -4,12 +4,14 @@ Run from any directory: python3 scripts/build-static.py
 This copies frontend files and artwork only; it never copies account data or keys.
 """
 import shutil
+import re
 import sys
 import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src/backend'))
+import CONST
 from server import PUBLIC_ASSETS, PUBLIC_FILES
 
 
@@ -28,6 +30,8 @@ def main():
             target = staging / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / "src/frontend" / name, target)
+            if name == 'signup.html' and not CONST.SIGNUP_CODE_REQUIRED:
+                target.write_bytes(re.sub(rb'[ \t]*<!-- signup-code:start -->.*?<!-- signup-code:end -->\n?', b'', target.read_bytes(), flags=re.S))
         destination.mkdir(exist_ok=True)
         shutil.copytree(staging, destination, dirs_exist_ok=True)
         for path in sorted(destination.rglob('*'), reverse=True):

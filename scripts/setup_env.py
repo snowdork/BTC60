@@ -11,6 +11,8 @@ import tempfile
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'src/backend'))
+import CONST
 ASSIGNMENT = re.compile(r'^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$')
 
 
@@ -22,10 +24,11 @@ def settings(text):
         if match:
             key, value = match.groups()
             value = value.strip()
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-                value = value[1:-1]
-            else:
-                value = value.split(' #', 1)[0].rstrip()
+            quoted = re.fullmatch(r"(['\"])(.*?)\1(?:[ \t]+#.*)?", value)
+            if quoted:
+                value = quoted[2]
+            elif not value.startswith(('"', "'")):
+                value = re.split(r'\s+#', value, maxsplit=1)[0].rstrip()
             values[key] = value
     return values
 
@@ -55,8 +58,8 @@ def origins(value):
         item = item.strip().rstrip('/')
         if not item:
             continue
-        parsed = urlsplit(item)
         try:
+            parsed = urlsplit(item)
             valid = (parsed.scheme in ('http', 'https') and parsed.hostname
                      and not parsed.username and not parsed.password
                      and not parsed.path and not parsed.query and not parsed.fragment
@@ -66,6 +69,10 @@ def origins(value):
             valid = False
         if not valid:
             raise ValueError('Aliases must be comma-separated http:// or https:// origins, without paths.')
+        host = f'[{parsed.hostname}]' if ':' in parsed.hostname else parsed.hostname
+        default_port = 443 if parsed.scheme == 'https' else 80
+        suffix = f':{parsed.port}' if parsed.port not in (None, default_port) else ''
+        item = f'{parsed.scheme}://{host}{suffix}'
         if item not in result:
             result.append(item)
     return ','.join(result)
@@ -73,6 +80,8 @@ def origins(value):
 
 def signup_code(value):
     """Use a portable code that works in both Compose and plain Docker env files."""
+    if not value and not CONST.SIGNUP_CODE_REQUIRED:
+        return value
     if not re.fullmatch(r'[A-Za-z0-9_.-]+', value):
         raise ValueError('Signup code is required; use letters, numbers, dots, underscores, or hyphens.')
     return value
@@ -142,8 +151,20 @@ def validate_profile(values, vps):
     signup_code(values.get('P60_SIGNUP_CODE', ''))
     client_id(values.get('GOOGLE_CLIENT_ID', ''))
     if vps:
-        domain(values.get('P60_DOMAIN', ''))
-        origins(values.get('P60_ADDITIONAL_ORIGINS', ''))
+        hostname = values.get('P60_DOMAIN', '')
+        if domain(hostname) != hostname:
+            raise ValueError('P60_DOMAIN must be lowercase without a trailing dot; use --update to normalize it.')
+        aliases = values.get('P60_ADDITIONAL_ORIGINS', '')
+        for alias in aliases.split(','):
+            if alias.strip() and origins(alias.strip()) != alias.strip():
+                raise ValueError('Additional origins must be normalized; use --update to normalize them.')
+        limit = values.get('P60_MAX_REQUESTS') or '32'
+        if not re.fullmatch(r'[0-9]+', limit) or not 1 <= int(limit) <= 256:
+            raise ValueError('P60_MAX_REQUESTS must be a number from 1 to 256.')
+        if (values.get('PREDICT60_LOG_LEVEL') or 'normal') not in ('normal', 'debug', 'warning', 'error'):
+            raise ValueError('PREDICT60_LOG_LEVEL must be normal, debug, warning, or error.')
+        if not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}', values.get('P60_IMAGE_TAG') or 'local'):
+            raise ValueError('P60_IMAGE_TAG must be a valid Docker image tag.')
 
 
 def client_id(value):
@@ -153,11 +174,22 @@ def client_id(value):
     return value
 
 
+def validate_local_file(text):
+    """Reject dotenv quoting that plain Docker would pass literally instead of interpreting."""
+    values = settings(text)
+    for line in text.splitlines():
+        match = ASSIGNMENT.match(line)
+        if match and match[1] in ('P60_PORT', 'GOOGLE_CLIENT_ID', 'P60_SIGNUP_CODE'):
+            if line.lstrip().startswith('export ') or match[2] != values[match[1]]:
+                raise ValueError(f'{match[1]} must use a plain unquoted value for local Docker; use --update to normalize it.')
+
+
 def finish_setup(args, target, values):
     """Explain the selected profile and optionally run its existing deployment helper."""
     url = 'https://' + values['P60_DOMAIN'] if args.vps else 'http://localhost:' + values.get('P60_PORT', '8085')
     print(f'Profile: {"VPS production" if args.vps else "local testing"} → {target.name}')
     print(f'App URL: {url}; host port: {values.get("P60_PORT", "8085")}. Signup: enabled.')
+    print(f'Registration: {"organizer code required" if CONST.SIGNUP_CODE_REQUIRED else "no organizer code"}; maximum {CONST.MAX_PLAYER_ACCOUNTS} accounts.')
     if values.get('GOOGLE_CLIENT_ID'):
         print(f'Authorize {url} in your Google web client JavaScript origins.')
     if args.vps:
@@ -169,7 +201,9 @@ def finish_setup(args, target, values):
         command.append('--recreate')
     if args.start:
         print('Starting the selected Docker deployment...', flush=True)
-        environment = {key: value for key, value in os.environ.items() if key not in values}
+        environment = {key: value for key, value in os.environ.items()
+                       if key not in values and not key.startswith(('P60_', 'PREDICT60_'))
+                       and key not in ('GOOGLE_CLIENT_ID', 'OILPRICE_API_KEY', 'TWELVE_DATA_API_KEY', 'COMPOSE_PROJECT_NAME')}
         return subprocess.run(command, cwd=ROOT, env=environment).returncode
     if not args.check:
         print('Next: sudo bash scripts/restart-docker.sh' + ('' if args.vps else ' --local'))
@@ -200,14 +234,21 @@ def main(argv=None):
         if args.check and previous is None:
             raise ValueError(f'{target.name} is missing; run setup first.')
         if previous is not None and not args.update:
+            template = (ROOT / 'deploy' / ('docker.env.example' if args.vps else 'local.env.example')).read_text()
+            saved = settings(previous)
+            values = {**settings(template), **saved}
+            if args.vps and 'P60_DOMAIN' not in saved:
+                values['P60_DOMAIN'] = ''
             try:
-                validate_profile(settings(previous), args.vps)
+                if args.local:
+                    validate_local_file(previous)
+                validate_profile(values, args.vps)
             except ValueError as error:
                 raise ValueError(f'{target.name}: {error} Run setup with --update to configure it.') from error
             if not args.check:
                 target.chmod(0o600)
             print(f'{target.name} validated; settings preserved. Use --update to change them.')
-            return finish_setup(args, target, settings(previous))
+            return finish_setup(args, target, values)
         if not args.non_interactive and not sys.stdin.isatty():
             raise ValueError('Use an interactive terminal, or --non-interactive with environment overrides.')
         template = (ROOT / 'deploy' / ('docker.env.example' if args.vps else 'local.env.example')).read_text()
@@ -218,7 +259,7 @@ def main(argv=None):
         values = {**defaults, **existing}
         keys = ['P60_PORT', 'P60_SIGNUP_CODE', 'GOOGLE_CLIENT_ID']
         if args.vps:
-            keys.extend(['P60_DOMAIN', 'P60_ADDITIONAL_ORIGINS'])
+            keys.extend(['P60_DOMAIN', 'P60_ADDITIONAL_ORIGINS', 'P60_MAX_REQUESTS', 'PREDICT60_LOG_LEVEL', 'P60_IMAGE_TAG'])
             if 'P60_DOMAIN' not in existing and existing.get('P60_HOST'):
                 values['P60_DOMAIN'] = urlsplit(existing['P60_HOST']).hostname or values['P60_DOMAIN']
         elif previous is None and (ROOT / '.env').is_file():
@@ -233,8 +274,9 @@ def main(argv=None):
             if previous is None and not use_legacy and chosen['P60_DOMAIN'] != defaults['P60_DOMAIN'] and 'P60_ADDITIONAL_ORIGINS' not in os.environ:
                 aliases = ''
             chosen['P60_ADDITIONAL_ORIGINS'] = ask('Additional origins (comma-separated; enter - for none)', aliases, lambda value: origins('' if value == '-' else value), interactive)
+            chosen.update({key: values[key] for key in ('P60_MAX_REQUESTS', 'PREDICT60_LOG_LEVEL', 'P60_IMAGE_TAG')})
         chosen['P60_PORT'] = ask('Published port', values['P60_PORT'], port, interactive)
-        chosen['P60_SIGNUP_CODE'] = ask('Signup code (letters, numbers, . _ -)', values['P60_SIGNUP_CODE'], signup_code, interactive, secret=True)
+        chosen['P60_SIGNUP_CODE'] = ask('Signup code (letters, numbers, . _ -)', values['P60_SIGNUP_CODE'], signup_code, interactive, secret=True) if CONST.SIGNUP_CODE_REQUIRED else values['P60_SIGNUP_CODE']
         chosen['GOOGLE_CLIENT_ID'] = ask('Google web client ID (enter - to disable)', values['GOOGLE_CLIENT_ID'], lambda value: client_id('' if value == '-' else value), interactive)
         validate_profile({**values, **chosen}, args.vps)
         save(target, render(base, template, chosen), previous)

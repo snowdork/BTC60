@@ -95,7 +95,7 @@
     renderExecutionState();
     renderReviewChance();
     const assessment=model.coin.feed==='oilpriceapi'&&model.feedMode==='live'&&!model.isHistorical;
-    const age=Date.now()-model.priceUpdatedAt;
+    const now=Date.now(),age=now-model.priceUpdatedAt;
     const fresh=model.feedMode==='demo'||(model.feedConnection==='connected'&&!model.paused&&Number.isFinite(age)&&model.priceUpdatedAt>0&&age>=-5000&&age<=(model.coin.maxPriceAgeMs||15000));
     markets.forEach(m=>{
       const nodes=marketElements.get(m.id);
@@ -111,7 +111,7 @@
       if(nodes.coin){
         const icon=model.coin.icon||'assets/coins/btc.svg';
         if(nodes.coin.dataset.source!==icon){nodes.coin.src=icon;nodes.coin.dataset.source=icon;}
-        nodes.coin.alt=model.coin.name;
+        if(nodes.coin.alt!==model.coin.name)nodes.coin.alt=model.coin.name;
         setText(nodes.coinName,`${model.coin.symbol} · ${m.minutes} MIN`);
         setText(nodes.strike,m.status==='queued'?'Set at open':Number.isFinite(m.strike)?price(m.strike):'—');
         const queued=m.status==='queued',boundary=queued?m.startsAt:m.endsAt;
@@ -122,13 +122,21 @@
         if(nodes.reference.hidden===assessment)nodes.reference.hidden=!assessment;
         setText(nodes.reference,assessment&&Number.isFinite(model.spot)?price(model.spot):'—');
       }
-      const ready=!assessment&&(m.status!=='open'||model.feedMode!=='live'||model.dataStatus(model,m,Date.now(),{allowLocked:true}).ready);
+      const ready=!assessment&&(m.status!=='open'||model.feedMode!=='live'||model.dataStatus(model,m,now,{allowLocked:true}).ready);
       const chances=ready?model.estimateChances(m,model.spot,model.now,model.volatility):null;
       window.PredictSegmentCard.updateOdds(nodes.up,chances?.up,'Up');
       window.PredictSegmentCard.updateOdds(nodes.down,chances?.down,'Down');
-      for(const node of [nodes.up,nodes.down])if(node)node.disabled=m.status!=='open'||!model.dataStatus(model,m,Date.now()).ready;
+      const orderReady=!assessment&&m.status==='open'&&model.dataStatus(model,m,now).ready;
+      const directionsDisabled=!orderReady;
+      for(const node of [nodes.up,nodes.down])if(node&&node.disabled!==directionsDisabled)node.disabled=directionsDisabled;
+      if(nodes.action){
+        const disabled=m.status==='open'&&!orderReady;
+        if(nodes.action.disabled!==disabled)nodes.action.disabled=disabled;
+      }
       if(nodes.summary){
-        const readOnly=m.status!=='open';nodes.chances.hidden=readOnly;nodes.summary.hidden=!readOnly;
+        const readOnly=m.status!=='open';
+        if(nodes.chances.hidden!==readOnly)nodes.chances.hidden=readOnly;
+        if(nodes.summary.hidden===readOnly)nodes.summary.hidden=!readOnly;
         setText(nodes.summary,m.status==='queued'?'Benchmark is set when this interval opens.':Number.isFinite(m.strike)&&Number.isFinite(m.close)?`${m.close>=m.strike?'↑ Up':'↓ Down'} wins · ${price(m.strike)} → ${price(m.close)}`:'Awaiting exact settlement candles');
       }
       const current=m.status==='settled'?m.close:m.status==='queued'?NaN:model.spot;
@@ -140,8 +148,10 @@
       setText(nodes.price,valid?price(current):'—');
       if(nodes.movement){
         const change=valid?window.PredictSegmentCard.priceMovement(m.strike,current):null;
-        nodes.movement.hidden=!change;setText(nodes.movement,change?change.label:'');
-        nodes.movement.dataset.direction=change?change.direction:'';
+        if(nodes.movement.hidden===!!change)nodes.movement.hidden=!change;
+        setText(nodes.movement,change?change.label:'');
+        const movementDirection=change?change.direction:'';
+        if(nodes.movement.dataset.direction!==movementDirection)nodes.movement.dataset.direction=movementDirection;
       }
       if(!valid)return;
       const movement=(Math.abs(delta)/m.strike*100).toFixed(2);
@@ -218,7 +228,7 @@
     });
     marketElements.clear();
     $('market-grid').querySelectorAll('[data-market]').forEach(card=>{
-      marketElements.set(card.dataset.market,{card,now:card.querySelector('[data-segment-now]'),reference:card.querySelector('[data-reference-price]'),predictions:card.querySelector('[data-predictions]'),up:card.querySelector('.segment-odds-up'),down:card.querySelector('.segment-odds-down'),price:card.querySelector('.segment-current-price'),direction:card.querySelector('[data-direction-indicator]'),arrow:card.querySelector('.segment-direction-arrow'),change:card.querySelector('.segment-direction-change'),coin:card.querySelector('[data-detail-coin]'),coinName:card.querySelector('[data-detail-coin-name]'),strike:card.querySelector('[data-detail-strike]'),status:card.querySelector('[data-detail-status]'),countdown:card.querySelector('[data-detail-countdown]'),chances:card.querySelector('.segment-chances'),summary:card.querySelector('.segment-summary'),movement:card.querySelector('[data-detail-movement]')});
+      marketElements.set(card.dataset.market,{card,action:card.querySelector('.segment-action'),now:card.querySelector('[data-segment-now]'),reference:card.querySelector('[data-reference-price]'),predictions:card.querySelector('[data-predictions]'),up:card.querySelector('.segment-odds-up'),down:card.querySelector('.segment-odds-down'),price:card.querySelector('.segment-current-price'),direction:card.querySelector('[data-direction-indicator]'),arrow:card.querySelector('.segment-direction-arrow'),change:card.querySelector('.segment-direction-change'),coin:card.querySelector('[data-detail-coin]'),coinName:card.querySelector('[data-detail-coin-name]'),strike:card.querySelector('[data-detail-strike]'),status:card.querySelector('[data-detail-status]'),countdown:card.querySelector('[data-detail-countdown]'),chances:card.querySelector('.segment-chances'),summary:card.querySelector('.segment-summary'),movement:card.querySelector('[data-detail-movement]')});
     });
     renderSegmentPredictions();
     renderChances();

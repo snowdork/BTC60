@@ -63,12 +63,12 @@
     }
   }
 
-  /** Retain the credential in memory while collecting the organizer code. */
+  /** Retain the credential in memory while collecting registration details. */
   function showSignup(selectedCredential) {
     credential = selectedCredential;
     find('auth-form').hidden = true;
     find('google-signup-form').hidden = false;
-    status.textContent = 'Google account selected. Enter your name and organizer signup code to create your account.';
+    status.textContent = find('google-signup-code')?'Google account selected. Enter your name and organizer signup code to create your account.':'Google account selected. Enter your name to create your account.';
     find('google-name').focus();
   }
 
@@ -137,10 +137,11 @@
         const data = await googleRequest('/api/auth/google/signup', {
           credential,
           name: find('google-name').value,
-          signupCode: find('google-signup-code').value
+          signupCode: find('google-signup-code')?.value,
+          website: find('google-website')?.value || ''
         });
         credential = null;
-        find('google-signup-code').value = '';
+        if(find('google-signup-code'))find('google-signup-code').value = '';
         window.location.assign(data.redirect || '/categories.html');
       } catch (error) {
         showError(error);

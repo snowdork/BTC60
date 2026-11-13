@@ -25,6 +25,10 @@ class AccountsTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls.signup_policy=patch.object(server.CONST, 'SIGNUP_CODE_REQUIRED', True)
+        cls.signup_policy.start()
+        cls.signup_limits=patch.multiple(server.CONST, SIGNUP_ATTEMPTS_PER_IP=1000, SIGNUP_ACCOUNTS_PER_IP=1000)
+        cls.signup_limits.start()
         cls.oil_config=patch('oilprice_api.configured',return_value=False)
         cls.oil_config.start()
         cls.temp = tempfile.TemporaryDirectory()
@@ -36,6 +40,8 @@ class AccountsTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        cls.signup_policy.stop()
+        cls.signup_limits.stop()
         cls.http.shutdown()
         cls.http.server_close()
         cls.temp.cleanup()
@@ -68,6 +74,23 @@ class AccountsTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(self.request('GET', '/api/account', cookie=cookie)[0], 401)
         self.assertEqual(self.request('GET', '/api/account', cookie=replacement)[0], 200)
+
+    def test_signup_code_fields_follow_server_policy_and_cache_revalidates(self):
+        self.assertEqual(self.request('GET', '/signup.html')[0], 200)
+        etag = self.last_headers['ETag']
+        with patch.object(server.CONST, 'SIGNUP_CODE_REQUIRED', False):
+            for encoding in ('identity', 'gzip'):
+                status, body, _ = self.request('GET', '/signup.html', extra_headers={
+                    'Accept-Encoding': encoding, 'If-None-Match': etag})
+                self.assertEqual(status, 200)
+                if encoding == 'gzip':
+                    body = server.gzip.decompress(body)
+                self.assertNotIn(b'id="signup-code"', body)
+                self.assertNotIn(b'id="google-signup-code"', body)
+                self.assertIn(b'name="website"', body)
+        status, body, _ = self.request('GET', '/signup.html')
+        self.assertEqual(status, 200)
+        self.assertIn(b'id="signup-code"', body)
 
     def test_password_storage_uses_unique_salted_scrypt_hashes(self):
         password = 'same-password'

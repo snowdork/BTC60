@@ -32,6 +32,20 @@ Those cards use a local time marker rather than projecting a full-hour marker
 onto a different scale. Time markers span the full graph or card height. Coin
 controls remain pinned above the scrolling playfield.
 
+## Registration policy
+
+Registration policy is centralized in `src/backend/CONST.py`. Organizer codes
+are optional (off by default), and both identity methods share the 100-account
+cap and persistent per-IP attempt/success budgets. Account insertion, capacity
+checks and successful-registration recording share a SQLite writer transaction.
+Defaults are 10 attempts per hour and 3 new accounts per 24 hours for each IP;
+IPv6 privacy addresses share a /64 budget. `signup_events` persists the counters
+across restarts and is pruned on signup attempts. Only configured trusted proxies
+may supply the client IP. A honeypot rejects basic bots; password registration
+does not verify email ownership. Switching the optional code gate changes the
+served signup fields, its cache key and the static export.
+See [setup and abuse controls](../deploy/SETUP.md#registration-abuse-controls).
+
 ## Segment layout and refresh
 
 `segment-card.js` supplies the shared card markup. `responsive.css` owns the
@@ -40,12 +54,14 @@ instead of appending competing overrides.
 
 Cards include UTC range, coin, status, starting and live/closing prices, actual
 movement, available model estimates, saved bet amount/execution percentage, and
-the relevant action. Hour cards place the coin below the time.
-Each card leads with green Up and red Down percentage shortcuts at the top left
-and a highlighted Predict button. The shortcuts retain direction selection and
-the normal freshness/cutoff gates. Narrow cards stack the action and price
-details with touch targets of at least 44 pixels; wider cards share the header
-row and arrange identity and prices side by side. Actual movement
+the relevant action.
+Each card has a compact coin/interval/status header and emphasizes the live or
+closing price, with a smaller starting benchmark and actual percentage change.
+Green Up and red Down percentage shortcuts sit beside Predict. Wide cards share
+one row for prices and controls; narrow cards stack them, retaining touch targets
+of at least 44 pixels. The countdown is a short footer. Live/upcoming cards omit
+the repeated date; historical cards retain it. Direction selection and the normal
+freshness/cutoff gates remain in force. Actual movement
 is `(current - starting price) / starting price`; it is separate from Up/Down
 probabilities. Completed results have an outcome-colored heading arrow only
 when both exact settlement benchmarks are available. Missing values remain
@@ -59,12 +75,24 @@ completed comparisons retain their exact historical close. Explicit Hour card
 selection is kept in the grid's dataset and survives a structural refresh, but
 is cleared on entering Hour or changing the displayed instrument/hour.
 
+`market-detail.js` caches stable workspace elements separately from replaceable
+card fields. DOM properties and serialized SVG/image attributes are written only
+when their values change. Saved orders are indexed by coin, market and exact
+start/end boundaries; replacing the account snapshot or emitting `account-update`
+invalidates that index. Readiness is still evaluated on every update, including
+wall-clock cutoff and quote-expiry checks. The main action uses its own
+`data-detail-action` marker so an Up/Down shortcut cannot capture its disabled
+state by appearing earlier in the card.
+
 ## Compact charts
 
 `market-model.js` projects valid minute OHLC bars at each minute's midpoint and
 closes at minute ends. It merges those closes with observed one-second prices.
 The live endpoint uses display time so quote arrival timing does not pull the
-line backwards. Samples up to one minute apart stay connected, including when
+line backwards. Candle range checks precede OHLC validation, duplicate seconds
+are collected in a single pass, and min/max reduction avoids temporary range
+arrays. Unsorted/duplicate inputs still resolve by timestamp, with exact boundary
+closes remaining authoritative. Samples up to one minute apart stay connected, including when
 coin switches, page returns, or delayed browser timers skip second recordings.
 Minute backfills reconnect longer absences; gaps longer than a minute without
 history remain visible. No second observations are invented, and synthetic and
@@ -73,8 +101,8 @@ incomplete data do not replace settlement candles.
 Both views inherit `--price-chart-height` from the workspace: 180 pixels on
 desktop and 150 pixels at widths of 700 pixels or less. The Hour cursor uses
 that same height so it spans the entire plot. Time labels sit directly below
-the chart and its compact minute summary. Header probability estimates remain
-available.
+the chart and its compact minute summary. Probability estimates remain in the
+segment controls.
 
 `minute-trend.js` renders a 16-pixel summary row beneath each graph. Its arrows
 align with candle midpoints and use the same OHLC validity rules as `minutePlot`.
@@ -151,7 +179,12 @@ Without a validated artifact for a coin, the normal-CDF model remains explicitly
 
 ## Review and execution
 
-Users select a side and a budget of at least $1 within their available demo balance. Fractional shares use the full budget; fees are zero. Stakes with sub-cent precision round up to the next cent. Winning payouts use integer arithmetic to round up to the next cent: `(cost_cents * 100 + price_cents - 1) // price_cents`. A winning contract returns $1 and a losing contract returns $0. Potential profit is winning return minus cost.
+Users select a side and a budget of 1–1,000 credits within their available hourly
+balance. Fractional shares use the full budget; fees are zero. Stakes with
+sub-cent precision round up to the next credit cent. Winning payouts use integer
+arithmetic: `(cost_cents * 100 + price_cents - 1) // price_cents`. A winning
+contract returns 1 credit and a losing contract returns zero. Potential profit
+is winning return minus cost; USD market prices are distinct from game credits.
 
 Review remains live as spot, benchmark, and model prices change. It shows contract price, count, cost, potential return, profit, and interval countdown. Confirmation authorizes execution at the server's current model price within the selected budget. The server does not enforce the browser quote or benchmark, and there is no 2¢ tolerance. Final quantity and return can differ from review. Expired intervals, unavailable authoritative data, and insufficient balance prevent saving.
 
@@ -197,6 +230,15 @@ expired session as success, clears account and contest-wallet state, and returns
 to the welcome page. Settlement requests pause while logout is in progress.
 
 UI/chart updates run once per second; incoming prices update the model immediately. The controller caches controls, delegates market selection, and avoids rebuilding unchanged rows and totals. Volatility is cached until candles change or a minute closes. Hidden tabs skip rendering and account polling. Static text assets support gzip and ETag revalidation; account/API responses are uncached.
+
+Settlement fetches provider benchmarks outside SQLite writer transactions and
+deduplicates each coin/boundary/source per pass. Finalization uses an indexed
+read-only preflight: only an ended hourly contest with no unsettled entries
+needs a writer transaction. The transaction still rechecks the contest before
+persisting ranks and prizes. Empty closed contests finalize normally; active,
+already-finalized and still-pending periods do not acquire the idle writer lock.
+Retain the single application process and nonblocking settlement lock; increasing
+replicas is not a substitute for reducing repeated work.
 
 The local server is a demo development service. Production hosting needs HTTPS, a production server, Secure cookies, and account recovery/email verification. See [README.md](../README.md) for development and [the maintenance guide](DATABASE_MAINTENANCE.md) for database operations.
 

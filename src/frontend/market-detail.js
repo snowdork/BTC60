@@ -3,13 +3,21 @@
  */
 (() => {
   'use strict';
-  const model=window.PredictModel,/** Find a stable detail workspace element. */ $=id=>document.getElementById(id);
+  const model=window.PredictModel,elements=new Map();
+  const /** Find and retain a stable workspace element, separate from replaceable card fields. */ $=id=>{if(!elements.has(id))elements.set(id,document.getElementById(id));return elements.get(id);};
+  /** Write a DOM property only when the displayed value changes. */
+  function set(node,key,value){if(node[key]!==value)node[key]=value;}
+  /** Write an SVG or image attribute only when its serialized value changes. */
+  function attribute(node,name,value){const text=String(value);if(node.getAttribute(name)!==text)node.setAttribute(name,text);}
   const /** Format an available instrument price or a missing-data placeholder. */ price=value=>Number.isFinite(value)?window.PredictCoins.formatPrice(value,model.coin.symbol):'—';
   const creditFormatter=new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   let minutes=15,visible=true,durationSelected=true,lastSignature='',intervals=[],selectedStart=null;
   const historyCache=new Map();
   let sourceCandles=null,extraCandles=null,mergedCandles=[];
   let cardFields=new WeakMap();
+  let predictionSource=null,predictionUser=null;
+  const predictionIndex=new Map();
+  const /** Identify saved orders by their coin, market and exact absolute boundaries. */ predictionKey=(coin,id,start,end)=>`${coin}:${id}:${start}:${end}`;
   /** Reuse the merged history until either source is replaced. */
   function playCandles(cached){
     const source=model.candles,extra=cached?.rows;
@@ -30,11 +38,19 @@
   /** Show the saved bet amount and execution percentage for this exact coin and interval. */
   function renderPredictionTags(selected,container){
     const account=window.Predict60Account;
-    const saved=account?.user&&model.feedMode!=='demo'?(account.predictions||[]).filter(p=>
-      p.mode==='contest'&&p.coin===model.coin.symbol&&p.market_id===selected.id&&
-      p.starts_at*1000===selected.startsAt&&p.ends_at*1000===selected.endsAt):[];
+    if(predictionSource!==account?.predictions||predictionUser!==account?.user){
+      predictionSource=account?.predictions;predictionUser=account?.user;predictionIndex.clear();
+      for(const p of predictionUser?predictionSource||[]:[]){
+        if(p.mode!=='contest')continue;
+        const key=predictionKey(p.coin,p.market_id,p.starts_at*1000,p.ends_at*1000);
+        if(!predictionIndex.has(key))predictionIndex.set(key,[]);
+        predictionIndex.get(key).push(p);
+      }
+    }
+    const saved=account?.user&&model.feedMode!=='demo'?predictionIndex.get(
+      predictionKey(model.coin.symbol,selected.id,selected.startsAt,selected.endsAt))||[]:[];
     const signature=JSON.stringify(saved.map(p=>[p.id,p.side,p.cost_cents,p.cents,p.settled_at,p.outcome]));
-    container.hidden=!saved.length;
+    set(container,'hidden',!saved.length);
     if(container.dataset.signature===signature)return;
     container.dataset.signature=signature;
     container.replaceChildren(...saved.map(p=>{
@@ -122,16 +138,16 @@
     ensureHistory(selected,candles);
     const completed=selected.status==='settled'&&Number.isFinite(selected.strike)&&Number.isFinite(selected.close);
     const state=selected.status==='queued'?'upcoming':selected.status==='settled'?(completed?'completed':'pending'):'live';
-    $('market-detail').dataset.state=state;
+    set($('market-detail').dataset,'state',state);
     const signature=`${model.coin.symbol}:${minutes}:${selected.startsAt}:${model.feedMode}:${state}:${completed?model.outcome(selected.strike,selected.close):''}`;
-    $('detail-title').textContent=`${model.coin.name} price chart`;
-    $('play-coin-icon').hidden=!model.coin.icon;
-    if(model.coin.icon)$('play-coin-icon').src=model.coin.icon;
-    $('play-coin-icon').alt=model.coin.name;
-    $('play-coin-fallback').hidden=!!model.coin.icon;
-    $('play-coin-fallback').textContent=model.coin.symbol;
-    $('detail-context').textContent=`${new Date(anchor).toISOString().slice(0,10)} · ${model.feedMode==='demo'?'Synthetic preview':selectedStart!==null||model.isHistorical?'Browsing selected interval':'Following the current interval'} · UTC`;
-    $('play-timeframe').textContent=`${model.coin.symbol} · ${selected.start} – ${selected.end} UTC · ${minutes} MIN`;
+    set($('detail-title'),'textContent',`${model.coin.name} price chart`);
+    set($('play-coin-icon'),'hidden',!model.coin.icon);
+    if(model.coin.icon)attribute($('play-coin-icon'),'src',model.coin.icon);
+    set($('play-coin-icon'),'alt',model.coin.name);
+    set($('play-coin-fallback'),'hidden',!!model.coin.icon);
+    set($('play-coin-fallback'),'textContent',model.coin.symbol);
+    set($('detail-context'),'textContent',`${new Date(anchor).toISOString().slice(0,10)} · ${model.feedMode==='demo'?'Synthetic preview':selectedStart!==null||model.isHistorical?'Browsing selected interval':'Following the current interval'} · UTC`);
+    set($('play-timeframe'),'textContent',`${model.coin.symbol} · ${selected.start} – ${selected.end} UTC · ${minutes} MIN`);
     if(force||signature!==lastSignature){
       lastSignature=signature;
       cardFields=new WeakMap();
@@ -144,19 +160,19 @@
     const timelineLive=!model.isHistorical&&quoteFresh?{t:model.priceUpdatedAt,price:model.spot}:null;
     const timeline=model.minutePlot(candles,selected.startsAt,selected.endsAt,now,timelineLive,model.secondPoints);
     window.PredictMinuteTrend.render($('play-minute-heatmap'),{candles,startsAt:selected.startsAt,endsAt:selected.endsAt,now,historical:model.isHistorical,label:'this interval'});
-    $('play-up').setAttribute('d',timeline.up);$('play-down').setAttribute('d',timeline.down);$('play-line').setAttribute('d',timeline.line);
-    $('play-tip').setAttribute('visibility',timeline.tip?'visible':'hidden');
-    if(timeline.tip){$('play-tip').setAttribute('cx',timeline.tip.x);$('play-tip').setAttribute('cy',timeline.tip.y);}
+    attribute($('play-up'),'d',timeline.up);attribute($('play-down'),'d',timeline.down);attribute($('play-line'),'d',timeline.line);
+    attribute($('play-tip'),'visibility',timeline.tip?'visible':'hidden');
+    if(timeline.tip){attribute($('play-tip'),'cx',timeline.tip.x);attribute($('play-tip'),'cy',timeline.tip.y);}
     const cursor=Math.max(0,Math.min(1000,(now-intervals[0].startsAt)/(minutes*60000)*1000));
-    $('play-cursor').hidden=selected.status!=='open';
-    $('play-cursor').style.left=`${cursor/10}%`;
-    $('play-cutoff').style.left=`${100-5/(minutes*60)*100}%`;
-    $('play-now-label').textContent=intervals[0].status==='open'?'LIVE · NOW':intervals[0].status==='queued'?'UPCOMING':'PAST PLAY';
-    $('play-live').hidden=selectedStart===null&&!model.isHistorical;
-    $('play-previous').disabled=selected.startsAt-minutes*60000-60000<Date.now()-30*86400000;
-    $('play-next').disabled=intervals[0].startsAt>now;
-    $('play-chart-empty').hidden=!!timeline.line||timeline.count>0;
-    $('play-chart-empty').textContent=selected.status==='queued'?'Chart begins when this play opens':historyRequest?.key===key?'Loading selected interval…':cached?.error?'Minute history unavailable · retrying automatically':'No minute candles available for this interval';
+    set($('play-cursor'),'hidden',selected.status!=='open');
+    set($('play-cursor').style,'left',`${cursor/10}%`);
+    set($('play-cutoff').style,'left',`${100-5/(minutes*60)*100}%`);
+    set($('play-now-label'),'textContent',intervals[0].status==='open'?'LIVE · NOW':intervals[0].status==='queued'?'UPCOMING':'PAST PLAY');
+    set($('play-live'),'hidden',selectedStart===null&&!model.isHistorical);
+    set($('play-previous'),'disabled',selected.startsAt-minutes*60000-60000<Date.now()-30*86400000);
+    set($('play-next'),'disabled',intervals[0].startsAt>now);
+    set($('play-chart-empty'),'hidden',!!timeline.line||timeline.count>0);
+    set($('play-chart-empty'),'textContent',selected.status==='queued'?'Chart begins when this play opens':historyRequest?.key===key?'Loading selected interval…':cached?.error?'Minute history unavailable · retrying automatically':'No minute candles available for this interval');
     const times=`<span>${selected.start}</span><span>${selected.end}</span>`;
     if($('play-times').innerHTML!==times)$('play-times').innerHTML=times;
     $('detail-cards').querySelectorAll('[data-detail-index]').forEach((card,index)=>{
@@ -165,28 +181,28 @@
       const result=closed&&Number.isFinite(m.strike)&&Number.isFinite(m.close)?model.outcome(m.strike,m.close):null;
       const seconds=Math.max(0,Math.ceil(((queued?m.startsAt:m.endsAt)-now)/1000));
       renderPredictionTags(m,get('predictions'));
-      get('coin').src=model.coin.icon||'assets/coins/btc.svg';get('coin').alt=model.coin.name;
-      get('coin-name').textContent=`${model.coin.symbol} · ${minutes} MIN`;
-      get('status').textContent=queued?'UPCOMING':closed?(result?'COMPLETED':'PENDING'):'OPEN';
-      get('status').className=`badge ${queued?'neutral':closed?(result==='up'?'green':result==='down'?'red':'neutral'):'green'}`;
-      get('countdown').textContent=closed?'Interval ended':`${queued?'Starts in':'Ends in'} ${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s${!queued&&seconds<=5?' · Betting closed':''}`;
-      get('strike').textContent=queued?'Set at open':price(m.strike);
-      get('price-label').textContent=closed?'Closing price':'Live price';get('price').textContent=closed?price(m.close):live?price(live.price):'—';
+      attribute(get('coin'),'src',model.coin.icon||'assets/coins/btc.svg');set(get('coin'),'alt',model.coin.name);
+      set(get('coin-name'),'textContent',`${model.coin.symbol} · ${minutes} MIN`);
+      set(get('status'),'textContent',queued?'UPCOMING':closed?(result?'COMPLETED':'PENDING'):'OPEN');
+      set(get('status'),'className',`badge ${queued?'neutral':closed?(result==='up'?'green':result==='down'?'red':'neutral'):'green'}`);
+      set(get('countdown'),'textContent',closed?'Interval ended':`${queued?'Starts in':'Ends in'} ${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s${!queued&&seconds<=5?' · Betting closed':''}`);
+      set(get('strike'),'textContent',queued?'Set at open':price(m.strike));
+      set(get('price-label'),'textContent',closed?'Closing price':'Live price');set(get('price'),'textContent',closed?price(m.close):live?price(live.price):'—');
       const displayedPrice=closed?m.close:live?.price;
-      get('price').dataset.direction=Number.isFinite(displayedPrice)&&Number.isFinite(m.strike)?(displayedPrice>=m.strike?'up':'down'):'';
-      get('chances').hidden=!chance;
+      set(get('price').dataset,'direction',Number.isFinite(displayedPrice)&&Number.isFinite(m.strike)?(displayedPrice>=m.strike?'up':'down'):'');
+      set(get('chances'),'hidden',!chance);
       window.PredictSegmentCard.updateOdds(get('up-chance'),chance?.up,'Up');
       window.PredictSegmentCard.updateOdds(get('down-chance'),chance?.down,'Down');
-      get('summary').hidden=!!chance;
-      get('summary').textContent=queued?'Benchmark is set when this interval opens.':result?`${result==='up'?'↑ Up':'↓ Down'} wins · ${price(m.strike)} → ${price(m.close)}`:closed?'Awaiting exact settlement candles':'Waiting for fresh price and benchmark data';
+      set(get('summary'),'hidden',!!chance);
+      set(get('summary'),'textContent',queued?'Benchmark is set when this interval opens.':result?`${result==='up'?'↑ Up':'↓ Down'} wins · ${price(m.strike)} → ${price(m.close)}`:closed?'Awaiting exact settlement candles':'Waiting for fresh price and benchmark data');
       const movement=queued?null:window.PredictSegmentCard.priceMovement(m.strike,displayedPrice);
-      get('movement').hidden=!movement;
-      get('movement').textContent=movement?movement.label:'';
-      get('movement').dataset.direction=movement?movement.direction:'';
-      get('result').style.color=result==='up'?'var(--green)':result==='down'?'var(--red)':'var(--muted)';
-      const action=get('predict');action.hidden=false;
-      action.disabled=!closed&&!queued&&(!model.markets.some(item=>item.id===m.id&&item.startsAt===m.startsAt)||!model.dataStatus(model,m,Date.now()).ready);
-      for(const node of [get('up-chance'),get('down-chance')])node.disabled=closed||queued||action.disabled;
+      set(get('movement'),'hidden',!movement);
+      set(get('movement'),'textContent',movement?movement.label:'');
+      set(get('movement').dataset,'direction',movement?movement.direction:'');
+      set(get('result').style,'color',result==='up'?'var(--green)':result==='down'?'var(--red)':'var(--muted)');
+      const action=get('action');set(action,'hidden',false);
+      set(action,'disabled',!closed&&!queued&&(!model.markets.some(item=>item.id===m.id&&item.startsAt===m.startsAt)||!model.dataStatus(model,m,Date.now()).ready));
+      for(const node of [get('up-chance'),get('down-chance')])set(node,'disabled',closed||queued||action.disabled);
     });
   }
   window.addEventListener('market-interval-select',event=>selectInterval(event.detail?.minutes,event.detail?.startsAt));
@@ -228,6 +244,7 @@
   $('play-live').addEventListener('click',()=>{selectedStart=null;if(model.isHistorical)$('current-hour').click();render(true);});
   window.addEventListener('coin-change',()=>{cancelHistory();historyCache.clear();selectedStart=null;render(true);});
   showDetail(true);
-  ['btc-market-update','btc-price-update','btc-chances-update','account-update'].forEach(name=>window.addEventListener(name,()=>render()));
+  ['btc-market-update','btc-price-update','btc-chances-update'].forEach(name=>window.addEventListener(name,()=>render()));
+  window.addEventListener('account-update',()=>{predictionSource=null;render();});
   window.addEventListener('pagehide',cancelHistory);
 })();

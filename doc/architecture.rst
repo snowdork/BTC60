@@ -48,6 +48,17 @@ concurrent settlement passes; persisted settlement rows prevent duplicate credit
 No synthetic preview price can execute a new order. OilPriceAPI physical spot
 assessments lack the exact minute benchmarks required by existing orders.
 
+Before requesting SQLite's writer lock for contest finalization, an indexed
+read checks for an ended hourly period without pending entries. Idle polling
+and contests awaiting provider data remain read-only; successful finalization
+still commits the ranks/prizes atomically and remains idempotent.
+
+The detail renderer caches stable workspace elements and replaceable card fields
+separately. Saved predictions are indexed by coin and exact interval bounds,
+invalidated by account replacement or an ``account-update`` event. An unchanged
+refresh performs no DOM mutations; freshness and cutoff gates are still checked.
+The main Predict action has its own field marker, separate from direction buttons.
+
 Oil and Weather remain dormant: their category cards cannot open a terminal and
 server-side validation rejects new orders. Oil adapters remain available for feed
 diagnostics. ``weather.py`` uses signed temperatures and nonnegative

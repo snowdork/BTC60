@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from decimal import Decimal, ROUND_CEILING
 import argparse
+import CONST
 import ipaddress
 import odds
 import contests
@@ -208,6 +209,8 @@ class AuthenticationError(ValueError):
 
 def validate_signup_code(provided):
     """Apply the same organizer-code gate to password and Google registration."""
+    if not CONST.SIGNUP_CODE_REQUIRED:
+        return
     expected = configured_signup_code()
     if not expected:
         raise AuthenticationError('Signup is currently unavailable.', status=503)
@@ -293,6 +296,11 @@ def initialize():
         CREATE TABLE IF NOT EXISTS google_identities (
           google_sub TEXT PRIMARY KEY, user_id INTEGER UNIQUE NOT NULL REFERENCES users(id),
           created_at INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS signup_events (
+          address TEXT NOT NULL, created_at INTEGER NOT NULL,
+          successful INTEGER NOT NULL CHECK(successful IN (0,1)));
+        CREATE INDEX IF NOT EXISTS signup_events_address ON signup_events(address,successful,created_at);
+        CREATE INDEX IF NOT EXISTS signup_events_time ON signup_events(created_at);
         CREATE TABLE IF NOT EXISTS sessions (
           token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
           csrf TEXT NOT NULL, expires_at INTEGER NOT NULL);
@@ -649,8 +657,10 @@ def settle_due(user_id=None):
         try:
             _settle_due(user_id)
             with connect() as conn:
-                conn.execute('BEGIN IMMEDIATE')
-                contests.finalize(conn)
+                now = int(time.time())
+                if contests.ready_to_finalize(conn, now):
+                    conn.execute('BEGIN IMMEDIATE')
+                    contests.finalize(conn, now)
         finally:
             SETTLE_LOCK.release()
 
@@ -918,10 +928,12 @@ class Handler(SimpleHTTPRequestHandler):
         stat = path.stat()
         compressed = path.suffix in {'.html','.css','.js','.svg'} and 'gzip' in self.headers.get('Accept-Encoding','')
         client_id = configured_client_id() if relative in {'login.html', 'signup.html', 'google-link.html'} else None
-        key = (relative,stat.st_mtime_ns,stat.st_size,compressed,client_id)
+        key = (relative,stat.st_mtime_ns,stat.st_size,compressed,client_id,CONST.SIGNUP_CODE_REQUIRED)
         cached = STATIC_CACHE.get(key)
         if cached is None:
             raw = path.read_bytes()
+            if relative == 'signup.html' and not CONST.SIGNUP_CODE_REQUIRED:
+                raw = re.sub(rb'[ \t]*<!-- signup-code:start -->.*?<!-- signup-code:end -->\n?', b'', raw, flags=re.S)
             if client_id is not None:
                 raw = raw.replace(f'data-client_id="{DEFAULT_CLIENT_ID}"'.encode(),
                                   f'data-client_id="{html.escape(client_id, quote=True)}"'.encode())
@@ -1060,6 +1072,7 @@ class Handler(SimpleHTTPRequestHandler):
         if self.auth_rate_limited():
             return self.reply(429, {'error': 'Too many attempts. Try again in a minute.'})
         if path == '/api/signup':
+            self.reserve_signup_attempt(data)
             validate_signup_code(data.get('signupCode'))
         email, password = data.get('email', ''), data.get('password', '')
         if not isinstance(email, str) or not isinstance(password, str):
@@ -1082,7 +1095,10 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError('Enter your name (up to 60 characters).')
                 salt = secrets.token_hex(16)
                 digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
+                conn.execute('BEGIN IMMEDIATE')
+                self.check_signup_limits(conn)
                 user_id = conn.execute('INSERT INTO users(name,email,password_hash,salt,created_at,balance_cents) VALUES(?,?,?,?,?,?)', (name.strip(), email, digest, salt, int(time.time()), 1000000)).lastrowid
+                self.record_signup(conn)
             else:
                 user = conn.execute('SELECT * FROM users WHERE email=?', (email,)).fetchone()
                 salt = user['salt'] if user else '0' * 32
@@ -1093,6 +1109,44 @@ class Handler(SimpleHTTPRequestHandler):
             token = self.create_session(conn, user_id)
         LOG.info('Authentication action=%s user=%s', path.rsplit('/', 1)[-1], user_id)
         return self.reply(200, {'ok': True}, session_cookie(token, 604800))
+
+    def signup_address(self):
+        """Group IPv6 privacy addresses by /64 while honoring only trusted proxy headers."""
+        address = ipaddress.ip_address(self.client_ip())
+        if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
+            address = address.ipv4_mapped
+        return str(ipaddress.ip_network(f'{address}/64', strict=False)) if address.version == 6 else str(address)
+
+    def check_signup_limits(self, conn):
+        """Enforce global capacity and successful registrations inside the account writer transaction."""
+        if conn.execute('SELECT count(*) FROM users').fetchone()[0] >= CONST.MAX_PLAYER_ACCOUNTS:
+            raise AuthenticationError('Registration is full. The player account limit has been reached.', status=403)
+        count = conn.execute('SELECT count(*) FROM signup_events WHERE address=? AND successful=1 AND created_at>?',
+                             (self.signup_address(), time.time() - CONST.SIGNUP_ACCOUNT_WINDOW_SECONDS)).fetchone()[0]
+        if count >= CONST.SIGNUP_ACCOUNTS_PER_IP:
+            raise AuthenticationError('Signup limit reached for this network. Try again later.', status=429)
+
+    def reserve_signup_attempt(self, data, check_capacity=True):
+        """Persist bounded signup attempts before expensive hashing or Google verification; reject the bot trap."""
+        now = time.time()
+        with connect() as conn:
+            conn.execute('DELETE FROM signup_events WHERE created_at<=?',
+                         (now - max(CONST.SIGNUP_ACCOUNT_WINDOW_SECONDS, CONST.SIGNUP_ATTEMPT_WINDOW_SECONDS),))
+            conn.commit()
+            conn.execute('BEGIN IMMEDIATE')
+            count = conn.execute('SELECT count(*) FROM signup_events WHERE address=? AND successful=0 AND created_at>?',
+                                 (self.signup_address(), now - CONST.SIGNUP_ATTEMPT_WINDOW_SECONDS)).fetchone()[0]
+            if count >= CONST.SIGNUP_ATTEMPTS_PER_IP:
+                raise AuthenticationError('Too many signup attempts from this network. Try again later.', status=429)
+            if check_capacity:
+                self.check_signup_limits(conn)
+            conn.execute('INSERT INTO signup_events VALUES(?,?,0)', (self.signup_address(), now))
+        if data.get('website'):
+            raise AuthenticationError('Unable to register. Please try again.', status=400)
+
+    def record_signup(self, conn):
+        """Record a successful registration atomically with its account and identity."""
+        conn.execute('INSERT INTO signup_events VALUES(?,?,1)', (self.signup_address(), time.time()))
 
     def create_session(self, conn, user_id):
         """Rotate a caller's session and reuse the normal SQLite session store."""
@@ -1138,6 +1192,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(403, {'error': 'Refresh the page and try again.', 'code': 'csrf_mismatch'})
         if self.auth_rate_limited():
             return self.reply(429, {'error': 'Too many attempts. Try again in a minute.'})
+        if signup and link_session is None:
+            self.reserve_signup_attempt(data, check_capacity=False)
         try:
             identity = verify_google_login(data.get('credential'))
         except ValueError:
@@ -1165,9 +1221,10 @@ class Handler(SimpleHTTPRequestHandler):
                 if exists or not signup:
                     code = 'LINK_REQUIRED' if exists else 'SIGNUP_REQUIRED'
                     return self.reply(409, {'code': code, 'error': 'Link your existing account.' if exists
-                                           else 'Register with your organizer signup code first.'})
+                                           else 'Create an account first.'})
                 # Registration and identity association commit together; a code never links an existing user.
                 validate_signup_code(data.get('signupCode'))
+                self.check_signup_limits(conn)
                 name = data.get('name', '')
                 if not isinstance(name, str) or not 1 <= len(name.strip()) <= 60:
                     raise ValueError('Enter your name (up to 60 characters).')
@@ -1180,6 +1237,7 @@ class Handler(SimpleHTTPRequestHandler):
                     (name.strip(), email, '', secrets.token_hex(16), int(time.time()), 1000000)).lastrowid
                 conn.execute('INSERT INTO google_identities VALUES(?,?,?)',
                              (identity['googleSub'], user_id, int(time.time())))
+                self.record_signup(conn)
             token = self.create_session(conn, user_id)
         return self.reply(200, {'ok': True, 'redirect': '/categories.html'}, session_cookie(token, 604800))
 

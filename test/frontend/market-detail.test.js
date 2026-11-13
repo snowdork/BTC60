@@ -3,20 +3,26 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 
-function detailHarness({predictions=[],user={id:1}}={}){
+function detailHarness({predictions=[],user={id:1},scriptSource=null}={}){
  const now=Date.UTC(2026,10,2,17,25,30),hour=Math.floor(now/3600000)*3600000;
  const base=require('../../src/frontend/market-model.js');
  const model={...base,coin:{symbol:'BTC',name:'Bitcoin',feed:'coinbase'},feedMode:'live',displayHour:hour,now,
   spot:101,spotStatus:'ready',feedConnection:'connected',priceUpdatedAt:now,quoteReady:true,volatility:.001,
   candles:Array.from({length:87},(_,i)=>[(hour/1000)-3660+i*60,98,103,100,100,1])};
  model.markets=base.adjacentMarkets(15,now,now,model.candles);
- const elements=new Map(),events=new Map(),dispatched=[];
- const node=()=>({hidden:false,dataset:{},style:{setProperty(key,value){this[key]=value;}},listeners:{},attrs:{},textContent:'',children:[],get ownerDocument(){return document;},
+ const elements=new Map(),events=new Map(),dispatched=[];let writes=0,selectors=0;
+ const tracked=values=>new Proxy(values,{set(target,key,value){writes++;target[key]=value;return true;}});
+ const node=()=>{
+ const element={dataset:tracked({}),style:tracked({setProperty(key,value){this[key]=value;}}),listeners:{},attrs:{},children:[],get ownerDocument(){return document;},
   replaceChildren(...children){this.children=children;},
-  addEventListener(name,fn){this.listeners[name]=fn;},setAttribute(k,v){this.attrs[k]=v;}});
+  addEventListener(name,fn){this.listeners[name]=fn;},getAttribute(k){return this.attrs[k]??null;},setAttribute(k,v){writes++;this.attrs[k]=String(v);if(k==='src')this.src=v;}};
+ const values={hidden:false,textContent:'',disabled:false,className:'',alt:'',src:'',innerHTML:''};
+ for(const key of Object.keys(values))Object.defineProperty(element,key,{get:()=>values[key],set(value){writes++;values[key]=value;}});
+ return element;
+ };
  const cards=Array.from({length:1},()=>{
   const nodes=new Map(),card=node();
-  card.querySelector=selector=>{if(!nodes.has(selector))nodes.set(selector,node());return nodes.get(selector);};return card;
+  card.querySelector=selector=>{selectors++;if(!nodes.has(selector))nodes.set(selector,node());return nodes.get(selector);};return card;
  });
  const get=id=>{if(!elements.has(id))elements.set(id,node());return elements.get(id);};
  const durations=[5,15,30,60].map(minutes=>{const button=node();button.dataset.detailDuration=String(minutes);return button;});
@@ -26,10 +32,10 @@ function detailHarness({predictions=[],user={id:1}}={}){
  const account={user,predictions};
  const window={PredictMinuteTrend:require('../../src/frontend/minute-trend.js'),PredictSegmentCard:require('../../src/frontend/segment-card.js'),PredictModel:model,Predict60Account:account,PredictCoins:{formatPrice:v=>'$'+v.toFixed(2)},
   addEventListener(name,fn){events.set(name,fn);},dispatchEvent(event){dispatched.push(event);events.get(event.type)?.(event);}};
- const document={getElementById:get,querySelectorAll:()=>durations,createElement:node};
- vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../../src/frontend/market-detail.js'),'utf8'),
+ const document={getElementById:id=>{selectors++;return get(id);},querySelectorAll:()=>durations,createElement:node};
+ vm.runInNewContext(scriptSource||fs.readFileSync(require('node:path').join(__dirname,'../../src/frontend/market-detail.js'),'utf8'),
   {window,document,Date:FakeDate,AbortController,setTimeout,clearTimeout,Event:class{constructor(type){this.type=type;}},CustomEvent:class{constructor(type,args){this.type=type;Object.assign(this,args);}}});
- return {model,account,get,cards,events,dispatched,durations,setWallTime(value){wallTime=value;},click:id=>get(id).listeners.click(),field:(index,name)=>cards[index].querySelector(`[data-detail-${name}]`)};
+ return {model,account,get,cards,events,dispatched,durations,stats:()=>({writes,selectors}),setWallTime(value){wallTime=value;},click:id=>get(id).listeners.click(),field:(index,name)=>cards[index].querySelector(`[data-detail-${name}]`)};
 }
 
 test('single play aligns chart, coin and red timer to the selected interval',()=>{
@@ -45,6 +51,31 @@ test('single play aligns chart, coin and red timer to the selected interval',()=
  assert.equal(h.get('play-cursor').style.left,'70%');
  h.get('detail-cards').listeners.click({target:{closest:()=>({dataset:{detailPredict:'0'}})}});
  assert.equal(h.dispatched.at(-1).detail.id,'15-1');
+});
+
+test('identical live updates avoid DOM mutations and repeated field lookups',()=>{
+ const h=detailHarness();
+ h.events.get('btc-price-update')();
+ const before=h.stats();
+ h.events.get('btc-chances-update')();
+ assert.deepEqual(h.stats(),before);
+ h.model.spot=102;h.events.get('btc-price-update')();
+ assert.equal(h.field(0,'price').textContent,'$102.00');
+ assert(h.stats().writes>before.writes);
+});
+
+test('saved history is indexed once between account updates and refreshes in-place account changes',()=>{
+ let scanned=0;
+ const predictions=Array.from({length:1000},(_,i)=>({id:String(i),mode:'contest',get coin(){scanned++;return 'ETH';},market_id:'15-0',starts_at:0,ends_at:900}));
+ const h=detailHarness({predictions});
+ assert.equal(scanned,1000);
+ h.events.get('btc-price-update')();h.events.get('btc-chances-update')();
+ assert.equal(scanned,1000);
+ const start=Date.UTC(2026,10,2,17,15)/1000;
+ predictions.push({id:'new',mode:'contest',coin:'BTC',market_id:'15-1',starts_at:start,ends_at:start+900,side:'up',cost_cents:1000,cents:60,settled_at:null});
+ h.events.get('account-update')();
+ assert.equal(h.field(0,'predictions').children[0].textContent,'↑ Up · 10.00 credits @ 60%');
+ assert.equal(scanned,2000);
 });
 
 test('interval chart reconnects observed prices when returning to a play',()=>{
@@ -221,7 +252,7 @@ test('the graph never retracts when quotes arrive between timer ticks or the con
  }
  h.model.feedConnection='disconnected';h.events.get('btc-chances-update')();
  assert.equal(Number(h.get('play-tip').attrs.cx),previousX,'a transport reconnect must retain the fresh provisional endpoint');
- assert.equal(h.field(0,'predict').disabled,true,'connection readiness still gates orders');
+ assert.equal(h.field(0,'action').disabled,true,'connection readiness still gates orders');
 });
 
 test('arrows move one duration and live restores automatic following',()=>{
@@ -229,18 +260,18 @@ test('arrows move one duration and live restores automatic following',()=>{
  h.click('play-previous');
  assert.match(h.get('detail-cards').innerHTML,/17:00 – 17:15 UTC/);
  assert.equal(h.get('market-detail').dataset.state,'completed');
- assert.equal(h.field(0,'predict').hidden,false);
- assert.equal(h.field(0,'predict').disabled,false);
+ assert.equal(h.field(0,'action').hidden,false);
+ assert.equal(h.field(0,'action').disabled,false);
  assert.equal(h.get('play-cursor').hidden,true);
  h.click('play-next');h.click('play-next');
  assert.match(h.get('detail-cards').innerHTML,/17:30 – 17:45 UTC/);
  assert.equal(h.get('play-next').disabled,true);
  assert.equal(h.get('market-detail').dataset.state,'upcoming');
- assert.equal(h.field(0,'predict').hidden,false);
- assert.equal(h.field(0,'predict').disabled,false);
+ assert.equal(h.field(0,'action').hidden,false);
+ assert.equal(h.field(0,'action').disabled,false);
  h.click('play-live');
  assert.match(h.get('detail-cards').innerHTML,/17:15 – 17:30 UTC/);
- assert.equal(h.field(0,'predict').disabled,false);
+ assert.equal(h.field(0,'action').disabled,false);
  assert.equal(h.get('market-detail').dataset.state,'live');
  h.model.now=h.model.displayHour+3601000;h.model.priceUpdatedAt=h.model.now;
  h.events.get('btc-market-update')();
@@ -294,10 +325,10 @@ test('stale prices and cutoff cannot place predictions',()=>{
  const h=detailHarness();
  h.model.feedConnection='disconnected';h.events.get('btc-chances-update')();
  assert.equal(h.field(0,'price').textContent,'—');
- assert.equal(h.field(0,'predict').disabled,true);
+ assert.equal(h.field(0,'action').disabled,true);
  h.model.feedConnection='connected';h.model.now=h.model.displayHour+1795000;h.model.priceUpdatedAt=h.model.now;
  h.events.get('btc-chances-update')();
- assert.equal(h.field(0,'predict').disabled,true);
+ assert.equal(h.field(0,'action').disabled,true);
  assert.match(h.field(0,'countdown').textContent,/Betting closed/);
 });
 

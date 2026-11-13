@@ -16,6 +16,9 @@ import setup_env
 
 class SetupEnvironmentTest(unittest.TestCase):
     def setUp(self):
+        policy = patch.object(setup_env.CONST, 'SIGNUP_CODE_REQUIRED', True)
+        policy.start()
+        self.addCleanup(policy.stop)
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
@@ -23,7 +26,7 @@ class SetupEnvironmentTest(unittest.TestCase):
         self.root_patch = patch.object(setup_env, 'ROOT', self.root)
         self.root_patch.start()
         self.addCleanup(self.root_patch.stop)
-        self.env_patch = patch.dict(os.environ, {}, clear=True)
+        self.env_patch = patch.dict(os.environ, {'P60_SIGNUP_CODE': 'test-code'}, clear=True)
         self.env_patch.start()
         self.addCleanup(self.env_patch.stop)
 
@@ -50,10 +53,17 @@ class SetupEnvironmentTest(unittest.TestCase):
         self.assertIn('http://localhost:18085', output)
 
     def test_vps_requires_signup_code_without_writing_partial_file(self):
-        status, output = self.run_setup('--vps', '--non-interactive')
+        with patch.dict(os.environ, {'P60_SIGNUP_CODE': ''}):
+            status, output = self.run_setup('--vps', '--non-interactive')
         self.assertEqual(status, 1)
         self.assertIn('Signup code is required', output)
         self.assertFalse((self.root / '.env').exists())
+
+    def test_open_registration_does_not_require_a_deployment_signup_code(self):
+        with patch.object(setup_env.CONST, 'SIGNUP_CODE_REQUIRED', False), patch.dict(os.environ, {'P60_SIGNUP_CODE': ''}):
+            status, output = self.run_setup('--vps', '--non-interactive')
+        self.assertEqual(status, 0, output)
+        self.assertIn('no organizer code', output)
 
     def test_vps_overrides_and_clears_example_alias_for_new_domain(self):
         with patch.dict(os.environ, {'P60_DOMAIN': 'example.test', 'P60_SIGNUP_CODE': 'private-test-code'}):
@@ -152,3 +162,66 @@ class SetupEnvironmentTest(unittest.TestCase):
                 self.run_setup(*flags)
         self.assertFalse((self.root / '.env').exists())
         self.assertFalse((self.root / '.env.local').exists())
+
+    def test_existing_incomplete_profile_reports_runtime_defaults_and_ignores_shell_override(self):
+        target = self.root / '.env.local'
+        target.write_text('P60_SIGNUP_CODE=test-code\n')
+        with patch.dict(os.environ, {'P60_PORT': '19999', 'COMPOSE_PROJECT_NAME': 'wrong-project',
+                                     'HTTPS_PROXY': 'http://proxy.example:8080'}), \
+                patch.object(setup_env.subprocess, 'run') as run:
+            run.return_value.returncode = 0
+            status, output = self.run_setup('--local', '--start')
+        self.assertEqual(status, 0, output)
+        self.assertIn('http://localhost:8085', output)
+        self.assertNotIn('P60_PORT', run.call_args.kwargs['env'])
+        self.assertNotIn('COMPOSE_PROJECT_NAME', run.call_args.kwargs['env'])
+        self.assertEqual(run.call_args.kwargs['env']['HTTPS_PROXY'], 'http://proxy.example:8080')
+        self.assertIn('Authorize http://localhost:8085', output)
+
+    def test_saved_vps_profile_cannot_use_template_domain_when_domain_is_missing(self):
+        (self.root / '.env').write_text('P60_SIGNUP_CODE=test-code\n')
+        status, output = self.run_setup('--vps', '--check')
+        self.assertEqual(status, 1, output)
+
+    def test_advanced_vps_overrides_are_saved_and_invalid_settings_do_not_overwrite(self):
+        overrides = {'P60_MAX_REQUESTS': '64', 'PREDICT60_LOG_LEVEL': 'warning', 'P60_IMAGE_TAG': 'production'}
+        with patch.dict(os.environ, overrides):
+            status, output = self.run_setup('--vps', '--non-interactive')
+        self.assertEqual(status, 0, output)
+        target = self.root / '.env'
+        values = setup_env.settings(target.read_text())
+        for key, value in overrides.items():
+            self.assertEqual(values[key], value)
+        before = target.read_bytes()
+        for key, value in (('P60_MAX_REQUESTS', '0'), ('P60_MAX_REQUESTS', '257'),
+                           ('PREDICT60_LOG_LEVEL', 'verbose'), ('P60_IMAGE_TAG', 'bad/tag')):
+            with patch.dict(os.environ, {key: value}):
+                status, output = self.run_setup('--vps', '--update', '--non-interactive')
+            self.assertEqual(status, 1, output)
+            self.assertEqual(target.read_bytes(), before)
+
+    def test_new_origin_values_are_normalized_to_match_backend_validation(self):
+        with patch.dict(os.environ, {'P60_DOMAIN': 'EXAMPLE.TEST.',
+                                    'P60_ADDITIONAL_ORIGINS': 'HTTPS://Alias.Example.Test:443/,http://localhost:80'}):
+            status, output = self.run_setup('--vps', '--non-interactive')
+        self.assertEqual(status, 0, output)
+        values = setup_env.settings((self.root / '.env').read_text())
+        self.assertEqual(values['P60_DOMAIN'], 'example.test')
+        self.assertEqual(values['P60_ADDITIONAL_ORIGINS'], 'https://alias.example.test,http://localhost')
+
+    def test_local_quoted_code_is_rejected_until_normalized_by_update(self):
+        target = self.root / '.env.local'
+        target.write_text('export P60_SIGNUP_CODE="test-code" # organizer\nP60_PORT=8085\n')
+        status, output = self.run_setup('--local', '--check')
+        self.assertEqual(status, 1, output)
+        self.assertIn('--update', output)
+        with patch.dict(os.environ, {}, clear=True):
+            status, output = self.run_setup('--local', '--update', '--non-interactive')
+        self.assertEqual(status, 0, output)
+        self.assertIn('P60_SIGNUP_CODE=test-code\n', target.read_text())
+
+    def test_malformed_aliases_are_rejected_without_partial_configuration(self):
+        with patch.dict(os.environ, {'P60_ADDITIONAL_ORIGINS': 'http://[invalid'}):
+            status, output = self.run_setup('--vps', '--non-interactive')
+        self.assertEqual(status, 1, output)
+        self.assertFalse((self.root / '.env').exists())
