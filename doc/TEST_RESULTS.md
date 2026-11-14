@@ -1,8 +1,87 @@
 # Latest regression test results
 
+**November 14, 2026 — 400 assertion cases passed; zero failures or skips.**
+
+## Current scope and environment
+
+Phase-10, base `144a808`, with the Interval/Hour layout changes, explicit Docker
+recreation option and cleanup. The follow-up gives Hour the same clock/coin/range
+identity and combines Interval prices/movement with its countdown beside the range.
+Linux, Python 3.14.4 in `.venv`, Node.js 24.22.2;
+timestamps use America/Denver. Providers and Docker lifecycle calls are mocked;
+accounts/databases are temporary. No real deployment was restarted or updated.
+
+## Current automated results
+
+Command: `.venv/bin/python scripts/run_tests.py`.
+Started November 14 at 09:13:19 MST; completed in 22.18 seconds.
+
+| Group | Assertion cases | Result | Duration |
+| --- | ---: | --- | ---: |
+| JavaScript (17 files) | 195 | PASS | 0.21 s |
+| Python application | 126 | PASS | 4.82 s |
+| Python scripts | 79 | PASS | 17.14 s |
+| **Total** | **400** | **PASS; no skips** | **22.18 s** |
+
+Full log: `/tmp/test_results/test_result_2026-11-14_09-13-19_445369.log`.
+The earlier sandbox run could not create loopback sockets; the final complete
+run allowed those temporary HTTP/watchdog fixtures. It passed without resource
+warnings after HTTP error streams and test SQLite connections were closed.
+
+New coverage includes selector image fallbacks, duration identity, shared Hour
+scrolling/Now behavior, cached price formatting, stable header ticks and account/
+time-boundary invalidation. Docker mocks cover restart versus `--recreate`, build
+failure before stopping, missing containers, health checks and setup delegation.
+Provider checks preserve retries/checkpoints while verifying response closure.
+
+## Current browser and performance checks
+
+Following the HUD edits, fresh offline Firefox fixtures using current renderers
+passed at 1440 and 390 pixels for both views, plus 320 pixels in light theme for
+Interval. Hour cards retain matching chart/row bounds and all twelve five-minute
+clocks, with no visible repeated ticker labels. Interval keeps both prices and
+movement inside one block, puts the countdown beside the range on desktop, and
+has no footer countdown. All checked sizes have no page overflow or clipped card
+buttons. Small-phone price type was reduced to preserve spacing, then rechecked.
+Fixtures, screenshots and measurement logs are in `/tmp/btc60-consistent-hud/`.
+
+Offline Firefox fixtures load the real styles and Hour card markup with synthetic
+values. After CSS cleanup, checks passed at 1440 and 390 pixels in dark theme:
+60/15/30/5 row order, 1/4/2/12 cards, matching chart/row bounds, no clipped buttons
+or page overflow, and pinned phone labels after horizontal scroll. Desktop chart
+width was 1,278 pixels; the phone shared axis was 1,090 pixels inside the 1,200-pixel
+timeline. The earlier layout pass also checked 1280 pixels.
+
+Artifacts: `/tmp/btc60-hour-qa/hour.html`, `desktop-cleanup.png`,
+`phone-cleanup.png` and their corresponding logs in the same directory.
+These temporary fixtures do not exercise live sign-in, providers or order submission.
+
+Price formatting median for 10,000 values: **110.194 → 3.863 ms** (about 28.5×
+faster in this local microbenchmark), with equal output strings. Across 30 stable
+header ticks, a 1,000-order settled history changed from 30,000 item reads to zero;
+duration accessibility-attribute writes changed from 120 to zero. See
+[performance details and reproduction](VPS_PERFORMANCE.md#november-14-2026-pre-vps-cleanup).
+
+The static export was regenerated and all nine changed frontend copies match
+their sources. Shell syntax, local documentation paths/heading links,
+`git diff --check`, and Docker Compose configuration validation passed. Compose validation used `config --quiet`
+with the selected `.env`; it neither started containers nor printed credentials.
+
+## Remaining deployment verification
+
+Follow the [VPS handoff](DEPLOYMENT_REVIEW.md#next-vps-update-not-yet-executed):
+preserve a backup, validate the VPS configuration and use `--recreate` to apply
+the updated source. Container startup, public HTTPS, live sign-in/provider/order
+checks and production load remain to be verified there. Sphinx HTML was not
+rebuilt; source documentation coverage is included in the passing suite.
+
+---
+
+## Archived regression report: November 13, 2026
+
 **November 13, 2026 — 389 assertion cases passed; zero unresolved failures or skips.**
 
-## Scope and environment
+### Scope and environment
 
 Phase-10, base `62efaea`, with the existing edited worktree plus this runtime and
 documentation cleanup. Python 3.14.4 in the project virtual environment, Node.js
@@ -10,7 +89,7 @@ documentation cleanup. Python 3.14.4 in the project virtual environment, Node.js
 order data are fixtures or temporary databases. No real database was reset and
 no running deployment was restarted.
 
-## Automated results
+### Automated results
 
 | Group | Cases | Result | Evidence |
 | --- | ---: | --- | --- |
@@ -51,7 +130,7 @@ concurrent account capacity, local/VPS setup/reset selection, chart and navigati
 behavior, main/direction readiness gates, settlement idempotence, writer-lock
 avoidance, and unchanged-DOM/history-index checks.
 
-## Browser and performance evidence
+### Browser and performance evidence
 
 Offline Firefox fixtures used the actual detail renderer, local assets and
 synthetic account/market data at 1366, 390 and 320 pixels in both themes. Checks
@@ -73,7 +152,7 @@ idle settlement writer transactions reduced from one to zero. See
 [VPS performance evidence](VPS_PERFORMANCE.md#november-13-2026-runtime-and-local-development-cleanup)
 for fixtures, commands and limitations.
 
-## Remaining release verification
+### Remaining release verification
 
 Rebuild the Docker image before expecting new source behavior in a deployment.
 Confirm its private environment, intended volume, container health and public

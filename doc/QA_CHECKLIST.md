@@ -30,6 +30,7 @@ Use the project virtual environment and installed documentation dependencies:
 ```bash
 .venv/bin/python scripts/run_tests.py
 node scripts/benchmark-market-model.cjs
+node scripts/benchmark-coin-format.cjs
 python3 scripts/build-static.py
 git diff --check
 ```
@@ -73,16 +74,24 @@ whether the data is mocked. Use current, completed, pending and upcoming plays.
   stays beside the player panel; fixed-width digital digits follow wall time across
   midnight and historical views without a clock icon, flip animations or layout shifts. The C$ amount equals the current
   contest wallet, not a separate currency balance.
-- The selected coin price is at the graph's top-left in both views. Switching
-  coins updates its icon, price and movement. Coin/duration controls stay above
-  the graph; no Current time / Prediction cutoff legend bar remains.
+- Hour shows the selected coin price at the graph's top-left. Interval combines
+  its prices and actions in a HUD headed by duration clock, coin icon, UTC range.
+  Changing duration updates the clock number and color. Coin buttons use larger
+  icons with names in tooltips/accessibility labels and ticker fallback on image
+  failure. Coin/duration controls stay above the graph.
+- Hour chart/card headers use duration clock, coin icon and UTC range without
+  repeated ticker/duration text. Interval groups live/starting prices and actual
+  percentage movement in one block; its countdown is beside the range (wrapping
+  beneath it on phones), with no separate movement/countdown footer row.
 - The segment shows coin, UTC range, status, live/closing price, starting price,
   actual movement, Up/Down estimates, relevant action and countdown. Prices use
   USD; stakes and payouts use credits. Probabilities and execution prices remain
   distinct. Missing prices are placeholders, never zero or fabricated values.
 - Controls fit without page-level overflow. Narrow cards stack prices/actions;
-  all prediction controls retain at least 44-pixel touch height. The five-minute
-  row can scroll. Historical cards retain their date across midnight.
+  all prediction controls retain at least 44-pixel touch height. Hour rows appear
+  in 60, 15, 30, 5 order on one axis, including all twelve five-minute cards.
+  Narrow screens scroll the chart and rows together; duration labels stay pinned
+  and Now reveals the current segment. Historical cards retain dates across midnight.
 - Up/Down shortcuts preselect a side and open review. They do not place orders.
   Main Predict and both shortcuts disable on stale/disconnected/paused feeds,
   unavailable benchmarks, or the five-second cutoff. Read-only Result/Details
@@ -96,6 +105,10 @@ whether the data is mocked. Use current, completed, pending and upcoming plays.
 - Changing data updates the UI, while an identical update causes no detail-view
   DOM mutations. Replacing account data updates saved prediction tags; logout
   clears them. All four durations and minute/hour rollovers remain correct.
+- Stable header ticks do not rescan settled history or rewrite duration labels.
+  Account events, replaced snapshots, interval starts/ends and backwards clock
+  changes refresh prediction markers. Reused number formatters preserve every
+  supported precision and invalid-value placeholder.
 
 ## 5. Orders, settlement and performance
 
@@ -127,6 +140,12 @@ On an isolated local deployment, test startup, restart, persistence, deliberate
 stop and a backup/restore round trip. Preserve the selected profile and volume
 in the report. A backup is not proven until it has been restored into separate
 test storage and its account/prediction data checked.
+
+`restart-docker.sh` defaults to restarting the existing container with its current
+image and environment. `--recreate` builds first, then replaces the selected app
+and checks health; a failed build leaves it running. A missing container requires
+`--recreate`. Setup `--start` and `deploy/start-docker.sh` explicitly recreate.
+Verify both local and VPS paths with mocks before any real lifecycle check.
 
 The profile reset commands require explicit `--confirm-reset` and permanently
 empty the selected database's game/account state after saving a safety backup.

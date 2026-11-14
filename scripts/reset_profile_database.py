@@ -44,7 +44,7 @@ def available_image(info, fallback):
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if result.returncode == 0:
             return image
-    raise ValueError('The app image is unavailable. Run the matching restart-docker.sh command to build it, then retry.')
+    raise ValueError('The app image is unavailable. Run the matching restart-docker.sh command with --recreate to build it, then retry.')
 
 
 def restart_and_check(identifier):

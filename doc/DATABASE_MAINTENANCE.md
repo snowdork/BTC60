@@ -48,7 +48,8 @@ with a generated name prefix. The local script selects `p60-local` and its
 volume. Both check image availability before stopping anything. If the original
 image was deleted, maintenance uses the available built profile image
 (`p60:local-dev` locally or the configured VPS image). If neither image exists,
-build it with the matching restart helper before retrying. The reset leaves the
+build it with the matching `restart-docker.sh --recreate` command before retrying.
+The reset leaves the
 app stopped if maintenance fails; inspect the error before restarting it.
 
 The local script requires an existing local Docker deployment. For a direct
@@ -61,8 +62,9 @@ leaves the Python server stopped.
 Run these commands from the checkout root during a maintenance window. A full
 reset removes accounts, sessions, predictions, contests, signup/IP counters and
 custom catalog edits, then restores seeded data. It preserves environment files
-and existing backup files. For routine schema upgrades, restart normally instead
-of resetting; startup applies migrations while preserving data.
+and existing backup files. For routine schema upgrades, deploy the updated image
+with `sudo bash scripts/restart-docker.sh --recreate`; startup applies migrations
+while preserving data. A plain restart reuses the existing image.
 
 1. Identify the current Compose app and save a consistent backup while it runs:
 

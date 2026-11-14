@@ -197,6 +197,7 @@ def finish_setup(args, target, values):
     command = ['bash', str(ROOT / 'scripts/restart-docker.sh')]
     if args.local:
         command.append('--local')
+    command.append('--recreate')
     if args.start:
         print('Starting the selected Docker deployment...', flush=True)
         environment = {key: value for key, value in os.environ.items()
@@ -204,7 +205,7 @@ def finish_setup(args, target, values):
                        and key not in ('GOOGLE_CLIENT_ID', 'OILPRICE_API_KEY', 'TWELVE_DATA_API_KEY', 'COMPOSE_PROJECT_NAME')}
         return subprocess.run(command, cwd=ROOT, env=environment).returncode
     if not args.check:
-        print('Next: sudo bash scripts/restart-docker.sh' + ('' if args.vps else ' --local'))
+        print('Next: sudo bash scripts/restart-docker.sh' + ('' if args.vps else ' --local') + ' --recreate')
     return 0
 
 

@@ -11,13 +11,13 @@ Predict60 is a buildless web app for exploring hourly direction predictions with
 - **Complete-hour workspace:** inspect open, upcoming, and completed intervals without hiding duration tiers; navigate previous hours and return to the current hour.
 - **Interval and Hour views:** Interval opens by default with one 5-, 15-, 30-, or 60-minute play. Hour shows all duration tiers. Use the title-bar view controls or double-click a card to switch views; single-click segment and duration selections stay in the current view.
 - **Readable interval cards:** UTC time, starting/live or closing prices, actual movement, model estimates, and saved execution terms stay together. Missing values use placeholders; confirmed results have a green/red outcome arrow.
-- **Top HUD:** pinned player name (ten displayed characters), C$ game-coin balance, live UTC clock, Interval/Hour controls, theme switch and account menu. Compact screens use two rows.
-- **Live market context:** selected coin icon, USD price and hourly dollar/percentage movement at the graph’s top-left. Coin and duration controls sit above the graph. Green/red minute candles and matching trend arrows retain gaps for missing data.
+- **Top HUD:** pinned player name (ten displayed characters), C$ game-coin balance, local/UTC clocks, Interval/Hour controls, theme switch and account menu. Compact screens wrap the controls across rows. Larger coin icons replace repeated ticker labels.
+- **Live market context:** Hour shows the selected coin, USD price and hourly movement above the graph. Interval shows the selected duration clock, coin icon and UTC range together with its prices and prediction controls. Green/red minute candles and matching trend arrows retain gaps for missing data.
 - **Points predictions:** choose Up or Down, set a budget, and review fractional shares, cost, possible return, and potential profit. Segment percentages estimate outcomes; the ticket shows the contract quote and execution terms.
 - **Live confirmation:** review follows the market; the server executes at its current model price within your budget. Final quantity and return can differ from review.
 - **Persistent accounts:** signup/login, password changes, 1,000 hourly contest credits, saved predictions, and automatic settlement backed by SQLite.
 - **Portfolio tracking:** pending orders, wins, losses, returns, and realized profit/loss, with committed funds shown separately.
-- **Display controls:** light/dark themes, black chart backgrounds, aligned time markers, and responsive interval rows. Fifteen-minute cards wrap on phones; five-minute cards scroll independently.
+- **Display controls:** light/dark themes, black chart backgrounds, aligned time markers, and 60, 15, 30, and 5-minute rows on the same hourly scale. Narrow screens scroll the chart and all rows together.
 
 ### Chart views
 
@@ -69,7 +69,7 @@ invalid/missing minutes still block an order. A successful 60-minute prediction
 does not supply the benchmark for a later 15-minute interval. A history failure
 is a provider-data problem, not a reason to log out. See the
 [user guide](doc/USER_GUIDE.md#troubleshooting) and
-[performance review](doc/VPS_PERFORMANCE.md#november-13-2026-runtime-and-local-development-cleanup).
+[performance review](doc/VPS_PERFORMANCE.md#november-14-2026-pre-vps-cleanup).
 
 These are uncalibrated model estimates, simulated prices, and Coinbase minute-close proxy results. Predict60 does not trade real money or claim official Kalshi or CF Benchmarks settlement. Synthetic preview and historical views cannot place orders.
 
@@ -101,11 +101,13 @@ Without the Compose plugin, use the plain-Docker restart script:
 ```bash
 cp -n deploy/local.env.example .env.local
 chmod 600 .env.local
-sudo bash scripts/restart-docker.sh --local
+sudo bash scripts/restart-docker.sh --local --recreate
 ```
 
-Repeat the last command after edits. It builds first, replaces `p60-local`,
-preserves `p60-local-data`, and checks readiness at http://localhost:8085.
+Repeat the last command after code or environment edits. `--recreate` builds
+first, replaces `p60-local`, preserves `p60-local-data`, and checks readiness at
+http://localhost:8085. Omit `--recreate` to restart the existing container with
+its current image and configuration. A missing container requires `--recreate`.
 Signup requires no organizer code by default; see [registration policy](deploy/SETUP.md). If port
 8085 is already used by the VPS stack, set `P60_PORT=18085` in `.env.local`
 and open `http://localhost:18085` instead. The VPS `.env` configuration does not
@@ -252,11 +254,13 @@ the console and support the same `--log-level` option.
 - [Contest operations](doc/CONTEST_OPERATIONS.md): UTC scoring, sponsor strip, and prize review.
 - [Test guide](doc/TEST_GUIDE.md): regression tests, Docker health, crash recovery, and restore checks.
 - [Test engineer checklist](doc/QA_CHECKLIST.md): expected outcomes, acceptance matrix, performance checks, and release evidence.
+- [Latest test results](doc/TEST_RESULTS.md): dated suite totals, browser checks, and unverified deployment checks.
 - [User guide](doc/USER_GUIDE.md): accounts, predictions, history, portfolio, and troubleshooting.
 - [Design](doc/DESIGN.md): interaction, pricing, settlement, architecture, and persistence.
 - [Database maintenance](doc/DATABASE_MAINTENANCE.md): initialization, inspection, backups, and explicit reset.
 - [VPS performance review](doc/VPS_PERFORMANCE.md): resource limits, query improvements, and local measurements.
 - [VPS deployment](deploy/README.md): Caddy, systemd, secrets, backups, and cutover checks.
+- [VPS update handoff](doc/DEPLOYMENT_REVIEW.md): current changes, backup/recreation steps, and post-update checks.
 
 ## Code documentation (Sphinx)
 
@@ -331,7 +335,7 @@ Both commands report progress. Rerun the download command after interruption to 
 The entry screen at `/` (or `welcome.html`) offers login and signup. Signed-in visitors go directly to `categories.html`, which loads category buttons from `/api/categories`. Oil and Weather are visible as Coming soon; neither category can open a terminal or accept predictions while their data feeds are being completed. See [weather preparation](doc/WEATHER.md).
 Choose **Crypto** to open the one-hour playfield at
 `index.html?category=crypto`. The 5-, 15-, 30-,
-and 60-minute intervals cover that hour; five-minute cards have their own scrollable rows with **Now** and **Select** controls. Each category has its own
+and 60-minute intervals cover that hour; all four rows share the chart's hourly scale and scroll together on narrow screens, with **Now** and **Select** controls beside the five-minute row. Each category has its own
 background, accent, instrument selection, and remembered instrument. The portfolio
 shows both categories and can filter history and statistics by category; the demo
 balance is shared.

@@ -21,7 +21,7 @@ Registration is open without a code by default. Configure registration policy in
 | --- | --- |
 | `SIGNUP_CODE_REQUIRED` | `False` |
 
-Rebuild/restart the app after
+Rebuild the app with the matching `restart-docker.sh --recreate` command after
 changing policy. With `SIGNUP_CODE_REQUIRED = True`, setup prompts for the code
 and rejects a missing code; supply `P60_SIGNUP_CODE` for automated setup.
 
@@ -41,7 +41,8 @@ disable Google sign-in when testing password registration only.
 
 `--start` builds and replaces `p60-local`, preserving its data volume, and waits
 for the app health check. A failed build leaves the running app untouched.
-For subsequent source updates, run `sudo bash scripts/restart-docker.sh --local`.
+For subsequent source updates, run `sudo bash scripts/restart-docker.sh --local --recreate`.
+Omit `--recreate` for a plain restart using the existing image and configuration.
 See [local operation](LOCAL.md) for switching from the Python watchdog and logs.
 
 ## VPS production
@@ -67,8 +68,8 @@ app inside Docker; they do not verify DNS, Google credentials, or public HTTPS.
 
 Before upgrading an existing production installation, take a database backup
 using the procedures in [Docker operation](DOCKER.md#data-and-upgrades).
-`--start` builds and updates only the app, preserving volumes and the shared
-proxy. Compose replaces changed containers without forcing unchanged ones:
+`--start` builds and recreates only the app, preserving volumes and the shared
+proxy. It explicitly selects `restart-docker.sh --recreate` and waits for health:
 
 ```bash
 sudo bash scripts/setup-vps.sh --start
@@ -83,7 +84,8 @@ bash scripts/setup-vps.sh --update
 
 Updates preserve unrelated settings and create a timestamped private backup
 beside the environment file. Changed settings reach running containers only
-after the matching restart or `--start` command. `--check` only validates the
+after the matching `restart-docker.sh --recreate` or setup `--start` command.
+A plain restart retains the existing image and environment. `--check` only validates the
 saved environment file and prints its profile; it changes no files or services.
 
 For automation, run:

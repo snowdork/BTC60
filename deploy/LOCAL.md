@@ -73,12 +73,16 @@ need the same accounts in another deployment.
 
 ```bash
 bash scripts/setup-local.sh
-bash scripts/restart-docker.sh --local
+bash scripts/restart-docker.sh --local --recreate
 ```
 
 See [guided setup](SETUP.md) for validation, updates, and automated rollout.
 
-After a successful build, the restart helper stops `predict60.service` when it
+Use `bash scripts/restart-docker.sh --local` for a plain restart of the existing
+container. Add `--recreate` for first startup or to apply code, environment, or
+port changes. Both paths preserve the data volume and check app readiness.
+
+With `--recreate`, after a successful build, the helper stops `predict60.service` when it
 is installed, before replacing/starting the Docker app. Run the helper with
 `sudo` for this handoff. If stopping the service fails, Docker replacement is
 aborted. A failed build leaves the host service running. Stopping the service

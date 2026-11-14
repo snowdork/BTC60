@@ -57,6 +57,9 @@ time and cutoff markers still work. Open **Menu** for history, contests, rules,
 account actions and navigation. The theme button switches light/dark mode.
 
 The default coins are BTC, ETH, SOL, XRP, DOGE, ADA, LTC, LINK, AVAX, and SUI.
+Coin buttons use larger icons without repeating their ticker below the image.
+Hover for the full coin name; screen readers also announce it. If an image cannot
+load, its ticker appears instead.
 
 Each compact segment contains:
 
@@ -86,23 +89,30 @@ history remains visible, while stale or incomplete data blocks new predictions.
 
 ## Interval and Hour views
 
-**Interval** is the default. One HUD above the graph combines the coin icon,
-exact UTC range and duration, Up/Down percentage buttons, prediction action,
+**Interval** is the default. Its HUD starts with the selected duration clock,
+then the coin icon and exact UTC range. It also contains Up/Down percentage buttons, prediction action,
 prices, countdown and saved bets. There is no separate lower interval pane.
+Live/closing price, starting price and actual percentage movement share one
+price block. The countdown is beside the UTC range, wrapping beneath it on
+smaller screens.
 The Up/Down buttons open review with that direction selected; they never place
 an order by themselves. The selected play’s price history appears below it.
 Use the graph arrows to move by one interval; **Back to live** resumes the current
 play. Changing duration or coin keeps the chosen view.
 
 **Hour** shows one 60-minute, two 30-minute, four 15-minute, and twelve 5-minute
-segments. Selecting Hour clears previous duration/card highlights. Single-click
-a card to choose its exact time without changing views. Select Interval to
+segments. The chart and card headers use the same duration clock, coin icon and
+UTC range as Interval, without repeated ticker or duration text. Selecting Hour
+clears previous duration/card highlights. Single-click a card to choose its exact
+time without changing views. Select Interval to
 inspect it, or double-click the card body to open it directly. Double-click the
 Interval card body to return to Hour. Buttons retain their normal actions.
 
 In Hour, the graph arrows move by UTC hour and **Back to now** returns to the
-current hour. The five-minute row scrolls horizontally; **Now** finds its active
-card and **Select** chooses that duration. Past intervals are read-only, and
+current hour. The rows appear in 60, 15, 30, and 5-minute order, all aligned to the
+same hour. On narrow screens, the chart and all rows scroll together, with duration
+labels pinned at the left; **Now**
+finds the active five-minute card and **Select** chooses that duration. Past intervals are read-only, and
 upcoming intervals have no opening benchmark until they start.
 
 Both graphs have black backgrounds in either theme. Hour uses a white price
@@ -181,9 +191,9 @@ logout still returns to the welcome page.
 
 Cards place prices and prediction controls together when space allows and stack
 them on narrow screens. Interactive controls retain at least 44-pixel touch
-sizes. Coin controls wrap to fit; five-minute cards scroll rather than shrinking
-all twelve into the viewport. Phones may wrap the 15-minute row, so its card
-markers use their own interval scale rather than the graph's full-hour scale.
+sizes. Coin controls wrap to fit. Hour keeps all twelve five-minute cards on the
+same time scale as the 60, 15, and 30-minute rows. When the screen is too narrow,
+the chart and rows scroll horizontally together to preserve that alignment.
 
 Use the sun/moon control to switch themes. The menu contains market navigation,
 prediction history, contest results, logout and phone rotation controls. Graphs

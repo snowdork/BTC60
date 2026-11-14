@@ -61,6 +61,7 @@ test('second-by-second prices survive history refreshes, coin switches and hour 
 
 test('live price, chart and clock refresh on each one-second tick',async()=>{
  const h=chartHarness();await flush();
+ assert.equal(h.element('chart-pair-label').textContent,'17:00 – 18:00 UTC');
  let previousPath=h.element('btc-line').d,previousClock=h.element('workspace-clock').textContent;
  for(const price of [110.25,111.75]){
   h.tick(price,1000);

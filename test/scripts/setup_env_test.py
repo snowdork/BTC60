@@ -127,7 +127,7 @@ class SetupEnvironmentTest(unittest.TestCase):
                 run.return_value.returncode = 7
                 status, output = self.run_setup(mode, '--non-interactive', '--start')
                 self.assertEqual(status, 7, output)
-                self.assertEqual(run.call_args.args[0], ['bash', str(self.root / 'scripts/restart-docker.sh'), *extra])
+                self.assertEqual(run.call_args.args[0], ['bash', str(self.root / 'scripts/restart-docker.sh'), *extra, '--recreate'])
                 self.assertNotIn('P60_SIGNUP_CODE', run.call_args.kwargs['env'])
 
     def test_symlink_target_is_rejected(self):

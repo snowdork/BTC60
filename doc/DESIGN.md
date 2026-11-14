@@ -18,7 +18,9 @@ The selected coin icon, USD price, and hourly dollar/percentage change are in
 a shared graph header outside the top HUD. It is visible in Hour view; Interval
 hides it and uses the selected interval’s live/closing and starting prices in
 its combined HUD, avoiding duplicate price panes. Coin and
-duration controls are inside the pinned HUD above the graph; the redundant time/cutoff legend is
+duration controls are inside the pinned HUD above the graph. Coin buttons show
+larger icons without repeated ticker text; accessible names and tooltips identify
+each coin, and a missing/failed image reveals the ticker fallback. The redundant time/cutoff legend is
 removed while its graph markers remain active. C$ denotes game credits; USD
 prices remain instrument prices. Interval is the default and
 shows one 5-, 15-, 30-, or 60-minute play. Hour shows one 60-minute card, two
@@ -26,11 +28,16 @@ shows one 5-, 15-, 30-, or 60-minute play. Hour shows one 60-minute card, two
 candles are data resolution, not a tradable duration.
 
 Interval view places its existing detail card into one HUD above the graph,
-sharing a row between coin/range identity and Up/Down prediction controls. The
-redundant lower panel and duplicate card identity are removed from the layout;
+sharing a row between identity and Up/Down prediction controls. Identity reads
+selected duration clock, coin icon, then UTC range; the clock uses the same duration
+colors as the selector. The redundant lower panel and duplicate card identity are removed from the layout;
 prices, status, countdown, saved predictions and Result/Details remain in the HUD.
+Live/closing price, starting price and actual percentage movement share one
+bordered price block. The countdown sits alongside the UTC range and wraps under
+it on narrow screens; neither field occupies a separate footer row. Result or
+unavailable-data messages remain inside the price block.
 The same card data fields, delegated prediction actions and double-click handling
-remain active. Full-hour card markup and hourly navigation are unchanged.
+remain active.
 
 The title-bar controls and card-body double-clicks change modes. Double-clicking
 an Hour card opens its exact start and duration; double-clicking an Interval card
@@ -49,10 +56,17 @@ orange dashed markers show prediction cutoffs 5 seconds before the end. Historic
 time markers. The theme applies to the surrounding controls and cards, not the
 black plot background.
 
-The Hour graph and unwrapped duration rows share their left/right bounds. On
-phones, 15-minute cards wrap into two rows; 5-minute cards scroll independently.
-Those cards use a local time marker rather than projecting a full-hour marker
-onto a different scale. Time markers span the full graph or card height. Coin
+Hour chart and card identities use the same duration clock, coin icon and UTC
+range as Interval, without an additional ticker or duration label. Five-minute
+cards use smaller versions of those icons and place the range below them.
+
+The Hour graph and all duration rows share their left/right bounds, in
+60, 15, 30, and 5-minute order. All twelve five-minute cards fit the same hourly
+axis. Narrow screens scroll the chart and every row together, with a shared
+minimum width of 1,200 pixels to keep cards readable. Time markers use the same
+full-hour scale and span the full graph or row height. Duration labels stay pinned
+at the left while the playfield scrolls; Now scrolls the shared timeline to the
+current segment. Coin
 controls remain pinned above the scrolling playfield.
 
 ## Registration policy
@@ -103,6 +117,14 @@ invalidates that index. Readiness is still evaluated on every update, including
 wall-clock cutoff and quote-expiry checks. The main action uses its own
 `data-detail-action` marker so an Up/Down shortcut cannot capture its disabled
 state by appearing earlier in the card.
+
+`coins.js` reuses an `Intl.NumberFormat` per supported price precision (0–12)
+within each catalog. Price strings and missing-value placeholders stay unchanged.
+The bootstrap header indexes unsettled predictions when the account snapshot or
+user changes, or an `account-update` event arrives. Direction markers refresh at
+the next start/end boundary and after backwards clock changes. Stable ticks skip
+history scans and unchanged duration attributes; coin, hour and demo navigation
+still select the corresponding cached markers immediately.
 
 ## Compact charts
 

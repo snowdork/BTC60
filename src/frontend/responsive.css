@@ -444,15 +444,11 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
 .terminal-page .terminal-overview.overview{position:sticky;top:0;z-index:19;background:var(--surface);box-shadow:0 4px 12px #0002}
 .terminal-page:has(dialog[open])>main{overflow:hidden}
 
-/* Short intervals keep readable cells and their own horizontal scroll. */
+/* Shared view controls and selected-play cards. */
 .terminal-page [hidden]{display:none!important}
 .market-view-switch,.detail-durations{display:flex;gap:4px;padding:4px;border:1px solid var(--border);border-radius:9px;background:var(--surface)}
 .market-view-switch button,.detail-durations button{min-height:44px;padding:9px 14px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-weight:700}
 .market-view-switch button[aria-pressed="true"],.detail-durations button[aria-pressed="true"]{background:var(--raised);color:var(--text);box-shadow:inset 0 0 0 1px var(--border)}
-.terminal-page .tier[data-duration="5"]{position:relative;z-index:4;background:var(--bg);padding-top:7px;border-top:1px solid var(--border)}
-.terminal-page .tier[data-duration="5"] .tier-cards{position:relative;grid-template-columns:repeat(var(--columns),minmax(250px,1fr));overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-width:thin;padding-bottom:10px}
-.terminal-page .tier[data-duration="5"] .market-card{scroll-snap-align:start}
-.terminal-page .tier[data-duration="5"] .market-card .card-top{display:flex}
 .ohlc-up,.ohlc-down{stroke-width:1;vector-effect:non-scaling-stroke;fill-opacity:.3;stroke:var(--green);fill:var(--green)}
 .ohlc-down{stroke:var(--red);fill:var(--red)}
 #btc-line,.minute-close-line{stroke:var(--cyan);fill:none;stroke-width:1.3;vector-effect:non-scaling-stroke}
@@ -484,8 +480,6 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
  .terminal-page .tier{display:block}
  .terminal-page .tier .tier-label{flex-direction:row;justify-content:flex-start;gap:8px;margin-bottom:8px;font-size:15px}
  .terminal-page .tier .tier-label img{width:20px;height:20px}
- .terminal-page .tier-cards{grid-template-columns:repeat(var(--columns),minmax(220px,1fr));overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:8px}
- .terminal-page .tier .market-card{scroll-snap-align:start}
  .terminal-page .hour-chart{margin-left:0}
  .terminal-page .interval-guides,.terminal-page .time-cursor{display:none}
  .terminal-page .chart-coin-icon{display:none}
@@ -495,15 +489,8 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
  .detail-durations{width:100%}.detail-durations button{flex:1}
 }
 
-/* Keep all sixty minute markets reachable without widening the phone page. */
-.terminal-page .tier-tools{display:flex;flex-direction:column;gap:4px}
-.terminal-page .tier-tools button{min-height:36px;padding:5px 7px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--text);font-size:11px}
-.terminal-page .tier-tools button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 .terminal-page .chart-price-scale{background:var(--surface);padding:2px 4px;border-radius:3px;color:var(--text);font-size:10px}
 @media(max-width:850px){
- .terminal-page .tier-tools{flex-direction:row;margin-left:auto}
- .terminal-page .tier-tools button{min-height:44px;padding:7px 12px;font-size:12px}
- .terminal-page .tier[data-duration="5"] .tier-cards{grid-template-columns:repeat(var(--columns),minmax(min(82vw,290px),1fr))}
  .detail-durations{box-sizing:border-box;min-width:0}
  .detail-durations button{min-width:0;padding:9px 5px}
 }
@@ -617,7 +604,7 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
 /* Thin red/yellow dots, spaced 12px apart on current-time markers. */
 :root{--current-time-dots:radial-gradient(circle at 1px 1px,#ff1744 .8px,transparent 1px),radial-gradient(circle at 1px 13px,#ffeb3b .8px,transparent 1px)}
 .time-cursor,.play-cursor,.segment-now-line,
-#hour-overview .tier:not([data-duration="5"]) .tier-cards::after{
+#hour-overview .tier .tier-cards::after{
  width:2px;border-left:0;background-image:var(--current-time-dots);background-size:2px 24px;background-repeat:repeat-y;
 }
 .play-cursor,.segment-now-line{position:absolute;top:0;bottom:0;transform:translateX(-50%);pointer-events:none}
@@ -913,7 +900,7 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
 }
 
 /* Full hour shares the selected-play header, graph size and card surfaces. */
-#hour-overview{--overview-color:#e879f9;--tier-gutter:54px;--hour-gutter:54px;--chart-height:var(--price-chart-height)}
+#hour-overview{--overview-color:#e879f9;--tier-gutter:54px;--hour-gutter:54px;--chart-height:var(--price-chart-height);overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:5px}
 #hour-overview[data-duration="60"]{--overview-color:#a78bfa}
 #hour-overview[data-duration="30"]{--overview-color:#60a5fa}
 #hour-overview[data-duration="5"]{--overview-color:#fbbf24}
@@ -921,11 +908,11 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
 :root .terminal-page #hour-overview .tier[data-duration="30"]{--tier-color:#60a5fa}
 :root .terminal-page #hour-overview .tier[data-duration="15"]{--tier-color:#e879f9}
 :root .terminal-page #hour-overview .tier[data-duration="5"]{--tier-color:#fbbf24}
-#hour-overview .timeline-stack{min-width:0;--chart-height:var(--price-chart-height)}
+#hour-overview .timeline-stack{min-width:1200px;--chart-height:var(--price-chart-height)}
 #hour-overview .hour-chart{margin:0 0 14px;border-radius:12px;overflow:hidden;background:#000}
 #hour-overview .chart-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto auto;height:auto;min-height:64px;padding:12px 55px;gap:16px;background:var(--surface)}
 #hour-overview .chart-toolbar .play-market-identity{display:flex;gap:12px;align-items:center;min-width:0}
-#hour-overview #price-coin-icon{width:36px;height:36px;object-fit:contain;flex-shrink:0}
+#hour-overview #price-coin-icon{width:48px;height:48px;object-fit:contain;flex-shrink:0}
 #hour-overview .overview-timeframe{font-size:17px;font-weight:700;color:var(--overview-color);font-variant-numeric:tabular-nums}
 #hour-overview .chart-plot{height:var(--chart-height);background:#000;min-width:0;--muted:#9ca3af}
 #hour-overview #btc-line{stroke:#f5f5f5}
@@ -942,16 +929,18 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
 #hour-overview .time-cursor[hidden]{display:none}
 #hour-overview .time-cursor>span{left:50%;top:0;font-size:10px}
 #hour-overview .tier{display:grid;grid-template-columns:var(--hour-gutter) minmax(0,1fr) var(--hour-gutter);gap:0;margin-bottom:12px}
-#hour-overview .tier-cards{grid-column:2;position:relative}
+#hour-overview .tier-cards{grid-column:2;position:relative;display:grid;grid-template-columns:repeat(var(--columns),minmax(0,1fr));gap:0;overflow:visible;padding-bottom:0;scroll-snap-type:none}
 #hour-overview #market-grid{padding-inline:1px}
-#hour-overview .tier:not([data-duration="5"]) .tier-cards{grid-template-columns:repeat(var(--columns),minmax(0,1fr));column-gap:0;overflow:visible;padding-bottom:0}
-#hour-overview .tier:not([data-duration="5"]) .tier-cards::after{
+#hour-overview .tier .tier-cards::after{
  content:'';position:absolute;top:0;bottom:0;left:var(--hour-progress,0%);transform:translateX(-50%);pointer-events:none;z-index:3;
 }
-#hour-overview .tier:not([data-duration="5"]) .segment-now-line{display:none}
+#hour-overview .tier .segment-now-line{display:none}
 #hour-overview[data-state="completed"] .tier-cards::after{display:none}
 #hour-overview .play-graph-row{grid-template-columns:var(--hour-gutter) minmax(0,1fr) var(--hour-gutter)}
-#hour-overview .tier-label{font-size:18px;color:var(--tier-color);gap:8px}
+#hour-overview .tier .tier-label{grid-column:1;position:sticky;left:0;z-index:4;align-self:stretch;flex-direction:column;justify-content:center;margin:0;background:var(--bg);font-size:18px;color:var(--tier-color);gap:8px}
+#hour-overview .tier-tools{display:flex;flex-direction:column;gap:4px;width:100%;margin:0;padding:0 3px}
+#hour-overview .tier-tools button{width:100%;min-width:0;min-height:44px;padding:4px 2px;font-size:10px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--text)}
+#hour-overview .tier-tools button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 #hour-overview .tier-coin-icon{width:30px;height:30px}
 #hour-overview .market-card{min-height:150px!important;padding:14px!important;border-radius:10px;border-color:color-mix(in srgb,var(--tier-color) 50%,var(--border))}
 #hour-overview .market-card.open{background:color-mix(in srgb,var(--tier-color) 12%,var(--surface))}
@@ -962,20 +951,17 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
 #hour-overview .segment-prediction{font-size:11px;line-height:1.4;border-radius:6px;padding:6px 10px}
 #hour-overview #feed-status[data-live="true"]{animation:play-live-pulse 3s ease-in-out infinite}
 @media(max-width:850px){
- #hour-overview .tier-label{grid-column:2;flex-direction:row;justify-content:flex-start;font-size:16px;margin-bottom:8px}
+ #hour-overview .tier .tier-label{font-size:16px}
  #hour-overview .tier-coin-icon{width:24px;height:24px}
 }
 @media(max-width:700px){
- #hour-overview{--hour-gutter:24px}
  #hour-overview .chart-toolbar{grid-template-columns:minmax(0,1fr) auto;padding:10px 12px;gap:10px}
  #hour-overview .chart-toolbar .play-market-identity{grid-column:1/-1;gap:8px}
  #hour-overview #current-hour{grid-column:2;grid-row:2;font-size:11px}
- #hour-overview #price-coin-icon{width:28px;height:28px}
+ #hour-overview #price-coin-icon{width:40px;height:40px}
+ #hour-overview .chart-toolbar .interval-clock{width:40px;height:40px}
  #hour-overview .overview-timeframe{font-size:12px}
  #hour-overview .chart-times{font-size:10px}
- #hour-overview .tier[data-duration="15"] .tier-cards{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:12px}
- #hour-overview .tier[data-duration="15"] .tier-cards::after{display:none}
- #hour-overview .tier[data-duration="15"] .segment-now-line:not([hidden]){display:block}
  #hour-overview .market-card{min-height:138px!important;padding:12px!important}
 }
 @media(prefers-reduced-motion:reduce){#hour-overview #feed-status[data-live="true"]{animation:none}}
@@ -1213,5 +1199,26 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
  :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls .segment-action{flex-basis:100%;width:100%}
 }
 @media(max-width:700px){#market-detail .detail-cards{margin-inline:0}}
+
+/* Twelve five-minute cards use the same hour-wide axis as every other tier. */
+#hour-overview .play-segment .segment-identity .interval-clock{width:36px;height:36px}
+#hour-overview .play-segment .segment-identity .interval-clock strong{font-size:14px}
+#hour-overview .play-segment .segment-identity .interval-clock small{font-size:7px}
+#hour-overview .play-segment .segment-identity img{width:36px;height:36px;flex-basis:36px}
+#hour-overview .tier[data-duration="5"] .play-segment{gap:6px;padding:8px 6px!important}
+#hour-overview .tier[data-duration="5"] .play-segment .detail-card-heading{gap:4px}
+#hour-overview .tier[data-duration="5"] .play-segment .segment-identity{gap:4px;flex-wrap:wrap}
+#hour-overview .tier[data-duration="5"] .play-segment .segment-identity>div{flex-basis:100%}
+#hour-overview .tier[data-duration="5"] .play-segment .segment-identity .interval-clock{width:30px;height:30px}
+#hour-overview .tier[data-duration="5"] .play-segment .segment-identity .interval-clock strong{font-size:12px}
+#hour-overview .tier[data-duration="5"] .play-segment .segment-identity .interval-clock small{font-size:6px}
+#hour-overview .tier[data-duration="5"] .play-segment .segment-identity img{width:30px;height:30px;flex-basis:30px}
+#hour-overview .tier[data-duration="5"] .play-segment [data-detail-coin-name]{font-size:10px}
+#hour-overview .tier[data-duration="5"] .play-segment .detail-range{font-size:10px}
+#hour-overview .tier[data-duration="5"] .play-segment .badge{font-size:8px;padding:3px 4px}
+#hour-overview .tier[data-duration="5"] .play-segment .segment-prediction-controls .segment-chances{grid-template-columns:minmax(0,1fr);width:100%}
+#hour-overview .tier[data-duration="5"] .play-segment :is(.segment-chances button,.segment-action){min-width:44px;min-height:44px;width:100%;padding:6px;font-size:16px}
+#hour-overview .tier[data-duration="5"] .play-segment :is(.segment-current-price,.segment-benchmark-price){font-size:11px}
+#hour-overview .tier[data-duration="5"] .play-segment :is(.detail-prices span,.detail-countdown,.detail-result){font-size:10px}
 
 /* Integrated title and selected-interval layouts live in hud.css. */

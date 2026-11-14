@@ -109,10 +109,15 @@
         }
       }
       if(nodes.coin){
-        const icon=model.coin.icon||'assets/coins/btc.svg';
-        if(nodes.coin.dataset.source!==icon){nodes.coin.src=icon;nodes.coin.dataset.source=icon;}
+        const icon=model.coin.icon||'';
+        if(nodes.coin.dataset.source!==icon){
+          nodes.coin.hidden=!icon;nodes.coinName.hidden=!!icon;
+          if(icon)nodes.coin.src=icon;
+          nodes.coin.dataset.source=icon;
+          nodes.coin.onerror=/** Reveal the ticker if this card's coin image cannot load. */ ()=>{nodes.coin.hidden=true;nodes.coinName.hidden=false;};
+        }
         if(nodes.coin.alt!==model.coin.name)nodes.coin.alt=model.coin.name;
-        setText(nodes.coinName,`${model.coin.symbol} · ${m.minutes} MIN`);
+        setText(nodes.coinName,model.coin.symbol);
         setText(nodes.strike,m.status==='queued'?'Set at open':Number.isFinite(m.strike)?price(m.strike):'—');
         const queued=m.status==='queued',boundary=queued?m.startsAt:m.endsAt;
         const seconds=Math.max(0,Math.ceil((boundary-model.now)/1000));
@@ -207,19 +212,18 @@
     if(grid.dataset.hour!==window.PredictModel.hour)delete grid.dataset.selection;
     grid.dataset.hour=window.PredictModel.hour;
     grid.dataset.scrollPending=String(grid.offsetParent===null);
-    const scrolls=new Map([...$('market-grid').querySelectorAll('.tier-cards')].map(row=>[row.closest('[data-duration]').dataset.duration,row.scrollLeft]));
-    $('market-grid').innerHTML=[60,30,15,5].map(minutes=>{
+    $('market-grid').innerHTML=[60,15,30,5].map(minutes=>{
       const items=markets.filter(m=>m.minutes===minutes);
-      return `<div class="tier" data-duration="${minutes}"><div class="tier-label"><span>${minutes}m</span><img class="tier-coin-icon" width="24" height="24" alt="">${minutes<=5?`<div class="tier-tools"><button type="button" data-tier-now="${minutes}" aria-label="Show current ${minutes}-minute market">Now</button><button type="button" data-tier-detail="${minutes}" aria-label="Select current ${minutes}-minute interval">Select</button></div>`:''}</div><div class="tier-cards" style="--columns:${items.length}" ${minutes<=5?`tabindex="0" role="region" aria-label="Twelve five-minute markets. Scroll horizontally for all intervals."`:''}>${items.map(m=>{
+      return `<div class="tier" data-duration="${minutes}"><div class="tier-label"><span>${minutes}m</span><img class="tier-coin-icon" width="24" height="24" alt="">${minutes<=5?`<div class="tier-tools"><button type="button" data-tier-now="${minutes}" aria-label="Show current ${minutes}-minute market">Now</button><button type="button" data-tier-detail="${minutes}" aria-label="Select current ${minutes}-minute interval">Select</button></div>`:''}</div><div class="tier-cards" style="--columns:${items.length}" ${minutes<=5?`role="group" aria-label="Twelve five-minute markets aligned with the hourly chart."`:''}>${items.map(m=>{
         return window.PredictSegmentCard.markup(m,{selected:grid.dataset.selection===`${m.id}:${m.startsAt}`});
       }).join('')}</div></div>`;
     }).join('');
     $('market-grid').querySelectorAll('.tier-cards').forEach(row=>{
-      const duration=row.closest('[data-duration]').dataset.duration;
-      if(!resetScroll&&scrolls.has(duration))row.scrollLeft=scrolls.get(duration);
-      else {
+      if(resetScroll&&row.closest('[data-duration]').dataset.duration==='5'){
         const active=row.querySelector('.market-card.open');
-        if(active)row.scrollLeft=Math.max(0,active.getBoundingClientRect().left-row.getBoundingClientRect().left+row.scrollLeft-12);
+        const timeline=$('hour-overview');
+        const gutter=row.closest('[data-duration]').querySelector('.tier-label').offsetWidth;
+        if(active)timeline.scrollLeft=Math.max(0,active.getBoundingClientRect().left-timeline.getBoundingClientRect().left+timeline.scrollLeft-gutter-12);
       }
     });
     $('market-grid').querySelectorAll('.tier-coin-icon').forEach(icon=>{
@@ -421,8 +425,10 @@
     if(detail){window.dispatchEvent(new CustomEvent('market-interval-select',{detail:{minutes:Number(detail.dataset.tierDetail)}}));return;}
     const now=event.target.closest('[data-tier-now]');
     if(now){
-      const row=now.closest('.tier').querySelector('.tier-cards'),active=row.querySelector('.market-card.open');
-      if(active)row.scrollLeft=Math.max(0,active.getBoundingClientRect().left-row.getBoundingClientRect().left+row.scrollLeft-12);
+      const tier=now.closest('.tier'),row=tier.querySelector('.tier-cards'),active=row.querySelector('.market-card.open');
+      const timeline=$('hour-overview');
+      const gutter=tier.querySelector('.tier-label').offsetWidth;
+      if(active)timeline.scrollTo({left:Math.max(0,active.getBoundingClientRect().left-timeline.getBoundingClientRect().left+timeline.scrollLeft-gutter-12),behavior:'smooth'});
     }
   });
   window.addEventListener('detail-predict',event=>{

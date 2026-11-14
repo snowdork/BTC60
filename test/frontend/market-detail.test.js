@@ -44,9 +44,11 @@ test('single play aligns chart, coin and red timer to the selected interval',()=
  assert.equal(h.get('detail-title').textContent,'Bitcoin price chart');
  assert.equal(h.get('market-detail').dataset.state,'live');
  assert.equal((h.get('detail-cards').innerHTML.match(/data-detail-index=/g)||[]).length,1);
- assert.equal(h.field(0,'coin-name').textContent,'BTC · 15 MIN');
+ assert.equal(h.field(0,'coin-name').textContent,'BTC');
+ assert.equal(h.field(0,'coin-name').hidden,!!h.model.coin.icon);
  assert.match(h.get('play-line').attrs.d,/^M/);
- assert.equal(h.get('play-timeframe').textContent,'BTC · 17:15 – 17:30 UTC · 15 MIN');
+ assert.equal(h.get('play-timeframe').textContent,'17:15 – 17:30 UTC');
+ assert.equal(h.get('play-countdown').textContent,'Ends in 4m 30s');
  assert.equal(h.get('play-cursor').hidden,false);
  assert.equal(h.get('play-cursor').style.left,'70%');
  h.get('detail-cards').listeners.click({target:{closest:()=>({dataset:{detailPredict:'0'}})}});
@@ -115,11 +117,11 @@ test('single-click interval selections keep the chosen view; Hour clears selecti
  assert.equal(h.durations[0].attrs['aria-pressed'],'true');
  h.click('show-detail');
  assert.equal(h.get('hour-overview').hidden,true);
- assert.equal(h.get('play-timeframe').textContent,'BTC · 17:05 – 17:10 UTC · 5 MIN');
+ assert.equal(h.get('play-timeframe').textContent,'17:05 – 17:10 UTC');
  h.click('show-overview');
  assert(h.durations.every(button=>button.attrs['aria-pressed']==='false'));
  h.click('show-detail');
- assert.equal(h.get('play-timeframe').textContent,'BTC · 17:25 – 17:30 UTC · 5 MIN','clearing a selection returns Interval to the current play');
+ assert.equal(h.get('play-timeframe').textContent,'17:25 – 17:30 UTC','clearing a selection returns Interval to the current play');
 });
 
 test('double-clicking a card moves between Hour and its exact interval',()=>{
@@ -129,7 +131,7 @@ test('double-clicking a card moves between Hour and its exact interval',()=>{
  h.get('market-grid').listeners.dblclick({target});
  assert.equal(h.get('hour-overview').hidden,true);
  assert.equal(h.get('show-detail').attrs['aria-pressed'],'true');
- assert.equal(h.get('play-timeframe').textContent,'BTC · 17:00 – 17:15 UTC · 15 MIN');
+ assert.equal(h.get('play-timeframe').textContent,'17:00 – 17:15 UTC');
  h.get('detail-cards').listeners.dblclick({target:{closest:selector=>selector==='[data-detail-index]'?{dataset:{detailIndex:'0'}}:null}});
  assert.equal(h.get('hour-overview').hidden,false);
  assert.equal(h.get('show-overview').attrs['aria-pressed'],'true');
@@ -182,6 +184,9 @@ test('minute summary arrows follow the selected interval and wait for completed,
  assert.equal(markers()[11].className,'minute-arrow current');
  for(const button of h.durations){
   button.listeners.click();
+  assert.equal(h.get('play-interval-clock').attrs['data-duration'],button.dataset.detailDuration);
+  assert.equal(h.get('play-interval-clock').attrs['aria-label'],`${button.dataset.detailDuration}-minute interval`);
+  assert.equal(h.get('play-interval-minutes').textContent,button.dataset.detailDuration);
   assert.equal(markers().length,Number(button.dataset.detailDuration));
   assert.equal(parseFloat(markers().at(-1).style.left),(markers().length-.5)/markers().length*100);
  }
@@ -310,14 +315,14 @@ test('missing interval history loads on navigation and late responses cannot rep
  assert.match(h.get('play-line').attrs.d,/^M/);
  assert.equal(h.get('play-chart-empty').hidden,true);
  assert.equal(h.get('market-detail').dataset.state,'completed');
- assert.equal(h.get('play-timeframe').textContent,'BTC · 16:45 – 17:00 UTC · 15 MIN');
+ assert.equal(h.get('play-timeframe').textContent,'16:45 – 17:00 UTC');
  h.click('play-next');
  await new Promise(resolve=>setImmediate(resolve));
  // A cancelled earlier request is fetched again rather than reused for a different interval.
  assert.equal(requests.length,3);
  requests[2].resolve(rows(requests[2]));
  await new Promise(resolve=>setImmediate(resolve));
- assert.equal(h.get('play-timeframe').textContent,'BTC · 17:00 – 17:15 UTC · 15 MIN');
+ assert.equal(h.get('play-timeframe').textContent,'17:00 – 17:15 UTC');
  assert.match(h.get('play-line').attrs.d,/^M/);
 });
 
@@ -329,7 +334,7 @@ test('stale prices and cutoff cannot place predictions',()=>{
  h.model.feedConnection='connected';h.model.now=h.model.displayHour+1795000;h.model.priceUpdatedAt=h.model.now;
  h.events.get('btc-chances-update')();
  assert.equal(h.field(0,'action').disabled,true);
- assert.match(h.field(0,'countdown').textContent,/Betting closed/);
+ assert.match(h.get('play-countdown').textContent,/Betting closed/);
 });
 
 test('duration changes return to the current play and coin switches refresh identity',()=>{
@@ -343,7 +348,7 @@ test('duration changes return to the current play and coin switches refresh iden
  assert.equal(h.get('play-coin-icon').src,'eth.svg');
  assert.equal(h.get('play-coin-icon').alt,'Ethereum');
  assert.equal(h.get('play-coin-fallback').hidden,true);
- assert.equal(h.field(0,'coin-name').textContent,'ETH · 60 MIN');
+ assert.equal(h.field(0,'coin-name').textContent,'ETH');
 });
 
 test('play reuses history across price ticks and refreshes replaced candles',()=>{

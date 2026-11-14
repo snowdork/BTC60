@@ -33,22 +33,31 @@
     if(!window.PredictCoins.available.length)throw Error('No instruments are currently available for predictions.');
     picker.replaceChildren(...window.PredictCoins.available.map(coin=>{
       const button=document.createElement('button');button.type='button';button.className='coin-button';button.dataset.coin=coin.symbol;button.setAttribute('aria-label',`Select ${coin.name}`);button.setAttribute('aria-pressed','false');button.title=`${coin.name} (${coin.symbol})`;
-      if(coin.icon){const icon=document.createElement('img');icon.src=coin.icon;icon.alt='';icon.width=24;icon.height=24;icon.addEventListener('error',()=>{icon.hidden=true;});button.append(icon);}
-      const label=document.createElement('span');label.textContent=coin.symbol;button.append(label);return button;
+      const label=document.createElement('span');label.textContent=coin.symbol;label.hidden=!!coin.icon;
+      if(coin.icon){const icon=document.createElement('img');icon.src=coin.icon;icon.alt='';icon.width=36;icon.height=36;icon.addEventListener('error',()=>{icon.hidden=true;label.hidden=false;});button.append(icon);}
+      button.append(label);return button;
     }));
     const coinButtons=[...picker.querySelectorAll('[data-coin]')];
     const durationButtons=[...document.querySelectorAll('[data-detail-duration]')];
     const hourlyPredictions=new Map();
     const hourlyDurationPredictions=new Map();
-    /** Index active pending contest directions by hour. */ function updateCoinPredictions(){
-      hourlyPredictions.clear();
-      hourlyDurationPredictions.clear();
+    let predictionSource=null,predictionUser=null,predictionsDirty=true,pendingPredictions=[];
+    let lastPredictionTime=-Infinity,nextPredictionChange=0;
+    /** Reindex pending directions only when account data or time boundaries change. */ function updateCoinPredictions(){
       const account=window.Predict60Account;
-      for(const prediction of account.user?account.predictions||[]:[]){
-        if(prediction.mode!=='contest'||prediction.settled_at!=null||!Number.isFinite(prediction.starts_at)||!Number.isFinite(prediction.ends_at))continue;
-        const now=Date.now()/1000;
-        if(prediction.starts_at>now||prediction.ends_at<=now)continue;
-        if(prediction.side!=='up'&&prediction.side!=='down')continue;
+      const changed=predictionsDirty||predictionSource!==account.predictions||predictionUser!==account.user;
+      const now=Date.now()/1000;
+      if(!changed&&now>=lastPredictionTime&&now<nextPredictionChange){lastPredictionTime=now;return;}
+      if(changed){
+        predictionSource=account.predictions;predictionUser=account.user;predictionsDirty=false;
+        pendingPredictions=account.user?(account.predictions||[]).filter(prediction=>prediction.mode==='contest'&&prediction.settled_at==null&&Number.isFinite(prediction.starts_at)&&Number.isFinite(prediction.ends_at)&&(prediction.side==='up'||prediction.side==='down')):[];
+      }
+      hourlyPredictions.clear();hourlyDurationPredictions.clear();
+      lastPredictionTime=now;nextPredictionChange=Infinity;
+      for(const prediction of pendingPredictions){
+        if(prediction.ends_at<=now)continue;
+        nextPredictionChange=Math.min(nextPredictionChange,prediction.starts_at>now?prediction.starts_at:prediction.ends_at);
+        if(prediction.starts_at>now)continue;
         const hour=Math.floor(prediction.starts_at/3600)*3600;
         if(!hourlyPredictions.has(hour))hourlyPredictions.set(hour,new Map());
         const states=hourlyPredictions.get(hour);
@@ -84,12 +93,13 @@
         const context=`${minutes}-minute plays${symbol?' for '+symbol:''}`;
         const direction=state===3?'Up and Down':state===1?'Up':state===2?'Down':'';
         const detail=direction?` · ${direction} prediction${state===3?'s':''} in this hour`:'';
+        if(button.title===context+detail)continue;
         button.dataset.prediction=marker;
         button.title=context+detail;
         button.setAttribute('aria-label','Select '+context+detail);
       }
     }
-    window.addEventListener('account-update',renderCoinPredictions);
+    window.addEventListener('account-update',()=>{predictionsDirty=true;renderCoinPredictions();});
     window.addEventListener('btc-market-update',renderCoinPredictions);
     window.addEventListener('coin-change',renderCoinPredictions);
     renderCoinPredictions();

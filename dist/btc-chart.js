@@ -314,7 +314,7 @@
   /** Project valid price points into SVG coordinates and update chart and benchmark labels. */ function draw(now,force=false) {
     const displayTime=historical?hour+3600000:now;
     $('hour-overview').dataset.state=historical?'completed':'live';
-    $('chart-pair-label').textContent=`${coin.symbol} · ${time(hour)} – ${time(hour+3600000)} UTC · FULL HOUR`;
+    $('chart-pair-label').textContent=`${time(hour)} – ${time(hour+3600000)} UTC`;
     const duration=Number($('hour-overview').dataset.duration)||15;
     $('hour-cutoffs').setAttribute('d',Array.from({length:60/duration},(_,index)=>{
       const x=((index+1)*duration*60000-5000)/3600000*1000;
@@ -428,13 +428,14 @@
     document.querySelectorAll('[data-coin]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.coin===coin.symbol)));
     for(const id of ['spot-coin-icon','price-coin-icon']){
       const icon=$(id);icon.hidden=!coin.icon;
-      icon.onerror=/** Hide an unavailable coin icon. */ ()=>{icon.hidden=true;};
+      icon.onerror=/** Hide an unavailable coin icon and reveal the Hour identity fallback. */ ()=>{icon.hidden=true;if(id==='price-coin-icon')$('price-coin-fallback').hidden=false;};
       if(coin.icon)icon.src=coin.icon;
       icon.alt=`${coin.name} logo`;
     }
+    $('price-coin-fallback').hidden=!!coin.icon;
+    $('price-coin-fallback').textContent=coin.symbol;
     $('coin-name').textContent=coin.name.toUpperCase();
     $('market-pair-label').textContent=`${coin.symbol} / USD · PREDICTION MARKETS`;
-    $('chart-pair-label').textContent=`${coin.symbol} / USD · 1H · 1m candles`;
     $('chart-title').textContent=`${coin.name} hourly price`;
     document.querySelector('.hour-chart').setAttribute('aria-label',`${coin.name} price for the current hour`);
     document.title=`${coin.name} · ${window.Predict60Category?.name||'Crypto'} · Predict60`;

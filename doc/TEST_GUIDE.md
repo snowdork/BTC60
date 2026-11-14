@@ -69,25 +69,25 @@ manual procedure explicitly says to use a live feed.
 | Suite files | Coverage |
 | --- | --- |
 | `test/frontend/account.test.js`, `test/frontend/auth.test.js`, `test/frontend/password.test.js` | Restored/expired sessions, ten-character HUD names with full-name tooltips, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery, bounded retries, and request/body timeouts without automatic order replay. |
-| `test/frontend/bootstrap.test.js`, `test/frontend/coins.test.js`, `test/frontend/categories.test.js` | Catalog-first startup, offline/static-server failures, instrument selection, category configuration, coming-soon availability and displayed-hour coin prediction rings (direction, settled retention, hour navigation and logout). |
+| `test/frontend/bootstrap.test.js`, `test/frontend/coins.test.js`, `test/frontend/categories.test.js` | Catalog-first startup, offline/static-server failures, larger icon buttons/ticker fallback, category availability, reused price formatters across all precisions, and displayed-hour prediction markers with account/time-boundary invalidation and no stable-tick history scans. |
 | `test/frontend/btc-chart.test.js` | Minute history, candle geometry and summary arrows, current/historical-hour navigation, one-second price/UTC clock updates, digital clock midnight rollover, hourly signed dollar/percentage changes, moving time-axis geometry, stale response rejection, and quote/benchmark freshness. |
 | `test/frontend/market-detail.test.js` | Interval default, view controls and double-click shortcuts, exact interval/past-hour returns, interactive-control guards, cleared and explicit duration highlights, exact selected starts, range-history cancellation/retry, saved execution tags, summary arrows and history across durations, missing candles, minute rollover, and upcoming intervals. |
 | `test/frontend/app.test.js` | Segment selection events and popups, pending/upcoming placeholders, stable DOM writes, disconnected live comparisons, winner badges, per-prediction budgets, and pending countdowns that skip settled history and clear after settlement/logout. |
 | `test/frontend/market-model.test.js`, `test/frontend/portfolio-model.test.js` | Interval layout, Up/Down outcomes, probability and volatility calculations, cutoff rules, credit limits, payout rounding, settled P/L and numeric history sorting. |
 | `test/frontend/community.test.js`, `test/frontend/contests.test.js`, `test/frontend/sponsor.test.js` | Community polling recovery, hourly score states, contest history and lookup, pending resets, safe sponsor links and absent/failed sponsor configuration. |
-| `server_test.py` | Exact-minute benchmark cache reuse, wider-window bounded recovery, malformed/truncated responses, permanent provider rejection, HTTP accounts, signup code, password changes, CSRF/origin/proxy/cookie rules, credit cap, idempotent predictions, settlement, health, catalog, community, protected pages and static allowlist/compression/HEAD. |
+| `server_test.py` | Exact-minute benchmark cache reuse, wider-window bounded recovery, malformed/truncated responses, permanent provider rejection and closed HTTP error streams, HTTP accounts, signup code, password changes, CSRF/origin/proxy/cookie rules, credit cap, idempotent predictions, settlement, health, catalog, community, protected pages and static allowlist/compression/HEAD. |
 | `contests_test.py` | Shared hourly wallet, concurrent spending, reusable winnings, hour boundaries, independent resets, finalization, ties, history, migration, gift-card pools and private-reference isolation. |
 | `categories_test.py` | Idempotent catalog migrations, ten-coin upgrades, custom-capacity preservation, and preservation of legacy simulated settlement sources. |
-| `odds_test.py` | Browser/server parity, volatility response, calibration, settlement horizon and resumable/deduplicated history downloads. |
+| `odds_test.py` | Browser/server parity, volatility response, calibration, settlement horizon, resumable/deduplicated history downloads and closed error responses on retries/exhaustion. |
 | `live_oil_test.py`, `oilprice_api_test.py`, `weather_test.py` | Provider timestamps, exact observation boundaries, unavailable/stale/mismatched data, credential/error handling and dormant category behavior. These tests do not enable Oil or Weather trading. |
 | `performance_test.py` | Bounded HTTP concurrency, database lifecycle, constant catalog query counts, bounded finalized leaderboard reads with complete tied winners/personal ranks, history coalescing, zero provider reads for 32 parallel cached interval benchmarks, and settlement retry deduplication. |
 | `logging_test.py`, `docs_test.py` | Log levels/rotation and source documentation coverage/control-flow ownership. |
 | `test/scripts/build_static_test.py`, `test/scripts/database_test.py` | Public-only static builds, preservation after a missing source, database initialization/backup/reset and process locking. |
-| `test/scripts/server_control_test.py`, `test/scripts/docker_restart_test.py` | Watchdog crash/stop lifecycle and Docker restart command ordering/container options. Docker calls are mocked. |
+| `test/scripts/server_control_test.py`, `test/scripts/docker_restart_test.py` | Watchdog crash/stop lifecycle, plain Docker restart versus explicit `--recreate`, missing containers, build-before-stop ordering and health checks in both profiles. Docker calls are mocked. |
 | `test/scripts/run_tests_test.py` | Timestamped result filenames and Node/Python summary parsing. |
 | `test/scripts/setup_env_test.py` | Isolated local/VPS configuration, signup validation, private backups, legacy migration, read-only checks and mocked rollout selection. |
 | `test/scripts/reset_profile_database_test.py` | Profile isolation, explicit confirmation, image fallback, preflight failures, and reset/restart ordering with Docker mocked. |
-| `signup_protection_test.py` | Optional signup-code gate, concurrent 100-player cap, shared password/Google IP quotas, persistent attempts, expiration, bot trap and proxy/IPv6 handling. |
+| `signup_protection_test.py` | Optional signup-code gate, concurrent registrations beyond the removed account cap, removal of signup/IP budgets, bot trap and duplicate-email rejection. |
 
 ## Account test isolation and deterministic time
 
@@ -135,16 +135,18 @@ PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest discover -s test
 The tests substitute a fake Docker executable and exercise
 `scripts/restart-docker.sh` in local and VPS modes. Expected behavior:
 
-- A failed build leaves the running deployment untouched: no stop, remove,
+- A default restart uses the existing container without building or creating;
+  a missing container fails before stopping the host service and asks for `--recreate`.
+- A failed `--recreate` build leaves the running deployment untouched: no stop, remove,
   recreate or run command occurs afterward.
-- VPS mode builds before `up -d --no-build --no-deps --wait` and never calls `down`.
-  `--recreate` adds `--force-recreate`; the default leaves replacement decisions
-  to Compose. The initial-start wrapper forwards the flag too.
-- Both modes stop an installed `predict60.service` after the build and before
+- VPS recreation builds before `up -d --no-build --no-deps --force-recreate --wait`
+  and never calls `down`. Initial-start and setup `--start` request recreation explicitly.
+- Both modes stop an installed `predict60.service` after preflight and any requested build, before
   replacing/starting Docker. An absent service is skipped; a failed service stop
   aborts Docker replacement. The systemctl commands are mocked.
 - Local mode includes a read-only root, 64 MiB temporary filesystem, dropped
   capabilities, no-new-privileges and bounded local logs.
+- Restart and readiness failures report an error without falling back to recreation.
 
 These assertions verify generated commands and ordering. Real image builds,
 volume ownership, readiness and recovery require the manual Docker checks below.
@@ -322,6 +324,21 @@ measurement. An optional earlier module path compares outputs and timings:
 The fixture uses 1,440 candles and 3,600 recorded seconds across 5/15/30/60-minute
 intervals. Record medians and input equality; do not set a CI timing threshold
 or infer public HTTP latency from this CPU-only benchmark.
+
+Run `node scripts/benchmark-coin-format.cjs` for the median time to format 10,000
+prices across the default ten-coin catalog. Seven runs follow warm-up. An optional
+earlier catalog module verifies identical strings before measuring both versions:
+
+```bash
+git show 144a808:src/frontend/coins.js > /tmp/btc60-before-coins.js
+node scripts/benchmark-coin-format.cjs /tmp/btc60-before-coins.js
+```
+
+`coins.test.js` covers every supported precision, fallback and invalid values.
+`bootstrap.test.js` uses 1,000 settled orders to check zero stable-tick history
+reads and duration-attribute writes, plus start/end expiry, clock rollback and
+in-place/replaced account updates. These operation counts are regression gates;
+local timings are not production throughput measurements.
 
 `market-detail.test.js` verifies zero mutations/selectors on an identical update
 and no repeated scan of a 1,000-order history between account updates.

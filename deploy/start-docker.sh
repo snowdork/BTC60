@@ -3,4 +3,4 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-exec bash "$root/scripts/restart-docker.sh" "$@"
+exec bash "$root/scripts/restart-docker.sh" --recreate "$@"

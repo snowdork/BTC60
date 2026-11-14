@@ -1,8 +1,58 @@
 # VPS performance review
 
-The latest review is November 13, 2026. Earlier dated sections are retained as
+The latest review is November 14, 2026. Earlier dated sections are retained as
 historical evidence. Measurements below use temporary databases and synthetic
 or mocked provider data; they do not establish production VPS capacity.
+
+## November 14, 2026 pre-VPS cleanup
+
+Reviewed the Phase-10 worktree based on `144a808`, including the Interval/Hour
+layout and explicit Docker recreation changes. This pass removes repeated browser
+work and closes HTTP error streams; it does not change pricing or settlement rules.
+
+- `coins.js` caches `Intl.NumberFormat` by precision within each catalog rather
+  than constructing one for each displayed price. The cache has at most 13 entries.
+- The header indexes unsettled predictions on account/user replacement or an
+  `account-update` event. Stable ticks skip history scans; start/end boundaries
+  and backwards clock movement recompute markers. Duration attributes are written
+  only when their accessible label changes. Coin/hour/demo navigation still works.
+- Candle benchmark retries and the resumable history downloader explicitly close
+  HTTP error responses before retrying or propagating an error. Regression checks
+  cover permanent rejection, throttling, server errors and retry exhaustion.
+  Test database fixtures also close their SQLite connections deterministically.
+- Removed obsolete separate five-minute scrolling rules and duplicate responsive
+  control styles. Hour now has one scrolling timeline and pinned duration labels.
+
+### Local measurements
+
+Node.js 24.22.2 and Python 3.14.4 on this development machine. The comparison uses
+the implementation at `144a808` and the current worktree, with fixture inputs.
+
+| Check | Before | After |
+| --- | ---: | ---: |
+| Median time to format 10,000 prices | 110.194 ms | 3.863 ms |
+| Settled-history item reads across 30 stable header ticks | 30,000 | 0 |
+| Duration accessibility-attribute writes across those ticks | 120 | 0 |
+
+Price formatting was about 28.5× faster in this microbenchmark. Seven runs follow
+warm-up and cover the default ten-coin catalog, fractional/negative/large values
+and missing prices. Outputs compared equal. Regression tests additionally cover
+all supported precisions. Header operation counts use 1,000 settled orders plus
+active/future predictions, with unchanged account data between ticks. An account
+update still scans the snapshot once; this does not reduce the API response size.
+
+```bash
+git show 144a808:src/frontend/coins.js > /tmp/btc60-before-coins.js
+node scripts/benchmark-coin-format.cjs /tmp/btc60-before-coins.js
+node --test test/frontend/coins.test.js test/frontend/bootstrap.test.js
+```
+
+The backend review retains bounded request concurrency, coalesced history loads,
+read-only idle settlement and bounded finalized leaderboard reads. Full account
+history payloads and live standings aggregation remain growth limits; changing
+those APIs is separate work. No production CPU, memory, request latency or load
+capacity was measured. See [verification](TEST_RESULTS.md) and the
+[VPS rollout handoff](DEPLOYMENT_REVIEW.md). No deployment was performed.
 
 ## November 13, 2026 runtime and local development cleanup
 
@@ -73,7 +123,7 @@ See [current verification](TEST_RESULTS.md), [test commands](TEST_GUIDE.md), and
 [release acceptance](QA_CHECKLIST.md). The older Docker-availability notes below
 refer to their dated reviews, not the current environment.
 
-## Implemented improvements
+## Earlier backend improvements (historical)
 
 - Catalog reads now batch instrument/provider metadata: `/api/coins` uses one
   SELECT and `/api/categories` uses two, regardless of the instrument count.
@@ -137,14 +187,15 @@ cache state; the request/query reductions are the more useful evidence.
 PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest performance_test
 python3 scripts/run_tests.py
 docker compose config --quiet
-docker compose up -d --build
+sudo bash scripts/restart-docker.sh --recreate
 docker compose ps
 docker compose logs --tail=100 app
 ```
 
 Back up before deploying. Creating indexes on a large database can extend the
-first startup. Docker build/runtime validation still requires a Docker-capable
-host; Docker is not installed in the development environment used for this review.
+first startup. This earlier review did not have Docker available. The November 14
+pass validated the Compose configuration with Docker but did not build or start
+an image. Runtime validation remains part of the VPS rollout.
 
 Resource tests cover connection commit/rollback/closure, contest reads while
 another connection owns the writer lock, history request coalescing and retries,
@@ -155,9 +206,11 @@ settlement retry deduplication, and overload recovery.
 The app still uses ThreadingHTTPServer behind Caddy and one SQLite writer. The
 concurrency bound is not a production-server refactor or a capacity guarantee.
 SQLite connections are scoped rather than pooled. Account snapshots still return
-complete prediction history, and the contest dashboard computes all recent
-standings before limiting displayed rows. Pagination and narrower leaderboard
-requests are the next changes if accumulated histories become large.
+complete prediction history, and live contest standings aggregate current entries
+before limiting displayed rows. Finalized standings already use bounded reads,
+including complete tied winners and the caller's rank. Account pagination and
+narrower live standings queries are the next changes if histories or participation
+become large.
 
 Slow external providers still consume request slots. Authentication hashing also
 uses CPU/memory, so test login bursts as well as reads. Monitor 503 responses,

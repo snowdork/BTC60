@@ -6,13 +6,13 @@ const {createCatalog}=require('../../src/frontend/coins.js');
 const pageIds=new Set([...fs.readFileSync(require('node:path').join(__dirname,'../../src/frontend/index.html'),'utf8').matchAll(/\bid="([^"]+)"/g)].map(match=>match[1]));
 async function run(protocol,fetch,category='crypto',accountOptions={}){
  const elements=new Map(),loaded=[],buttons=[],listeners=new Map(),timers=[];
- let now=1800000300000;
+ let now=1800000300000,durationWrites=0;
  const element=id=>{if(!elements.has(id))elements.set(id,{textContent:'Connecting…',hidden:true,addEventListener(){},append(){},replaceChildren(...children){buttons.push(...children);},querySelectorAll(){return buttons;},setAttribute(){},dataset:{}});return elements.get(id);};
- const durationButtons=[60,30,15,5].map(minutes=>({dataset:{detailDuration:String(minutes)},attributes:{},setAttribute(name,value){this.attributes[name]=value;}}));
+ const durationButtons=[60,30,15,5].map(minutes=>({dataset:{detailDuration:String(minutes)},attributes:{},setAttribute(name,value){durationWrites++;this.attributes[name]=value;}}));
  const document={querySelectorAll:selector=>selector==='[data-detail-duration]'?durationButtons:[],body:{dataset:{},style:{setProperty(){}}},getElementById:id=>pageIds.has(id)?element(id):null,querySelector:()=>element('picker'),createElement:()=>({dataset:{},attributes:{},setAttribute(name,value){this.attributes[name]=value;},addEventListener(){},append(){}}),head:{append(script){loaded.push(script.src);script.onload();}}};
  const context={document,location:{protocol,search:'?category='+category,reload(){}},window:{addEventListener(name,handler){listeners.set(name,handler);},Predict60Account:{loaded:Promise.resolve(),user:{},predictions:[],...accountOptions},PredictCoinCatalog:{createCatalog},PredictModel:{configure(){}}},fetch:async(url,...args)=>url==='/api/categories'?{ok:true,json:async()=>({categories:[{id:'crypto',name:'Crypto'},{id:'oil',name:'Oil'}]})}:fetch(url,...args),URLSearchParams,AbortSignal,AbortController,setTimeout,clearTimeout,setInterval(handler){timers.push(handler);return timers.length;},clearInterval(){},Date:{now:()=>now},Error,TypeError,SyntaxError};
  await vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../../src/frontend/bootstrap.js'),'utf8'),context);
- return {elements,loaded,window:context.window,document,buttons,durationButtons,listeners,tick(value){now=value;timers.forEach(handler=>handler());}};
+ return {elements,loaded,window:context.window,document,buttons,durationButtons,listeners,stats:()=>({durationWrites}),tick(value){now=value;timers.forEach(handler=>handler());}};
 }
 test('file preview shows actionable offline state instead of Connecting',async()=>{const {elements,loaded}=await run('file:',()=>assert.fail('Must not fetch from file URLs'));assert.equal(elements.get('startup-help').hidden,false);assert.equal(elements.get('workspace-clock').textContent,'Terminal offline');assert.equal(elements.get('submit-prediction').disabled,true);assert.equal(loaded.length,0);});
 test('network errors and static-server HTML stop startup clearly',async()=>{for(const fetch of [async()=>{throw new TypeError('NetworkError');},async()=>({ok:true,headers:{get:()=> 'text/html'}})]){const {elements,loaded}=await run('http:',fetch);assert.match(elements.get('chart-empty').textContent,/server.py/);assert.equal(elements.get('feed-status').textContent,'UNAVAILABLE');assert.equal(loaded.length,0);}});
@@ -74,6 +74,31 @@ test('coin position markers refresh after an order, settlement, and logout',asyn
  account.predictions[0].settled_at=null;
  refresh();assert.equal(button.dataset.prediction,'pending');
  account.user=null;refresh();assert.equal(button.dataset.prediction,'none');
+});
+
+test('header ticks reuse settled history while pending boundaries and clock corrections stay accurate',async()=>{
+ const now=1800000300;
+ let scanned=0;
+ const predictions=Array.from({length:1000},()=>({get mode(){scanned++;return 'contest';},settled_at:now-1}));
+ const order=(coin,start,end)=>({coin,mode:'contest',side:'up',market_id:'5-0',starts_at:start,ends_at:end,settled_at:null});
+ predictions.push(order('BTC',now-10,now+60),order('ETH',now+30,now+90));
+ const result=await run('http:',async()=>({ok:true,headers:{get:()=> 'application/json'},json:async()=>({coins:['BTC','ETH'].map(symbol=>({symbol,name:symbol,product:symbol+'-USD',precision:2,demoBase:100,enabled:1}))})}),'crypto',{predictions});
+ const state=symbol=>result.buttons.find(button=>button.dataset.coin===symbol).dataset.prediction;
+ assert.equal(scanned,1000);
+ const before=result.stats();
+ for(let elapsed=0;elapsed<30;elapsed++)result.tick((now+elapsed)*1000);
+ assert.equal(scanned,1000,'unchanged ticks do not scan settled history');
+ assert.deepEqual(result.stats(),before,'unchanged duration controls do not rewrite their labels');
+ assert.equal(state('BTC'),'pending');assert.equal(state('ETH'),'none');
+ result.tick((now+30)*1000);assert.equal(state('ETH'),'pending');
+ result.tick((now+60)*1000);assert.equal(state('BTC'),'none');
+ result.tick((now+90)*1000);assert.equal(state('ETH'),'none');
+ result.tick((now+10)*1000);assert.equal(state('BTC'),'pending');assert.equal(state('ETH'),'none');
+ assert.equal(scanned,1000,'boundary updates scan only cached pending orders');
+ predictions.at(-2).settled_at=now+10;result.listeners.get('account-update')();
+ assert.equal(scanned,2000);assert.equal(state('BTC'),'none');
+ result.window.Predict60Account.predictions=[order('ETH',now,now+90)];result.tick((now+11)*1000);
+ assert.equal(state('ETH'),'pending','replacement account arrays invalidate the cache');
 });
 
 

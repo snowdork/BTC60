@@ -78,10 +78,10 @@ restart helper if needed. Keep the database volume; a transient name conflict
 does not require resetting accounts or removing volumes.
 
 
-`start-docker.sh` delegates to `scripts/restart-docker.sh`; both can be called
-from any directory. They explicitly use this checkout's `compose.yaml` and
-`.env`, validate Compose without printing secrets, check daemon access, build
-the app, and wait up to 120 seconds for service readiness. Use a recent
+`start-docker.sh` delegates to `scripts/restart-docker.sh --recreate`; both can
+be called from any directory. They explicitly use this checkout's `compose.yaml`
+and `.env`, validate Compose without printing secrets, and check daemon access.
+Recreation builds the app and waits up to 120 seconds for service readiness. Use a recent
 Compose plugin supporting `up --wait`. If startup fails, containers remain
 available for log inspection; correct the problem and rerun the command. App
 startup does not verify public DNS or certificate issuance, so check the public
@@ -111,11 +111,20 @@ See [Docker restart policies](https://docs.docker.com/engine/containers/start-co
 
 ## Data and upgrades
 
-To build an updated image and recreate changed VPS containers:
+To restart the existing VPS app with its current image and configuration:
 
 ```bash
 sudo bash scripts/restart-docker.sh
 ```
+
+To build an updated image and recreate the VPS app after code or environment changes:
+
+```bash
+sudo bash scripts/restart-docker.sh --recreate
+```
+
+The default never builds or creates containers. If the app container is missing,
+it exits with instructions to use `--recreate`. Both paths check app readiness.
 
 After a successful build, the restart helper stops `predict60.service` when it
 is installed, before replacing/starting the Docker app. Run the helper with
@@ -148,14 +157,14 @@ not automatically imported into the host database. The shared host proxy continu
 
 ### Rebuild behavior and persistent data
 
-Run `sudo bash scripts/restart-docker.sh` after updating the checkout and making
+Run `sudo bash scripts/restart-docker.sh --recreate` after updating the checkout and making
 a database backup. The script
 uses the VPS `compose.yaml` and `.env`, checks configuration and Docker access
 before building, and retains all database and certificate volumes. Existing
 containers continue serving during the build. If the build fails, they remain
-untouched. After a successful build, Compose recreates changed services and waits
-for readiness. The helper has no forced-recreation option; unchanged containers
-are retained. Expect a brief interruption when a changed app instance is
+untouched. After a successful build, Compose forcibly recreates only the app and
+waits for readiness. Without `--recreate`, the helper restarts the existing app
+without applying image or environment changes. Expect a brief interruption when an app instance is
 replaced; this is not a zero-downtime deployment. The shared host proxy continues running. It does not restart the Docker daemon or
 stop unrelated containers. This command does not use `compose.local.yaml`.
 
@@ -252,7 +261,7 @@ docker compose logs --tail=100 app
 docker stats --no-stream
 
 # Apply application code changes after taking a backup
-bash scripts/restart-docker.sh
+bash scripts/restart-docker.sh --recreate
 
 # Apply .env changes without rebuilding the image
 docker compose up -d --no-build --wait --wait-timeout 120

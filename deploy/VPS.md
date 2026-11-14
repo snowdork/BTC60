@@ -21,7 +21,7 @@ Keep `P60_PORT=8085` and `P60_DOMAIN=predict60.com`. Follow
 ```bash
 bash deploy/start-docker.sh
 # Later source updates:
-bash scripts/restart-docker.sh
+bash scripts/restart-docker.sh --recreate
 curl --fail http://127.0.0.1:8085/healthz
 ```
 

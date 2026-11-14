@@ -12,15 +12,19 @@ For guided environment configuration and rollout, start with
 | Environment | Start/update | Persistent data | Logs |
 | --- | --- | --- | --- |
 | Local Python | `python3 src/backend/server.py` | `data/p60.sqlite3` by default | Terminal |
-| Local Docker, no Compose | `bash scripts/restart-docker.sh --local` | `p60-local-data` volume | `docker logs p60-local` |
+| Local Docker, no Compose | `bash scripts/restart-docker.sh --local --recreate` | `p60-local-data` volume | `docker logs p60-local` |
 | Local Compose | `docker compose -f compose.local.yaml --env-file .env.local up -d --build` | `p60-local-data` volume | Compose logs |
-| VPS Docker + HTTPS | `bash deploy/start-docker.sh` initially; `bash scripts/restart-docker.sh` for updates | Compose `p60-data` volume | Compose logs |
+| VPS Docker + HTTPS | `bash deploy/start-docker.sh` initially; `bash scripts/restart-docker.sh --recreate` for updates | Compose `p60-data` volume | Compose logs |
 | VPS systemd + HTTPS | `sudo systemctl restart predict60` | Configured database path | systemd journal |
 
 Use one supervisor per deployment and one app process per database. Local Docker
 and local Compose share a volume/container name: stop the previous mode before
 switching. See [local operation](LOCAL.md) for setup, backups, and troubleshooting,
 and [Docker operation](DOCKER.md) for VPS upgrades and rollback.
+
+Omit `--recreate` from a restart command to restart existing containers with their
+current image and environment. First startup and source/configuration updates
+require recreation; the setup `--start` and `start-docker.sh` entrypoints request it automatically.
 
 The local image is `p60:local-dev`; VPS images use `p60:${P60_IMAGE_TAG}`.
 When running both on one host, set a different `P60_PORT` in `.env.local`.

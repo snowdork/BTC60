@@ -500,6 +500,7 @@ def candle_close(coin, boundary, source=None):
             if close is not None:
                 return close
         except urllib.error.HTTPError as error:
+            error.close()
             if error.code != 429 and error.code < 500:
                 raise
         except (urllib.error.URLError, TimeoutError, ConnectionError, IncompleteRead, json.JSONDecodeError):

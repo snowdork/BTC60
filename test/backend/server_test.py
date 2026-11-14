@@ -657,13 +657,27 @@ class AccountsTest(unittest.TestCase):
                 self.assertEqual(network.call_count, 2)
 
     def test_benchmark_does_not_retry_permanent_provider_rejection(self):
-        error = server.urllib.error.HTTPError('https://example.invalid', 404, 'Not found', {}, None)
+        from io import BytesIO
+        body = BytesIO(b'Not found')
+        error = server.urllib.error.HTTPError('https://example.invalid', 404, 'Not found', {}, body)
         with patch.dict(server.HISTORY_CACHE, {}, clear=True), patch('server.time.sleep') as sleep, patch(
                 'server.urllib.request.urlopen', side_effect=error) as network:
             with self.assertRaises(server.urllib.error.HTTPError):
                 server.candle_close('BTC', 120, {'feed': 'coinbase', 'product': 'BTC-USD'})
             self.assertEqual(network.call_count, 1)
             sleep.assert_not_called()
+        self.assertTrue(body.closed)
+
+    def test_benchmark_closes_http_responses_before_retrying(self):
+        from io import BytesIO
+        bodies = [BytesIO(b'Try later') for _ in range(2)]
+        errors = [server.urllib.error.HTTPError('https://example.invalid', code, 'Try later', {}, body)
+                  for code, body in zip((429, 503), bodies)]
+        with patch.dict(server.HISTORY_CACHE, {}, clear=True), patch('server.time.sleep'), patch(
+                'server.urllib.request.urlopen', side_effect=[*errors, BytesIO(b'[[60,0,0,0,101]]')]) as network:
+            self.assertEqual(server.candle_close('BTC', 120, {'feed': 'coinbase', 'product': 'BTC-USD'}), 101)
+            self.assertEqual(network.call_count, 3)
+        self.assertTrue(all(body.closed for body in bodies))
 
     def test_benchmark_retry_is_bounded_and_never_uses_another_minute(self):
         from io import BytesIO

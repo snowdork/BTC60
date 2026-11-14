@@ -1,4 +1,5 @@
 """Exercise contest isolation, limits, UTC boundaries, finalization, and prize auditing."""
+from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 import sqlite3
 import tempfile
@@ -232,7 +233,7 @@ class ContestTest(unittest.TestCase):
                 contests.reserve_prize(conn, 'hourly', self.day, 'ai_credit', 100, 'Unsupported', 'Funds', now=self.day - 1)
 
     def test_existing_schema_keeps_old_records_but_rejects_new_non_gift_prizes(self):
-        with sqlite3.connect(':memory:') as conn:
+        with closing(sqlite3.connect(':memory:')) as conn, conn:
             conn.execute("CREATE TABLE contest_prize_plans (contest_id INTEGER, kind TEXT, amount INTEGER, description TEXT, funding_reference TEXT, created_at INTEGER, PRIMARY KEY(contest_id,kind))")
             conn.execute("INSERT INTO contest_prize_plans VALUES(1,'ai_credit',100,'Old record','old',0)")
             contests.initialize(conn)

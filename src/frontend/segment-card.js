@@ -39,18 +39,20 @@
     const date=Number.isFinite(m.startsAt)?new Date(m.startsAt).toISOString().slice(0,10):'';
     return `<article role="group" class="panel play-segment detail-card ${detail?'':'market-card'} ${m.status} ${state==='pending'?'pending':''} ${selected?'selected':''}" data-state="${state}" ${detail?`data-detail-index="${index}" aria-current="true"`:`data-market="${escape(m.id)}"`} aria-label="${m.minutes} minute play ${escape(m.start)} to ${escape(m.end)} UTC">
       <div class="detail-card-heading">
-      <div class="segment-identity"><img data-detail-coin width="28" height="28" alt=""><div><strong data-detail-coin-name></strong><strong class="detail-range">${escape(m.start)} – ${escape(m.end)} UTC</strong><span class="detail-date">${date}</span></div></div>
+      <div class="segment-identity"><span class="interval-clock" data-duration="${m.minutes}" role="img" aria-label="${m.minutes}-minute interval"><strong aria-hidden="true">${m.minutes}</strong><small aria-hidden="true">MIN</small></span><img data-detail-coin width="36" height="36" alt=""><strong data-detail-coin-name hidden></strong><div><strong class="detail-range">${escape(m.start)} – ${escape(m.end)} UTC</strong><span class="detail-date">${date}</span></div></div>
       <div class="segment-heading-labels"><h3 class="segment-state-label">${heading}</h3><span data-detail-status class="badge ${queued||state==='pending'?'neutral':result==='down'?'red':'green'}">${status}</span></div>${result?`<span class="play-settlement-arrow ${result}" role="img" aria-label="${result==='up'?'Up':'Down'} wins"><span aria-hidden="true">${result==='up'?'↑':'↓'}</span></span>`:''}<div class="play-prediction-tags" ${detail?'data-detail-predictions':`data-predictions="${escape(m.id)}"`} hidden></div>
       </div>
       <div class="segment-body">
+      ${detail?'<div class="segment-price-hud" role="group" aria-label="Interval prices and movement">':''}
       <div class="detail-prices"><div class="segment-live-quote"><span data-detail-price-label>${closed?'Closing price':'Live price'}</span><strong data-detail-price class="segment-current-price">—</strong></div><div class="segment-start-quote"><span>Starting price</span><strong data-detail-strike class="segment-benchmark-price">—</strong></div><span data-reference-price="${escape(m.id)}" hidden></span></div>
       <p data-detail-result class="detail-result"><span data-detail-movement class="segment-movement" hidden></span><span data-detail-summary class="segment-summary" hidden></span></p>
+      ${detail?'</div>':''}
       <div class="segment-prediction-controls">
       <div data-detail-chances class="segment-chances"><button type="button" data-detail-up-chance data-predict-side="up" ${detail?`data-detail-predict="${index}"`:`data-segment-action="${escape(m.id)}"`} class="segment-odds-up" aria-haspopup="dialog" aria-controls="prediction-dialog" aria-label="Up chance unavailable" disabled>—</button><button type="button" data-detail-down-chance data-predict-side="down" ${detail?`data-detail-predict="${index}"`:`data-segment-action="${escape(m.id)}"`} class="segment-odds-down" aria-haspopup="dialog" aria-controls="prediction-dialog" aria-label="Down chance unavailable" disabled>—</button></div>
       <button type="button" class="segment-action" ${detail?`data-detail-action data-detail-predict="${index}" aria-haspopup="dialog" aria-controls="prediction-dialog"`:`data-segment-action="${escape(m.id)}" aria-haspopup="dialog" aria-controls="prediction-dialog"`}><span class="segment-action-label">${closed?'Result':queued?'Details':'Predict'}</span></button>
       </div>
       </div>
-      <p data-detail-countdown ${detail?'':`data-remaining="${escape(m.id)}"`} class="detail-countdown">${escape(m.remaining)}</p>
+      ${detail?'':`<p data-detail-countdown data-remaining="${escape(m.id)}" class="detail-countdown">${escape(m.remaining)}</p>`}
       ${detail?'':'<span class="segment-direction" data-direction-indicator hidden role="img"><span class="segment-direction-change" hidden></span><span class="segment-direction-arrow" aria-hidden="true"></span></span>'}
       ${detail?'':`<span class="segment-time-markers" aria-hidden="true"><span class="prediction-cutoff-marker" style="left:${100-5/(m.minutes*60)*100}%"></span><span class="segment-now-line" data-segment-now hidden></span></span>`}
     </article>`;

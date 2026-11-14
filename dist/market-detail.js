@@ -146,8 +146,11 @@
     set($('play-coin-icon'),'alt',model.coin.name);
     set($('play-coin-fallback'),'hidden',!!model.coin.icon);
     set($('play-coin-fallback'),'textContent',model.coin.symbol);
+    attribute($('play-interval-clock'),'data-duration',minutes);
+    attribute($('play-interval-clock'),'aria-label',`${minutes}-minute interval`);
+    set($('play-interval-minutes'),'textContent',String(minutes));
     set($('detail-context'),'textContent',`${new Date(anchor).toISOString().slice(0,10)} · ${model.feedMode==='demo'?'Synthetic preview':selectedStart!==null||model.isHistorical?'Browsing selected interval':'Following the current interval'} · UTC`);
-    set($('play-timeframe'),'textContent',`${model.coin.symbol} · ${selected.start} – ${selected.end} UTC · ${minutes} MIN`);
+    set($('play-timeframe'),'textContent',`${selected.start} – ${selected.end} UTC`);
     if(force||signature!==lastSignature){
       lastSignature=signature;
       cardFields=new WeakMap();
@@ -182,10 +185,11 @@
       const seconds=Math.max(0,Math.ceil(((queued?m.startsAt:m.endsAt)-now)/1000));
       renderPredictionTags(m,get('predictions'));
       attribute(get('coin'),'src',model.coin.icon||'assets/coins/btc.svg');set(get('coin'),'alt',model.coin.name);
-      set(get('coin-name'),'textContent',`${model.coin.symbol} · ${minutes} MIN`);
+      set(get('coin-name'),'textContent',model.coin.symbol);
+      set(get('coin-name'),'hidden',!!model.coin.icon);
       set(get('status'),'textContent',queued?'UPCOMING':closed?(result?'COMPLETED':'PENDING'):'OPEN');
       set(get('status'),'className',`badge ${queued?'neutral':closed?(result==='up'?'green':result==='down'?'red':'neutral'):'green'}`);
-      set(get('countdown'),'textContent',closed?'Interval ended':`${queued?'Starts in':'Ends in'} ${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s${!queued&&seconds<=5?' · Betting closed':''}`);
+      set($('play-countdown'),'textContent',closed?'Interval ended':`${queued?'Starts in':'Ends in'} ${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s${!queued&&seconds<=5?' · Betting closed':''}`);
       set(get('strike'),'textContent',queued?'Set at open':price(m.strike));
       set(get('price-label'),'textContent',closed?'Closing price':'Live price');set(get('price'),'textContent',closed?price(m.close):live?price(live.price):'—');
       const displayedPrice=closed?m.close:live?.price;

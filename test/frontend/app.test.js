@@ -64,7 +64,7 @@ test('segment direction shortcuts preselect Up or Down without placing an order'
  }
 });
 
-test('overview exposes all twelve five-minute prediction and detail actions in a scrollable region',()=>{
+test('overview orders all four aligned tiers and exposes all twelve five-minute actions',()=>{
  const model=require('../../src/frontend/market-model.js');
  const markets=model.markets.map(m=>({...m}));
  const grid={innerHTML:'',dataset:{},querySelectorAll:()=>[]};
@@ -74,9 +74,26 @@ test('overview exposes all twelve five-minute prediction and detail actions in a
   outcome:model.outcome,price:String,renderSegmentPredictions(){},renderChances(){}
  });
  assert.equal((grid.innerHTML.match(/data-market="5-\d+"/g)||[]).length,12);
- assert.match(grid.innerHTML,/tabindex="0" role="region" aria-label="Twelve five-minute markets/);
+ assert.deepEqual([...grid.innerHTML.matchAll(/class="tier" data-duration="(\d+)"/g)].map(match=>Number(match[1])),[60,15,30,5]);
+ assert.match(grid.innerHTML,/role="group" aria-label="Twelve five-minute markets aligned with the hourly chart/);
  assert.equal((grid.innerHTML.match(/data-market="1-\d+"/g)||[]).length,0);
  for(let index=0;index<12;index++)assert.match(grid.innerHTML,new RegExp(`data-segment-action="5-${index}"`));
+});
+
+test('five-minute Now scrolls the shared hourly timeline instead of an individual row',()=>{
+ const start=source.indexOf("  $('market-grid').addEventListener('click',event=>{\n    const detail=");
+ const end=source.indexOf("  window.addEventListener('detail-predict'",start);
+ let click,scroll;
+ const active={getBoundingClientRect:()=>({left:300})};
+ const row={scrollLeft:0,querySelector:()=>active};
+ const button={closest:()=>({querySelector:selector=>selector==='.tier-cards'?row:{offsetWidth:54}})};
+ const timeline={scrollLeft:120,getBoundingClientRect:()=>({left:10}),scrollTo(options){scroll=options;}};
+ const grid={addEventListener(_,handler){click=handler;}};
+ vm.runInNewContext(source.slice(start,end),{$:id=>id==='market-grid'?grid:timeline});
+ click({target:{closest:selector=>selector==='[data-tier-now]'?button:null}});
+ assert.equal(scroll.left,344,'the active card stays clear of the pinned duration label');
+ assert.equal(scroll.behavior,'smooth');
+ assert.equal(row.scrollLeft,0);
 });
 
 test('last-hour winner badge requires a finalized first-place result and clears on other states',()=>{
