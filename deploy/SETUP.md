@@ -20,14 +20,10 @@ Registration is open without a code by default. Configure registration policy in
 | Constant | Default |
 | --- | --- |
 | `SIGNUP_CODE_REQUIRED` | `False` |
-| `MAX_PLAYER_ACCOUNTS` | `100` |
-| `SIGNUP_ATTEMPTS_PER_IP` | `10` per hour |
-| `SIGNUP_ACCOUNTS_PER_IP` | `3` per 24 hours |
 
-The corresponding window constants are in seconds. Rebuild/restart the app after
+Rebuild/restart the app after
 changing policy. With `SIGNUP_CODE_REQUIRED = True`, setup prompts for the code
 and rejects a missing code; supply `P60_SIGNUP_CODE` for automated setup.
-The 100-account limit counts existing accounts and never deletes them.
 
 ## Local testing
 
@@ -128,17 +124,23 @@ for the data cleared and failure behavior.
 
 ## Registration abuse controls
 
-Both registration methods share persistent SQLite attempt and success counters.
-The account cap and successful-signup limits are enforced in the transaction
-that creates the account, including concurrent requests. Failed attempts count
-toward the hourly budget, and the hidden website field rejects simple form bots.
-Google signup still verifies Google's signed token, origin and CSRF protection.
-Existing accounts retain login access when new registration reaches capacity.
+Both registration methods allow signup without an account cap or per-network
+attempt/success limits. Existing signup-event records do not restrict registration.
+The hidden website field rejects simple form bots, and general authentication
+throttling remains active. Google signup still verifies Google's signed token,
+origin and CSRF protection. Password signup does not verify email ownership.
 
-Client IPs come from the direct connection unless it is an explicitly trusted
-proxy. IPv6 addresses share a /64 quota; IPv4-mapped IPv6 addresses share their
-IPv4 quota. Configure the proxy to overwrite `X-Forwarded-For` with one address.
-People sharing a network share the daily allowance. Signup-event IP records are
-pruned on signup attempts after the longest configured window (24 hours by
-default). These controls limit abuse; password signup does not verify email
-ownership and IP limits cannot establish one person per account.
+## Login origins and localhost access
+
+Password signup/login and Google authentication enforce the deployment's exact
+browser origins. `P60_HOST` sets the primary origin; `P60_ADDITIONAL_ORIGINS`
+adds comma-separated aliases. For `http://localhost:8085/signup.html` on the
+public Docker stack, include `http://localhost:8085` in `.env` while preserving
+existing public aliases. Keep `P60_HOST` on the public HTTPS origin.
+
+Recreate the app container to apply environment changes; a container restart
+alone retains its old environment. See [Docker login origin setup](DOCKER.md)
+for the configuration and command. Database volumes are preserved. Google login
+also requires the same origin in Google's Authorized JavaScript origins; that
+setting does not replace the app's allowlist. Origin checks, CSRF protection,
+and Google token verification remain enabled.

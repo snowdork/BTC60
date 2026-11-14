@@ -333,7 +333,11 @@
     stack.style.setProperty('--cursor-top',`${bounds.top-stackBounds.top}px`);
     $('time-cursor-label').textContent=clock(now);
     const wallTime=Date.now();
-    $('workspace-clock').textContent=`${clock(wallTime)} GMT`;
+    const currentClock=$('workspace-clock');
+    const clockText=`${clock(wallTime)} UTC`;
+    if(currentClock.textContent!==clockText){
+      currentClock.textContent=clockText;
+    }
     $('workspace-local-clock').textContent=localClock.format(wallTime);
     $('workspace-local-clock').title=`Local time · ${localTimezone}`;
     $('hour-window-label').textContent=`${time(hour)} — ${time(hour+3600000)}`;

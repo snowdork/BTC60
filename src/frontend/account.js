@@ -43,8 +43,9 @@
   /** Render account controls from the latest account, market, and interface state. */ function renderAccountControls(){
     document.querySelectorAll('[data-account-name]').forEach(label=>{
       label.hidden=!account.user;
-      label.textContent=account.user?.name||'';
-      label.title=account.user?.name||'';
+      const name=account.user?.name||'',limit=Number(label.dataset?.accountNameLimit);
+      label.textContent=limit>0?Array.from(name).slice(0,limit).join(''):name;
+      label.title=name;
     });
     document.querySelectorAll('[data-logout]').forEach(button=>{button.hidden=!account.user;});
     document.querySelectorAll('[data-login]').forEach(link=>{link.hidden=!!account.user;});

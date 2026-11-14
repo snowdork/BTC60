@@ -2,9 +2,21 @@
 
 ## Workspace and visual language
 
-The title bar contains the stacked P60/Predict60 brand, selected coin icon,
-current USD price, hourly dollar and percentage change, contest credits,
-UTC/local clocks, and **Interval | Hour** controls. Interval is the default and
+One sticky header owns the title bar, duration selector and coin selector,
+keeping them locked together during scroll. The top row groups the P60/Predict60 brand,
+a single illuminated player/C$ readout, **Interval | Hour**, local/UTC clocks,
+and account tools. The readout shares a dark instrument-panel surface across
+themes with a static mint accent, player icon, name and tabular coin balance. Player names are rendered as plain text, limited to ten displayed Unicode
+code points with the full saved name in a tooltip. The saved name is not changed.
+The clock sits beside the player mini HUD on the left, with local time above UTC, both
+in the same font. Both use wall time independently of the viewed hour. The clock is digital only, with fixed-width digits and no
+clock icon, flip animations or layout shifts. Responsive layouts use two rows.
+
+The selected coin icon, USD price, and hourly dollar/percentage change are in
+one shared graph header, outside the top HUD, for both chart views. Coin and
+duration controls are inside the pinned HUD above the graph; the redundant time/cutoff legend is
+removed while its graph markers remain active. C$ denotes game credits; USD
+prices remain instrument prices. Interval is the default and
 shows one 5-, 15-, 30-, or 60-minute play. Hour shows one 60-minute card, two
 30-minute cards, four 15-minute cards, and twelve 5-minute cards. One-minute
 candles are data resolution, not a tradable duration.
@@ -35,13 +47,10 @@ controls remain pinned above the scrolling playfield.
 ## Registration policy
 
 Registration policy is centralized in `src/backend/CONST.py`. Organizer codes
-are optional (off by default), and both identity methods share the 100-account
-cap and persistent per-IP attempt/success budgets. Account insertion, capacity
-checks and successful-registration recording share a SQLite writer transaction.
-Defaults are 10 attempts per hour and 3 new accounts per 24 hours for each IP;
-IPv6 privacy addresses share a /64 budget. `signup_events` persists the counters
-across restarts and is pruned on signup attempts. Only configured trusted proxies
-may supply the client IP. A honeypot rejects basic bots; password registration
+are optional (off by default). Both identity methods allow registration without
+an account cap or per-network attempt/success budgets. Account and Google
+identity insertion share a SQLite writer transaction. A honeypot rejects basic
+bots and general authentication throttling remains active. Password registration
 does not verify email ownership. Switching the optional code gate changes the
 served signup fields, its cache key and the static export.
 See [setup and abuse controls](../deploy/SETUP.md#registration-abuse-controls).
@@ -216,6 +225,15 @@ The terminal lists unsettled predictions with countdowns and marks account wager
 | `scripts/database.py` | Explicit initialization, status, backup, reset |
 
 SQLite stores users, hashed sessions, predictions, settlements, coins, and migration versions. Each player receives 1,000 contest credits per hour, with a fresh balance at each GMT hour boundary independently of prior settlements. Passwords use salted scrypt; sessions use HttpOnly/SameSite cookies and CSRF tokens. Account data persists across browser sessions and server restarts. Local storage holds presentation preferences rather than balances or saved orders.
+
+Browser POST origins must exactly match `P60_HOST` or an alias in
+`P60_ADDITIONAL_ORIGINS`, including scheme and port. Localhost access to the
+public Docker stack requires an explicit `http://localhost:8085` alias; the
+signup page path is not part of that origin. Compose environment changes require
+recreating the app container. Google authentication additionally checks the
+requested-with header, CSRF token, and signed Google credential. Google's
+Authorized JavaScript origins are configured separately from the app allowlist.
+See [deployment login configuration](../deploy/DOCKER.md).
 
 Authenticated `POST /api/change-password` requires the session CSRF token and
 `currentPassword`, `newPassword`, and `confirmPassword` fields. It verifies the

@@ -4,10 +4,11 @@ const vm=require('node:vm');
 const fs=require('node:fs');
 const signedIn={user:{name:'Taylor <admin>'},csrf:'token',predictions:[]};
 const response=(data,ok=true,status=200)=>({ok,status,json:async()=>data});
-function setup(fetch,attributes=[]){
+function setup(fetch,attributes=[],nameLimit){
  const events={},calls=[],redirects=[],intervals=[],timers=new Map();let nextTimer=0;
  const node=()=>({hidden:false,textContent:'',addEventListener(name,fn){this[name]=fn;}});
  const name=node(),logout=node(),login=node(),content=node(),status=node();
+ name.dataset={accountNameLimit:nameLimit};
  const nodes={'[data-account-name]':[name],'[data-logout]':[logout],'[data-login]':[login],'[data-authenticated]':[content]};
  const window={addEventListener:(key,fn)=>(events[key]??=[]).push(fn),dispatchEvent:e=>(events[e.type]||[]).forEach(fn=>fn())};
  const document={hidden:false,body:{hasAttribute:key=>attributes.includes(key)},querySelectorAll:key=>nodes[key]||[],getElementById:()=>status,addEventListener(){}};
@@ -169,4 +170,14 @@ test('CSRF retries are bounded and other errors never replay predictions',async(
   await s.account.loaded;await assert.rejects(s.account.place({requestId:'bounded-retry'}));
   assert.equal(s.calls.filter(c=>c.url==='/api/predictions').length,expected);
  }
+});
+
+test('title-bar name shows ten characters while retaining the full name in its tooltip',async()=>{
+ const fullName='Player😀LongName';
+ const s=setup(()=>response({user:{name:fullName},csrf:'token',predictions:[]}),[],10);
+ await s.account.loaded;
+ assert.equal(s.name.textContent,'Player😀Lon');
+ assert.equal(Array.from(s.name.textContent).length,10);
+ assert.equal(s.name.title,fullName);
+ assert.equal(s.name.hidden,false);
 });

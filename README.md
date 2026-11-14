@@ -11,7 +11,8 @@ Predict60 is a buildless web app for exploring hourly direction predictions with
 - **Complete-hour workspace:** inspect open, upcoming, and completed intervals without hiding duration tiers; navigate previous hours and return to the current hour.
 - **Interval and Hour views:** Interval opens by default with one 5-, 15-, 30-, or 60-minute play. Hour shows all duration tiers. Use the title-bar view controls or double-click a card to switch views; single-click segment and duration selections stay in the current view.
 - **Readable interval cards:** UTC time, starting/live or closing prices, actual movement, model estimates, and saved execution terms stay together. Missing values use placeholders; confirmed results have a green/red outcome arrow.
-- **Live market context:** a compact title bar with coin icon, USD price, hourly dollar/percentage movement, credits, and UTC/local clocks. Green/red minute candles and matching trend arrows retain gaps for missing data.
+- **Top HUD:** pinned player name (ten displayed characters), C$ game-coin balance, live UTC clock, Interval/Hour controls, theme switch and account menu. Compact screens use two rows.
+- **Live market context:** selected coin icon, USD price and hourly dollar/percentage movement at the graph’s top-left. Coin and duration controls sit above the graph. Green/red minute candles and matching trend arrows retain gaps for missing data.
 - **Points predictions:** choose Up or Down, set a budget, and review fractional shares, cost, possible return, and potential profit. Segment percentages estimate outcomes; the ticket shows the contract quote and execution terms.
 - **Live confirmation:** review follows the market; the server executes at its current model price within your budget. Final quantity and return can differ from review.
 - **Persistent accounts:** signup/login, password changes, 1,000 hourly contest credits, saved predictions, and automatic settlement backed by SQLite.
@@ -118,8 +119,8 @@ chmod 600 .env.local
 sudo docker compose -f compose.local.yaml --env-file .env.local up -d --build
 ```
 
-Open **http://localhost:8085**. Registration is limited to 100 accounts, with
-per-IP signup budgets configured in `src/backend/CONST.py`. Repeat the last command
+Open **http://localhost:8085**. Registration has no account cap or per-network
+signup limits. Repeat the last command
 after code changes to rebuild and recreate the app, then refresh your browser.
 Local Docker uses its own persistent `p60-local-data` volume and leaves the
 checkout's database unchanged.
@@ -144,8 +145,9 @@ Behind an HTTPS reverse proxy, set `P60_HOST` to the exact public origin
 P60_HOST=https://predict60.com python3 scripts/restart-server.py
 ```
 
-POST requests with an `Origin` header must match this value exactly. If
-`P60_HOST` is unset or empty, the existing `http://<Host header>` check applies.
+POST requests with an `Origin` header must match `P60_HOST` or an exact alias
+in `P60_ADDITIONAL_ORIGINS`. If neither is configured, the existing
+`http://<Host header>` check applies.
 Requests without an `Origin` header retain their existing behavior; authenticated
 mutations still require a valid session and CSRF token. Restart the server after
 changing the environment. An HTTPS origin automatically adds `Secure` to login
@@ -460,6 +462,13 @@ service's Python environment, rather than an unrelated interactive environment.
 Keep `P60_HOST` set to the exact public HTTPS origin and authorize that same
 origin in the Google web client settings. Local testing uses an authorized
 `http://localhost:<port>` origin.
+For localhost access to the public Docker stack, also add the exact browser
+origin (for example, `http://localhost:8085`) to `P60_ADDITIONAL_ORIGINS` in
+`.env`, preserving the public aliases. This is required for password signup/login
+as well as Google authentication. Recreate the app container to load the change;
+see [allowed origins and the Docker apply command](deploy/DOCKER.md).
+An `Invalid request origin.` response is an app origin-allowlist rejection;
+Google's Authorized JavaScript origins are a separate configuration.
 
 `GET /api/auth/google/csrf` returns a short-lived login CSRF token and sets a
 matching HttpOnly cookie. The login callback sends that token in `X-CSRF-Token`
@@ -474,7 +483,8 @@ The login page routes new Google users to `signup.html?google=1`. Google signup
 requires selecting a Google account and a display name. An organizer code is
 required only when `SIGNUP_CODE_REQUIRED` is enabled in `src/backend/CONST.py`.
 `POST /api/auth/google/signup` verifies Google's token again and atomically
-creates the user and subject mapping after checking the account and IP limits.
+creates the user and subject mapping. Registration has no account cap or
+per-network signup budgets; general authentication throttling remains active.
 Google-only users have no local password; they return using Google. Existing
 password registration remains available.
 

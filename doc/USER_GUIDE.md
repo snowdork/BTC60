@@ -1,6 +1,8 @@
 # Predict60 user guide
 
-Predict60 is a crypto direction game using credits. Start with **Crypto**;
+Predict60 is a crypto direction game using game coins, shown as **C$** in the
+HUD. Tickets and results also call these coins credits; C$ 1 equals one credit.
+C$ is a game unit, separate from the USD market price. Start with **Crypto**;
 Oil and Weather are marked **Coming soon**. Prices and settlement benchmarks use
 Coinbase minute candles. Credits cannot be purchased or redeemed for cash.
 
@@ -13,10 +15,8 @@ Coinbase minute candles. Credits cannot be purchased or redeemed for cash.
 4. Open **Crypto**, choose a coin and interval, and inspect the current play.
 
 No organizer code is needed by default. If an administrator enables invite codes,
-registration shows an additional code field. Default registration limits are 100
-accounts per installation, 10 attempts per hour per IP, and 3 new accounts per
-24 hours per IP. People using the same network share these limits. Registration
-limits do not prevent existing users from logging in.
+registration shows an additional code field. Registration has no account cap or
+per-network signup limits.
 
 A Google account with the same email as an existing password account must be
 linked: sign in to the existing account, then complete the Google-link step.
@@ -35,9 +35,26 @@ provide accounts, live orders, or settlement.
 
 ## Read the terminal
 
-The title bar shows the selected coin's USD price, the displayed hour's dollar
-and percentage movement, your credits, and GMT/local clocks. Choose a coin or
-5-, 15-, 30-, or 60-minute interval using the controls above the playfield.
+One integrated, pinned HUD contains the title bar, time intervals and coin
+selector. It groups the Predict60 title, one illuminated player/coin
+readout, view controls, local/UTC clocks, and account menu. The mini readout
+combines your name and C$ balance with a steady glow, without flashing. The player name displays at most ten
+characters; hover it to see the full saved name. The **C$** balance is your
+available contest balance and updates when predictions or settlements change it.
+The clock sits immediately beside the player mini HUD on the left. Local time, using your browser timezone,
+appears above UTC in the same font. Both follow current time even when you
+browse a historical chart. Fixed-width digital digits update without a clock
+icon, flip animations or layout shifts. The layout uses two
+rows on smaller screens.
+
+Use **Interval / Hour** in the HUD to choose your view. Choose a coin and
+5-, 15-, 30-, or 60-minute play using the controls within the same pinned HUD.
+The selected coin's icon, USD price and hourly dollar/percentage movement are
+at the top-left of the graph area in both views. The former Current time /
+Prediction cutoff legend below the coin controls has been removed; the graph's
+time and cutoff markers still work. Open **Menu** for history, contests, rules,
+account actions and navigation. The theme button switches light/dark mode.
+
 The default coins are BTC, ETH, SOL, XRP, DOGE, ADA, LTC, LINK, AVAX, and SUI.
 
 Each compact segment contains:
@@ -179,8 +196,7 @@ feed disconnects; an open play requires fresh data before Predict is enabled.
 
 | Symptom | Next step |
 | --- | --- |
-| Registration is full | The installation reached its account cap. Existing players can still log in; ask the administrator about capacity. |
-| Too many signup attempts / network signup limit | Wait for the hourly/daily allowance to expire. People sharing a network share the limit. |
+| Invalid request origin | Use the configured address exactly, including http/https and port. For localhost signup/login, ask the administrator to allow `http://localhost:8085` and recreate the app container; see [Docker origin configuration](../deploy/DOCKER.md). |
 | Organizer code requested | This installation enabled invite codes. Obtain its code from the organizer. |
 | Signup is currently unavailable | Ask the administrator to check the optional invite-code configuration for this deployment. |
 | Price unavailable, stale or disconnected | Wait for automatic retries and a fresh quote. Check your connection if it persists. |

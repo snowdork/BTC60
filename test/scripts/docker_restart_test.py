@@ -1,5 +1,6 @@
 """Exercise restart ordering and build failure without a Docker daemon."""
 import os
+import fcntl
 from pathlib import Path
 import shutil
 import subprocess
@@ -9,7 +10,7 @@ import unittest
 
 class DockerRestartTest(unittest.TestCase):
     def run_restart(self, fail_build=False, local=False, service_present=True, fail_stop=False,
-                    published_ports='', local_port='8085', start=False, args=()):
+                    published_ports='', local_port='8085', start=False, args=(), lock_held=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'scripts').mkdir()
@@ -47,10 +48,22 @@ if sys.argv[1] == 'stop' and os.environ['SERVICE_STOP_FAIL'] == '1':
                        PUBLISHED_PORTS=published_ports)
             env.pop('P60_PORT', None)
             entrypoint = root / ('deploy/start-docker.sh' if start else 'scripts/restart-docker.sh')
-            result = subprocess.run(['bash', str(entrypoint),
-                                     *(['--local'] if local else []), *args], env=env,
-                                    capture_output=True, text=True, timeout=10)
+            with (root / '.docker-restart.lock').open('w') as lock:
+                if lock_held:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                result = subprocess.run(['bash', str(entrypoint),
+                                         *(['--local'] if local else []), *args], env=env,
+                                        capture_output=True, text=True, timeout=10)
             return result, log.read_text().splitlines() if log.exists() else []
+
+    def test_overlapping_restart_exits_before_any_docker_or_service_calls(self):
+        for local in (False, True):
+            for start in (False, True):
+                with self.subTest(local=local, start=start):
+                    result, calls = self.run_restart(local=local, start=start, lock_held=True)
+                    self.assertEqual(result.returncode, 75, result.stderr)
+                    self.assertIn('already running', result.stderr)
+                    self.assertEqual(calls, [])
 
     def test_failed_build_leaves_running_services_untouched(self):
         for local in (False, True):

@@ -18,6 +18,22 @@ done
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
 
+# Serialize both entrypoints and modes before building or replacing containers.
+# Read-open the lock so sudo and Docker-group users can share the same file.
+if ! command -v flock >/dev/null 2>&1; then
+  echo 'Install flock (util-linux) before restarting Docker.' >&2
+  exit 1
+fi
+lock_file="$root/.docker-restart.lock"
+if [[ ! -e $lock_file ]]; then
+  (umask 022; set -o noclobber; : > "$lock_file") 2>/dev/null || [[ -f $lock_file ]]
+fi
+exec 9< "$lock_file"
+if ! flock --exclusive --nonblock 9; then
+  echo 'Another Predict60 Docker restart is already running. Wait for it to finish, then retry.' >&2
+  exit 75
+fi
+
 # Hand supervision to Docker only after a successful image build.
 stop_host_service() {
   local load_state

@@ -68,9 +68,9 @@ manual procedure explicitly says to use a live feed.
 
 | Suite files | Coverage |
 | --- | --- |
-| `test/frontend/account.test.js`, `test/frontend/auth.test.js`, `test/frontend/password.test.js` | Restored/expired sessions, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery, bounded retries, and request/body timeouts without automatic order replay. |
+| `test/frontend/account.test.js`, `test/frontend/auth.test.js`, `test/frontend/password.test.js` | Restored/expired sessions, ten-character HUD names with full-name tooltips, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery, bounded retries, and request/body timeouts without automatic order replay. |
 | `test/frontend/bootstrap.test.js`, `test/frontend/coins.test.js`, `test/frontend/categories.test.js` | Catalog-first startup, offline/static-server failures, instrument selection, category configuration, coming-soon availability and displayed-hour coin prediction rings (direction, settled retention, hour navigation and logout). |
-| `test/frontend/btc-chart.test.js` | Minute history, candle geometry and summary arrows, current/historical-hour navigation, one-second price/clock updates, hourly signed dollar/percentage changes, moving time-axis geometry, stale response rejection, and quote/benchmark freshness. |
+| `test/frontend/btc-chart.test.js` | Minute history, candle geometry and summary arrows, current/historical-hour navigation, one-second price/UTC clock updates, digital clock midnight rollover, hourly signed dollar/percentage changes, moving time-axis geometry, stale response rejection, and quote/benchmark freshness. |
 | `test/frontend/market-detail.test.js` | Interval default, view controls and double-click shortcuts, exact interval/past-hour returns, interactive-control guards, cleared and explicit duration highlights, exact selected starts, range-history cancellation/retry, saved execution tags, summary arrows and history across durations, missing candles, minute rollover, and upcoming intervals. |
 | `test/frontend/app.test.js` | Segment selection events and popups, pending/upcoming placeholders, stable DOM writes, disconnected live comparisons, winner badges, per-prediction budgets, and pending countdowns that skip settled history and clear after settlement/logout. |
 | `test/frontend/market-model.test.js`, `test/frontend/portfolio-model.test.js` | Interval layout, Up/Down outcomes, probability and volatility calculations, cutoff rules, credit limits, payout rounding, settled P/L and numeric history sorting. |
@@ -337,8 +337,8 @@ and mocked providers; see [local performance measurements](VPS_PERFORMANCE.md).
 
 Legacy gate tests explicitly enable it and configure `P60_SIGNUP_CODE`, verify
 code changes, and check that missing/empty configuration disables signup without
-blocking login. Protection tests use the default open gate and verify capacity,
-IP limits, concurrent registration, bot traps, and expiration.
+blocking login. Protection tests use the default open gate and verify registration beyond the
+former account and network limits, concurrent registration, and bot traps.
 
 ## Password changes and logout
 

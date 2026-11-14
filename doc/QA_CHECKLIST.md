@@ -45,23 +45,21 @@ and files separately. Preserve raw logs, not just the final pass label.
 
 ## 3. Registration and session acceptance
 
-Use disposable databases/accounts for capacity and abuse cases.
+Use disposable databases/accounts for registration and abuse cases.
 
 | Case | Expected result |
 | --- | --- |
 | Default password signup | No organizer-code field; matching 8–16-character passwords create one account. |
 | Default Google signup | Verified identity and display name create an account; no code is requested. |
 | Optional code gate | With `SIGNUP_CODE_REQUIRED=True`, both methods require the correct server-side code. Missing configuration fails closed. |
-| Global account limit | At 99 accounts, concurrent requests create at most one more. At 100, new accounts are rejected; existing users can log in. |
-| IP attempt budget | The eleventh attempt within an hour is rejected with HTTP 429, including after recreating the handler. |
-| IP success budget | A fourth account within 24 hours is rejected, sharing the budget between password and Google signup. |
+| Removed account cap | Password and Google signup work beyond 100 accounts, including concurrent requests. |
+| Removed network budgets | Old signup-event records and more than three registrations or ten attempts do not activate the removed hourly/daily signup budgets. General authentication throttling still applies. |
 | Bot trap | A nonempty hidden website field creates no account; Google verification is not attempted for that trap. |
-| IP trust | Untrusted forwarding headers cannot select another IP. IPv6 addresses within one /64 share the budget. |
-| Expiration | Attempts and successful-registration windows expire independently; pruning retains only the longest active window. |
+| IP trust | Untrusted forwarding headers cannot choose another IP for general authentication throttling. |
 | Sessions | Logout clears state; an older response cannot sign the user back in. Password changes revoke other sessions. |
 
-IP budgets are shared by people behind the same network and do not establish
-identity. Password-email ownership is not verified; do not claim this as a
+General authentication throttling does not establish identity. Password-email
+ownership is not verified; do not claim this as a
 CAPTCHA, email-confirmation or one-person-per-account guarantee.
 
 ## 4. Segment and chart acceptance
@@ -69,6 +67,15 @@ CAPTCHA, email-confirmation or one-person-per-account guarantee.
 Check 1366×768, 390×844 and 320×720 in both themes. Record the browser and
 whether the data is mocked. Use current, completed, pending and upcoming plays.
 
+- The title, duration controls and coin selector stay pinned together as one
+  HUD while scrolling. It groups player, C$ balance, UTC clock and view/menu
+  controls. Names show at most ten characters, with a full-name tooltip. Clock
+  stays beside the player panel; fixed-width digital digits follow wall time across
+  midnight and historical views without a clock icon, flip animations or layout shifts. The C$ amount equals the current
+  contest wallet, not a separate currency balance.
+- The selected coin price is at the graph's top-left in both views. Switching
+  coins updates its icon, price and movement. Coin/duration controls stay above
+  the graph; no Current time / Prediction cutoff legend bar remains.
 - The segment shows coin, UTC range, status, live/closing price, starting price,
   actual movement, Up/Down estimates, relevant action and countdown. Prices use
   USD; stakes and payouts use credits. Probabilities and execution prices remain

@@ -460,3 +460,11 @@ test('price ticks reuse minute annotations until the minute changes',async()=>{
  assert.notEqual(h.element('minute-heatmap').children,markers);
  assert.notEqual(h.element('segment-results').children,results);
 });
+
+test('digital title clock updates in UTC across midnight',async()=>{
+ const h=chartHarness({startTime:Date.UTC(2026,9,12,23,59,59)});
+ await flush();
+ assert.equal(h.element('workspace-clock').textContent,'23:59:59 UTC');
+ h.step();
+ assert.equal(h.element('workspace-clock').textContent,'00:00:00 UTC');
+});

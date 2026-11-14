@@ -27,8 +27,6 @@ class AccountsTest(unittest.TestCase):
     def setUpClass(cls):
         cls.signup_policy=patch.object(server.CONST, 'SIGNUP_CODE_REQUIRED', True)
         cls.signup_policy.start()
-        cls.signup_limits=patch.multiple(server.CONST, SIGNUP_ATTEMPTS_PER_IP=1000, SIGNUP_ACCOUNTS_PER_IP=1000)
-        cls.signup_limits.start()
         cls.oil_config=patch('oilprice_api.configured',return_value=False)
         cls.oil_config.start()
         cls.temp = tempfile.TemporaryDirectory()
@@ -41,7 +39,6 @@ class AccountsTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.signup_policy.stop()
-        cls.signup_limits.stop()
         cls.http.shutdown()
         cls.http.server_close()
         cls.temp.cleanup()
@@ -359,11 +356,14 @@ class AccountsTest(unittest.TestCase):
     def test_additional_public_origin_accepts_alias_and_rejects_lookalikes(self):
         with patch.dict('os.environ', {
             'P60_HOST': 'https://predict60.com',
-            'P60_ADDITIONAL_ORIGINS': 'https://predict60.free-vibe.com',
+            'P60_ADDITIONAL_ORIGINS': 'https://predict60.free-vibe.com,http://localhost:8085',
         }):
             for origin, expected in (
                 ('https://predict60.com', 415),
                 ('https://predict60.free-vibe.com', 415),
+                ('http://localhost:8085', 415),
+                ('http://localhost:8086', 403),
+                ('http://localhost.evil.example:8085', 403),
                 ('http://predict60.free-vibe.com', 403),
                 ('https://predict60.free-vibe.com.evil.example', 403),
             ):

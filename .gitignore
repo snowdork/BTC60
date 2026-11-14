@@ -12,3 +12,4 @@ doc/node_modules/
 doc/test-results/
 
 .venv/
+.docker-restart.lock

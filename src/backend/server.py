@@ -1072,7 +1072,7 @@ class Handler(SimpleHTTPRequestHandler):
         if self.auth_rate_limited():
             return self.reply(429, {'error': 'Too many attempts. Try again in a minute.'})
         if path == '/api/signup':
-            self.reserve_signup_attempt(data)
+            self.validate_signup_request(data)
             validate_signup_code(data.get('signupCode'))
         email, password = data.get('email', ''), data.get('password', '')
         if not isinstance(email, str) or not isinstance(password, str):
@@ -1096,9 +1096,7 @@ class Handler(SimpleHTTPRequestHandler):
                 salt = secrets.token_hex(16)
                 digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
                 conn.execute('BEGIN IMMEDIATE')
-                self.check_signup_limits(conn)
                 user_id = conn.execute('INSERT INTO users(name,email,password_hash,salt,created_at,balance_cents) VALUES(?,?,?,?,?,?)', (name.strip(), email, digest, salt, int(time.time()), 1000000)).lastrowid
-                self.record_signup(conn)
             else:
                 user = conn.execute('SELECT * FROM users WHERE email=?', (email,)).fetchone()
                 salt = user['salt'] if user else '0' * 32
@@ -1110,43 +1108,10 @@ class Handler(SimpleHTTPRequestHandler):
         LOG.info('Authentication action=%s user=%s', path.rsplit('/', 1)[-1], user_id)
         return self.reply(200, {'ok': True}, session_cookie(token, 604800))
 
-    def signup_address(self):
-        """Group IPv6 privacy addresses by /64 while honoring only trusted proxy headers."""
-        address = ipaddress.ip_address(self.client_ip())
-        if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
-            address = address.ipv4_mapped
-        return str(ipaddress.ip_network(f'{address}/64', strict=False)) if address.version == 6 else str(address)
-
-    def check_signup_limits(self, conn):
-        """Enforce global capacity and successful registrations inside the account writer transaction."""
-        if conn.execute('SELECT count(*) FROM users').fetchone()[0] >= CONST.MAX_PLAYER_ACCOUNTS:
-            raise AuthenticationError('Registration is full. The player account limit has been reached.', status=403)
-        count = conn.execute('SELECT count(*) FROM signup_events WHERE address=? AND successful=1 AND created_at>?',
-                             (self.signup_address(), time.time() - CONST.SIGNUP_ACCOUNT_WINDOW_SECONDS)).fetchone()[0]
-        if count >= CONST.SIGNUP_ACCOUNTS_PER_IP:
-            raise AuthenticationError('Signup limit reached for this network. Try again later.', status=429)
-
-    def reserve_signup_attempt(self, data, check_capacity=True):
-        """Persist bounded signup attempts before expensive hashing or Google verification; reject the bot trap."""
-        now = time.time()
-        with connect() as conn:
-            conn.execute('DELETE FROM signup_events WHERE created_at<=?',
-                         (now - max(CONST.SIGNUP_ACCOUNT_WINDOW_SECONDS, CONST.SIGNUP_ATTEMPT_WINDOW_SECONDS),))
-            conn.commit()
-            conn.execute('BEGIN IMMEDIATE')
-            count = conn.execute('SELECT count(*) FROM signup_events WHERE address=? AND successful=0 AND created_at>?',
-                                 (self.signup_address(), now - CONST.SIGNUP_ATTEMPT_WINDOW_SECONDS)).fetchone()[0]
-            if count >= CONST.SIGNUP_ATTEMPTS_PER_IP:
-                raise AuthenticationError('Too many signup attempts from this network. Try again later.', status=429)
-            if check_capacity:
-                self.check_signup_limits(conn)
-            conn.execute('INSERT INTO signup_events VALUES(?,?,0)', (self.signup_address(), now))
+    def validate_signup_request(self, data):
+        """Reject the hidden bot-trap field without limiting registrations."""
         if data.get('website'):
             raise AuthenticationError('Unable to register. Please try again.', status=400)
-
-    def record_signup(self, conn):
-        """Record a successful registration atomically with its account and identity."""
-        conn.execute('INSERT INTO signup_events VALUES(?,?,1)', (self.signup_address(), time.time()))
 
     def create_session(self, conn, user_id):
         """Rotate a caller's session and reuse the normal SQLite session store."""
@@ -1193,7 +1158,7 @@ class Handler(SimpleHTTPRequestHandler):
         if self.auth_rate_limited():
             return self.reply(429, {'error': 'Too many attempts. Try again in a minute.'})
         if signup and link_session is None:
-            self.reserve_signup_attempt(data, check_capacity=False)
+            self.validate_signup_request(data)
         try:
             identity = verify_google_login(data.get('credential'))
         except ValueError:
@@ -1224,7 +1189,6 @@ class Handler(SimpleHTTPRequestHandler):
                                            else 'Create an account first.'})
                 # Registration and identity association commit together; a code never links an existing user.
                 validate_signup_code(data.get('signupCode'))
-                self.check_signup_limits(conn)
                 name = data.get('name', '')
                 if not isinstance(name, str) or not 1 <= len(name.strip()) <= 60:
                     raise ValueError('Enter your name (up to 60 characters).')
@@ -1237,7 +1201,6 @@ class Handler(SimpleHTTPRequestHandler):
                     (name.strip(), email, '', secrets.token_hex(16), int(time.time()), 1000000)).lastrowid
                 conn.execute('INSERT INTO google_identities VALUES(?,?,?)',
                              (identity['googleSub'], user_id, int(time.time())))
-                self.record_signup(conn)
             token = self.create_session(conn, user_id)
         return self.reply(200, {'ok': True, 'redirect': '/categories.html'}, session_cookie(token, 604800))
 

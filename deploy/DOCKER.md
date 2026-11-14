@@ -21,18 +21,32 @@ Google OAuth Authorized JavaScript origins must include both HTTPS origins.
 Configure them under [Google Auth Platform → Clients](https://console.cloud.google.com/auth/clients).
 Accounts share the database; browser login cookies are separate per hostname.
 
-For Google login at `http://localhost:8085` on this same stack, add that exact
+For password signup/login and Google authentication at `http://localhost:8085`
+on this same stack, add that exact
 origin to the existing comma-separated `P60_ADDITIONAL_ORIGINS` in `.env`:
 
 ```dotenv
 P60_ADDITIONAL_ORIGINS=https://predict60.free-vibe.com,http://localhost:8085
 ```
 
-Then run `docker compose up -d --no-build --wait app` to apply the setting.
+From the project root, apply the setting by recreating the app container:
+
+```bash
+sudo docker compose --env-file .env -f compose.yaml up -d --no-build --wait app
+```
+
+This preserves the database volume. Refresh the signup/login page after the app
+is healthy. Restarting the existing container alone does not load changed Compose
+environment settings. This origin-only change requires no image rebuild.
 Keep `P60_HOST` on the public HTTPS origin and keep the existing aliases.
 Authorize `http://localhost:8085` in Google's web client settings as well.
-An `Invalid request origin.` response from `/api/auth/google` means the
-browser origin is missing from the app's allowlist. For a separate local
+An `Invalid request origin.` response from signup, login, Google authentication,
+or another browser POST means the browser origin is missing from the app's
+allowlist. An origin includes scheme, hostname, and port, without a path:
+`http://localhost:8085/signup.html` needs `http://localhost:8085`.
+`http://127.0.0.1:8085` is a different origin and needs its own explicit entry if
+used. Preserve existing public aliases; do not disable origin checks or use a
+wildcard. For a separate local
 development container, use [local Docker mode](LOCAL.md#docker).
 
 Existing deployments: stop the old stack's Caddy with `docker compose stop caddy`
@@ -49,6 +63,20 @@ docker compose logs --tail=100 app
 ```
 
 See [guided setup](SETUP.md) for saved-profile checks, updates, and automation.
+
+Restart helpers use a shared `.docker-restart.lock` in this checkout. If another
+restart is in progress, the second exits before any Docker or service changes;
+wait for the first to finish, then retry. The operating system releases the lock
+when the helper exits, including failures. Do not delete the lock file while a
+restart is running. Direct `docker compose` commands do not acquire this lock;
+avoid running them during a helper restart.
+
+A container-name conflict involving `p60-app-1` and a temporary name such as
+`b66613c94523_p60-app-1` can occur when two Compose replacements overlap. Wait
+for the active operation, then check `sudo docker compose ps` and retry the
+restart helper if needed. Keep the database volume; a transient name conflict
+does not require resetting accounts or removing volumes.
+
 
 `start-docker.sh` delegates to `scripts/restart-docker.sh`; both can be called
 from any directory. They explicitly use this checkout's `compose.yaml` and
@@ -202,7 +230,7 @@ See the [performance review](../doc/VPS_PERFORMANCE.md) for measurements and lim
 
 ## Signup code configuration
 
-Registration requires no code by default. Policy and the 100-account cap live
+Registration requires no code by default. The optional invite-code policy lives
 in `src/backend/CONST.py`; see [registration protections](SETUP.md#registration-abuse-controls).
 To enable invite codes, set `SIGNUP_CODE_REQUIRED = True` and set
 `P60_SIGNUP_CODE` in the private environment file. With the gate enabled,

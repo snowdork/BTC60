@@ -172,8 +172,16 @@ curl --fail http://localhost:8085/healthz # Docker
 python3 scripts/run_tests.py
 ```
 
-- Signup unavailable: set a nonempty `P60_SIGNUP_CODE` and restart/recreate.
-- Origin rejected: use the configured hostname, scheme, and port exactly.
+- Signup unavailable: if invite codes are enabled, set a nonempty
+  `P60_SIGNUP_CODE` and restart/recreate. No code is needed with the default policy.
+- Origin rejected: the allowed origin must match the browser's scheme, hostname,
+  and port exactly. For `http://localhost:8085/signup.html`, allow
+  `http://localhost:8085` (without `/signup.html`). When accessing the public
+  Docker stack locally, add it to `P60_ADDITIONAL_ORIGINS` in `.env`, retain
+  existing public aliases, and recreate the app container. See
+  [the exact configuration and command](DOCKER.md). Separate local Compose
+  already sets `P60_HOST` to `http://localhost:<P60_PORT>`. Google's authorized
+  origins must also include this address when using Google login.
 - Port in use: stop the other process/supervisor or choose another Python port.
 - Changes missing in Docker: rebuild the image; editing `dist/` has no effect.
 - Missing history or settlement delays: check connectivity and provider errors;

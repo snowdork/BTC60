@@ -161,3 +161,33 @@ html[data-theme="light"] .welcome-page:before{background:linear-gradient(90deg,#
  .welcome-page h2{font-size:29px}
  .welcome-prizes{padding:20px;gap:16px}
 }
+
+/* Keep title-screen copy and controls readable over every part of the artwork. */
+.welcome-page.title-screen{--welcome-text:#ffffff;--welcome-muted:#dcecff;--welcome-accent:#bcefff;--welcome-line:#a8dfff66;--welcome-panel:#10283e;--text:var(--welcome-text);--muted:var(--welcome-muted)}
+.welcome-page.title-screen:before{background:linear-gradient(#061422c9,#061422e6),url('assets/backgrounds/icy-coins-color.webp') center top/cover no-repeat}
+.title-screen .welcome-nav{border-bottom-color:var(--welcome-line)}
+.title-screen .welcome-brand-name,.title-screen .welcome-copy h1{color:var(--welcome-text);text-shadow:0 2px 8px #0009}
+.title-screen .welcome-nav .p60-mark{filter:brightness(1.25) drop-shadow(0 2px 8px #020b15)}
+.title-screen .welcome-nav :is(.winners-link,.theme-toggle){display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 12px;border:1px solid var(--welcome-line);border-radius:10px;background:var(--welcome-panel);color:var(--welcome-text)}
+.title-screen .welcome-nav .theme-toggle{min-width:44px;font-size:22px}
+.title-screen .welcome-nav :is(.welcome-nav-login,.welcome-nav-join) svg{stroke-width:2.2}
+.title-screen .welcome-nav .welcome-nav-join svg{stroke-width:1}
+.title-screen .welcome-demo-button{background:#bcefff;color:#062139;border-color:#bcefff;box-shadow:0 2px 12px #0005}
+.title-screen .welcome-demo-button:hover{background:#e4f8ff;color:#062139}
+.title-screen .welcome-demo-button>span{font-size:18px}
+.title-screen :is(.welcome-intro,.welcome-fine,.welcome-stats p,.welcome-steps p,.section-intro>p:last-child,.welcome-prizes p:last-child,.welcome-footer){color:var(--welcome-muted)}
+.title-screen .welcome-fine{font-size:12px;font-weight:600}
+.title-screen .welcome-footer{font-size:11px}
+.title-screen .welcome-eyebrow{font-weight:700}
+.title-screen :is(a,button):focus-visible{outline-color:var(--welcome-accent);outline-offset:4px}
+html[data-theme="light"] .welcome-page.title-screen{--welcome-text:#10293e;--welcome-muted:#29485e;--welcome-accent:#07567a;--welcome-line:#254d7266;--welcome-panel:#f3f9ff}
+html[data-theme="light"] .welcome-page.title-screen:before{background:linear-gradient(#edf7ffeb,#edf7fff5),url('assets/backgrounds/icy-coins-color.webp') center top/cover no-repeat}
+html[data-theme="light"] .title-screen :is(.welcome-brand-name,.welcome-copy h1){text-shadow:none}
+html[data-theme="light"] .title-screen .welcome-nav .p60-mark{filter:drop-shadow(0 1px 2px #10293e33)}
+@media(max-width:680px){
+ .title-screen .welcome-nav .winners-link{display:none}
+ .title-screen .welcome-nav .theme-toggle{padding:8px;min-width:44px}
+ .title-screen .welcome-copy .welcome-eyebrow{font-size:10px;letter-spacing:.8px}
+ .title-screen .welcome-stats p{font-size:11px}
+ .welcome-page.title-screen:before{background-position:60% top}
+}
