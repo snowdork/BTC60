@@ -55,6 +55,7 @@ SETTLE_LOCK = threading.Lock()
 STATIC_CACHE = {}
 LOG = logging.getLogger(__name__)
 PUBLIC_ASSETS = {
+    'assets/previews/interval-playfield.png',
     'assets/previews/prediction-playfield.png',
     'assets/previews/welcome-splash.png',
     'assets/backgrounds/hourly-markets.webp',

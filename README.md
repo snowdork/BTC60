@@ -2,7 +2,9 @@
 
 Predict60 is a buildless web app for exploring hourly direction predictions with game credits. See a complete UTC hour at once: one 60-minute market, two 30-minute markets, four 15-minute markets, twelve 5-minute markets, with a live chart and prediction popups.
 
-![Predict60 terminal with an hourly chart, aligned prediction intervals, and an order ticket](src/frontend/assets/previews/prediction-playfield.png)
+![Predict60 Interval playfield with starting and live prices, percentage movement, and prediction controls](src/frontend/assets/previews/interval-playfield.png)
+
+![Predict60 Hour playfield with a price chart and aligned prediction intervals](src/frontend/assets/previews/prediction-playfield.png)
 
 *Illustrative demo preview. Prices, percentages, and account figures shown are sample values.*
 
@@ -315,7 +317,7 @@ Custom coins need a supported Coinbase USD product, display precision, positive 
 
 ## Static distribution and hosting
 
-`dist/` contains generated static copies, not a standalone account backend. After frontend changes, run `python3 scripts/build-static.py` to refresh the public HTML, CSS, browser JavaScript, and artwork in `dist/`. The build uses the server’s public file list and excludes backend scripts, tests, credentials, and account data. It stages sources before updating output and removes obsolete files; keep hand-edited files outside `dist/`. The welcome preview is `src/frontend/assets/previews/prediction-playfield.png`. `.openai/hosting.json` identifies the existing private Site.
+`dist/` contains generated static copies, not a standalone account backend. After frontend changes, run `python3 scripts/build-static.py` to refresh the public HTML, CSS, browser JavaScript, and artwork in `dist/`. The build uses the server’s public file list and excludes backend scripts, tests, credentials, and account data. It stages sources before updating output and removes obsolete files; keep hand-edited files outside `dist/`. The welcome demo switches between `src/frontend/assets/previews/interval-playfield.png` and `prediction-playfield.png` in the same directory. `.openai/hosting.json` identifies the existing private Site.
 
 The Python server binds to loopback for local development. Public account hosting requires a production server, HTTPS, Secure session cookies, and account recovery/email verification. Static hosting cannot replace the Python/SQLite API.
 

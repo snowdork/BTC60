@@ -33,7 +33,9 @@
 <footer class="welcome-footer"><span>Predict60 <span aria-hidden="true">/</span> One hour. Your call.</span><p>Points-only game. Credits cannot be purchased or redeemed for cash.</p><span>Crypto available · Oil &amp; weather coming soon</span></footer>
 <dialog id="welcome-demo" class="welcome-demo" aria-labelledby="welcome-demo-title">
 <div class="welcome-demo-header"><h2 id="welcome-demo-title">Inside Predict60</h2><button id="welcome-demo-close" type="button" aria-label="Close demo">✕</button></div>
-<div class="welcome-demo-media"><img src="assets/previews/welcome-splash.png" alt="Predict60 gameplay preview showing an Ethereum price chart and prediction segments" width="1311" height="899" loading="lazy" decoding="async"></div>
-<p class="welcome-demo-caption">Gameplay preview · Motion demo coming soon</p>
+<div class="welcome-demo-views" role="group" aria-label="Choose a playfield snapshot"><button type="button" data-demo-view="interval" aria-pressed="true" aria-controls="demo-interval">Interval</button><button type="button" data-demo-view="hour" aria-pressed="false" aria-controls="demo-hour">Hour</button></div>
+<figure id="demo-interval" class="welcome-demo-media" data-demo-panel="interval"><img src="assets/previews/interval-playfield.png" alt="Interval view with a 15-minute Bitcoin chart, starting and live prices, percentage movement, and Up/Down prediction controls" width="1440" height="580" loading="lazy" decoding="async"><figcaption>Interval · Focus on one play and follow its price movement.</figcaption></figure>
+<figure id="demo-hour" class="welcome-demo-media" data-demo-panel="hour" hidden><img src="assets/previews/prediction-playfield.png" alt="Hour view with a Bitcoin price chart and aligned 60, 15, 30, and 5-minute prediction segments" width="1440" height="1720" loading="lazy" decoding="async"><figcaption>Hour · See the full hour with all four interval rows aligned.</figcaption></figure>
+<p class="welcome-demo-caption">Playfield snapshots · Sample prices, predictions and game-coin balances.</p>
 </dialog>
 </body></html>
