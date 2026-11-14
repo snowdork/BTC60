@@ -1,5 +1,7 @@
 """Google credentials never grant access without verification and same-origin CSRF."""
 import hashlib
+import gzip
+from html.parser import HTMLParser
 import json
 import os
 import tempfile
@@ -53,6 +55,37 @@ class GoogleLoginHTTPTest(unittest.TestCase):
             stored = conn.execute('SELECT token_hash FROM sessions').fetchone()['token_hash']
         self.assertEqual(stored, hashlib.sha256(cookie.split(';')[0].split('=', 1)[1].encode()).hexdigest())
 
+    def test_google_pages_use_the_configured_client_id_with_safe_html_and_gzip(self):
+        class ButtonParser(HTMLParser):
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if attrs.get('id') == 'g_id_onload':
+                    self.button = attrs
+
+        cookie = self.signup()
+        for client_id in ('deployment.apps.googleusercontent.com', 'client" data-injected="true&<>'):
+            with patch.dict(os.environ, {'GOOGLE_CLIENT_ID': client_id}):
+                for path in ('/login.html', '/signup.html', '/google-link.html'):
+                    for encoding in ('identity', 'gzip'):
+                        with self.subTest(client_id=client_id, path=path, encoding=encoding):
+                            status, body, _ = self.request('GET', path, cookie=cookie,
+                                                          extra_headers={'Accept-Encoding': encoding})
+                            self.assertEqual(status, 200)
+                            parser = ButtonParser()
+                            parser.feed((gzip.decompress(body) if encoding == 'gzip' else body).decode())
+                            self.assertEqual(parser.button['data-client_id'], client_id)
+                            self.assertNotIn('data-injected', parser.button)
+
+    def test_google_page_cache_revalidates_when_the_client_id_changes(self):
+        with patch.dict(os.environ, {'GOOGLE_CLIENT_ID': 'first.apps.googleusercontent.com'}):
+            self.assertEqual(self.request('GET', '/login.html')[0], 200)
+            old_etag = self.last_headers['ETag']
+        with patch.dict(os.environ, {'GOOGLE_CLIENT_ID': 'second.apps.googleusercontent.com'}):
+            status, body, _ = self.request('GET', '/login.html', extra_headers={'If-None-Match': old_etag})
+            self.assertEqual(status, 200)
+            self.assertNotEqual(self.last_headers['ETag'], old_etag)
+            self.assertIn(b'data-client_id="second.apps.googleusercontent.com"', body)
+
     def test_unknown_subject_never_links_by_email_or_creates_an_account(self):
         self.signup()
         for email, code in [('player@example.com', 'LINK_REQUIRED'), ('new@example.com', 'SIGNUP_REQUIRED')]:
@@ -102,6 +135,20 @@ class GoogleLoginHTTPTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertNotEqual(cookie, new_cookie)
         self.assertEqual(self.google_request(identity)[0], 200)
+
+    def test_unavailable_verification_logs_reason_without_token_or_upstream_details(self):
+        headers = {'Origin': f'http://127.0.0.1:{self.http.server_port}', 'X-Requested-With': 'XMLHttpRequest'}
+        _, data, cookie = self.request('GET', '/api/auth/google/csrf', extra_headers=headers)
+        for reason in ('dependencies_missing', 'client_id_missing', 'signing_keys_unreachable'):
+            with self.subTest(reason=reason), patch('server.verify_google_login',
+                    side_effect=google_login.GoogleVerificationUnavailable(reason)), self.assertLogs(level='WARNING') as logs:
+                status, response, session = self.request('POST', '/api/auth/google',
+                    {'credential': 'private-token'}, cookie, data['csrf'], headers)
+            self.assertEqual(status, 503)
+            self.assertFalse(session)
+            self.assertEqual(response['error'], 'Google sign-in is temporarily unavailable.')
+            self.assertIn('reason=' + reason, '\n'.join(logs.output))
+            self.assertNotIn('private-token', '\n'.join(logs.output))
 
     def test_google_login_is_rate_limited(self):
         with patch.object(server.Handler, 'auth_rate_limited', return_value=True), patch('server.verify_google_login') as verify:

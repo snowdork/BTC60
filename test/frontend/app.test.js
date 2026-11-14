@@ -7,11 +7,11 @@ const source=fs.readFileSync(require('node:path').join(__dirname,'../../src/fron
 test('segments expose prediction, result, and upcoming details actions without nested buttons',()=>{
   const markets=[{id:'60-0',minutes:60,status:'open'},{id:'30-0',minutes:30,status:'settled'},{id:'15-0',minutes:15,status:'queued'}].map(m=>({...m,start:'12:00',end:'13:00',strike:100,close:101}));
   const icons=[{},{},{}];
-  const grid={innerHTML:'',querySelectorAll:selector=>selector==='.tier-coin-icon'?icons:[]};
+  const grid={innerHTML:'',dataset:{},querySelectorAll:selector=>selector==='.tier-coin-icon'?icons:[]};
   const start=source.indexOf('function renderMarkets()');
   const end=source.indexOf('  /** Estimate the selected interval',start);
   vm.runInNewContext(source.slice(start,end)+';renderMarkets();',{
-    markets,market:markets[0],$:()=>grid,marketElements:new Map(),window:{PredictModel:{coin:{feed:'coinbase',icon:'assets/coins/eth.svg',symbol:'ETH'}}},
+    markets,market:markets[0],$:()=>grid,marketElements:new Map(),window:{PredictSegmentCard:require('../../src/frontend/segment-card.js'),PredictModel:{coin:{feed:'coinbase',icon:'assets/coins/eth.svg',symbol:'ETH'}}},
     outcome:()=> 'up',price:String,renderSegmentPredictions(){},renderChances(){}
   });
   assert.match(grid.innerHTML,/data-segment-action="60-0"[^>]*>[\s\S]*?<span class="segment-action-label">Predict<\/span><\/button>/);
@@ -19,24 +19,81 @@ test('segments expose prediction, result, and upcoming details actions without n
   assert.match(grid.innerHTML,/data-segment-action="15-0"[^>]*>[\s\S]*?<span class="segment-action-label">Details<\/span><\/button>/);
   for(const minutes of [60,30,15])assert.ok(grid.innerHTML.includes(`<span>${minutes}m</span>`));
   assert.ok(icons.every(icon=>icon.src==='assets/coins/eth.svg'&&icon.alt==='ETH'));
-  assert.equal((grid.innerHTML.match(/<button/g)||[]).length,3);
-  assert.equal((grid.innerHTML.match(/aria-controls="prediction-dialog"/g)||[]).length,3);
+  assert.equal((grid.innerHTML.match(/data-segment-action=/g)||[]).length,9);
+  assert.equal((grid.innerHTML.match(/aria-controls="prediction-dialog"/g)||[]).length,9);
 });
 
 test('segment action selects its market and opens the popup',()=>{
   const start=source.indexOf("$('market-grid').addEventListener('click'");
   const end=source.indexOf('  let directionHintTimer;',start);
   let click,rendered=0,opened=0;
+  const dispatched=[],grid={dataset:{},addEventListener(_,fn){click=fn;}};
   const dialog={open:false,showModal(){this.open=true;opened++;}};
-  const selected={id:'30-0'};
+  const selected={id:'30-0',minutes:30,startsAt:1800000000000};
   const context={markets:[selected],market:null,side:'up',review:{},marketElements:new Map(),renderTicket(){rendered++;},
-    $:id=>id==='market-grid'?{addEventListener(_,fn){click=fn;}}:id==='prediction-dialog'?dialog:{close(){}}};
+    window:{dispatchEvent(event){dispatched.push(event);}},CustomEvent:class{constructor(type,{detail}){this.type=type;this.detail=detail;}},
+    $:id=>id==='market-grid'?grid:id==='prediction-dialog'?dialog:{close(){}}};
   vm.runInNewContext(source.slice(start,end),context);
   click({target:{closest:selector=>selector==='[data-market]'?{dataset:{market:'30-0'}}:{}}});
   assert.equal(context.market,selected);
   assert.equal(context.side,null);
   assert.equal(rendered,1);
   assert.equal(opened,1);
+  assert.equal(grid.dataset.selection,'30-0:1800000000000');
+  assert.equal(dispatched[0].type,'market-interval-select');
+  assert.equal(dispatched[0].detail.minutes,30);
+  assert.equal(dispatched[0].detail.startsAt,selected.startsAt);
+});
+
+test('segment direction shortcuts preselect Up or Down without placing an order',()=>{
+ const start=source.indexOf("$('market-grid').addEventListener('click'");
+ const end=source.indexOf('  let directionHintTimer;',start);
+ let click;
+ const grid={dataset:{},addEventListener(_,fn){click=fn;}};
+ const dialog={open:false,showModal(){this.open=true;}};
+ const selected={id:'15-0',status:'open',minutes:15,startsAt:1800000000000};
+ const context={markets:[selected],market:null,side:null,review:null,marketElements:new Map(),renderTicket(){},
+  window:{dispatchEvent(){}},CustomEvent:class{},$:id=>id==='market-grid'?grid:id==='prediction-dialog'?dialog:{close(){}}};
+ vm.runInNewContext(source.slice(start,end),context);
+ for(const side of ['up','down',null]){
+  click({target:{closest:selector=>selector==='[data-market]'?{dataset:{market:'15-0'}}:selector==='[data-predict-side]'?(side?{dataset:{predictSide:side}}:null):selector==='[data-segment-action]'?{}:null}});
+  assert.equal(context.side,side);
+  assert.equal(context.market,selected);
+  assert.equal(dialog.open,true);
+  assert.equal(context.review,null,'choosing a direction must not confirm or submit a bet');
+ }
+});
+
+test('overview orders all four aligned tiers and exposes all twelve five-minute actions',()=>{
+ const model=require('../../src/frontend/market-model.js');
+ const markets=model.markets.map(m=>({...m}));
+ const grid={innerHTML:'',dataset:{},querySelectorAll:()=>[]};
+ const start=source.indexOf('function renderMarkets()'),end=source.indexOf('  /** Estimate the selected interval',start);
+ vm.runInNewContext(source.slice(start,end)+';renderMarkets();',{
+  markets,market:markets[0],$:()=>grid,marketElements:new Map(),window:{PredictSegmentCard:require('../../src/frontend/segment-card.js'),PredictModel:{coin:{symbol:'BTC'}}},
+  outcome:model.outcome,price:String,renderSegmentPredictions(){},renderChances(){}
+ });
+ assert.equal((grid.innerHTML.match(/data-market="5-\d+"/g)||[]).length,12);
+ assert.deepEqual([...grid.innerHTML.matchAll(/class="tier" data-duration="(\d+)"/g)].map(match=>Number(match[1])),[60,15,30,5]);
+ assert.match(grid.innerHTML,/role="group" aria-label="Twelve five-minute markets aligned with the hourly chart/);
+ assert.equal((grid.innerHTML.match(/data-market="1-\d+"/g)||[]).length,0);
+ for(let index=0;index<12;index++)assert.match(grid.innerHTML,new RegExp(`data-segment-action="5-${index}"`));
+});
+
+test('five-minute Now scrolls the shared hourly timeline instead of an individual row',()=>{
+ const start=source.indexOf("  $('market-grid').addEventListener('click',event=>{\n    const detail=");
+ const end=source.indexOf("  window.addEventListener('detail-predict'",start);
+ let click,scroll;
+ const active={getBoundingClientRect:()=>({left:300})};
+ const row={scrollLeft:0,querySelector:()=>active};
+ const button={closest:()=>({querySelector:selector=>selector==='.tier-cards'?row:{offsetWidth:54}})};
+ const timeline={scrollLeft:120,getBoundingClientRect:()=>({left:10}),scrollTo(options){scroll=options;}};
+ const grid={addEventListener(_,handler){click=handler;}};
+ vm.runInNewContext(source.slice(start,end),{$:id=>id==='market-grid'?grid:timeline});
+ click({target:{closest:selector=>selector==='[data-tier-now]'?button:null}});
+ assert.equal(scroll.left,344,'the active card stays clear of the pinned duration label');
+ assert.equal(scroll.behavior,'smooth');
+ assert.equal(row.scrollLeft,0);
 });
 
 test('last-hour winner badge requires a finalized first-place result and clears on other states',()=>{
@@ -62,7 +119,7 @@ test('reused hourly winnings allow further orders in an interval up to the per-p
   const market={startsAt:1800000000000,endsAt:1800003600000};
   const context={available:1500,market,maxPredictionCredits:1000,
     account:{predictions:[{coin:'BTC',mode:'contest',starts_at:1800000000,ends_at:1800003600,cost_cents:100000}]},
-    window:{PredictModel:{coin:{symbol:'BTC'}}}};
+    window:{PredictSegmentCard:require('../../src/frontend/segment-card.js'),PredictModel:{coin:{symbol:'BTC'}}}};
   context.balance=()=>context.available;
   vm.createContext(context);vm.runInContext(source.slice(start,end),context);
   assert.equal(vm.runInContext('budgetAvailable()',context),1000);
@@ -102,36 +159,38 @@ test('account updates refresh pending countdowns and remove settled or signed-ou
   assert.equal(context.predictionIndex.size,0);
 });
 
-test('pending and upcoming cards omit unavailable prices, movement, odds and countdowns',()=>{
+test('pending and upcoming cards share the placeholder layout without invented prices',()=>{
   const markets=['queued','settled'].map((status,i)=>({id:`15-${i}`,minutes:15,status,start:'12:00',end:'12:15',strike:100,close:null}));
-  const grid={innerHTML:'',querySelectorAll:()=>[]};
+  const grid={innerHTML:'',dataset:{},querySelectorAll:()=>[]};
   const start=source.indexOf('function renderMarkets()'),end=source.indexOf('  /** Estimate the selected interval',start);
   vm.runInNewContext(source.slice(start,end)+';renderMarkets();',{
     markets,market:markets[0],$:()=>grid,marketElements:new Map(),outcome(){throw Error('No result without close');},
-    price:String,renderSegmentPredictions(){},renderChances(){}
+    price:String,renderSegmentPredictions(){},renderChances(){},window:{PredictSegmentCard:require('../../src/frontend/segment-card.js'),PredictModel:{coin:{}}}
   });
-  for(const content of ['segment-price-row','segment-odds','data-direction-indicator','segment-countdown'])assert.equal(grid.innerHTML.includes(content),false,content);
+  assert.equal((grid.innerHTML.match(/data-detail-strike class="segment-benchmark-price">—/g)||[]).length,2);
+  assert.equal((grid.innerHTML.match(/data-detail-price class="segment-current-price">—/g)||[]).length,2);
   assert.match(grid.innerHTML,/UPCOMING/);assert.match(grid.innerHTML,/PENDING/);
-  assert.equal((grid.innerHTML.match(/class="card-time"/g)||[]).length,2);
+  assert.equal((grid.innerHTML.match(/class="detail-range"/g)||[]).length,2);
   assert.equal((grid.innerHTML.match(/class="segment-action"/g)||[]).length,2);
 });
 
 test('segment refresh preserves stable DOM values and clears stale live movement',()=>{
   let writes=0;
   const node=()=>{
-    const values={textContent:'',className:'',hidden:true},attrs=new Map();
+    const values={textContent:'',className:'',hidden:true,disabled:false,alt:'',src:''},attrs=new Map();
     const element={dataset:new Proxy({},{set(target,key,value){writes++;target[key]=value;return true;}}),
+      style:new Proxy({},{set(target,key,value){writes++;target[key]=value;return true;}}),
       getAttribute:key=>attrs.get(key),setAttribute(key,value){writes++;attrs.set(key,value);}};
     for(const key of Object.keys(values))Object.defineProperty(element,key,{get:()=>values[key],set:value=>{writes++;values[key]=value;}});
     return element;
   };
-  const nodes=()=>Object.fromEntries(['price','up','down','direction','change','arrow','reference'].map(key=>[key,node()]));
+  const nodes=()=>Object.fromEntries(['price','up','down','action','direction','change','arrow','reference','coin','coinName','strike','countdown','chances','summary','movement','now'].map(key=>[key,node()]));
   const open={id:'open',status:'open',strike:100},settled={id:'settled',status:'settled',strike:100,close:99};
   const live=nodes(),closed=nodes(),marketElements=new Map([['open',live],['settled',closed]]);
-  const model={coin:{feed:'coinbase'},feedMode:'live',feedConnection:'connected',priceUpdatedAt:100000,spot:101,
+  const model={coin:{feed:'coinbase',symbol:'BTC',name:'Bitcoin'},feedMode:'live',feedConnection:'connected',priceUpdatedAt:100000,spot:101,now:100000,
     dataStatus:()=>({ready:true}),estimateChances:m=>m.status==='settled'?{up:0,down:100}:{up:60,down:40}};
   const start=source.indexOf('function renderChances()'),end=source.indexOf('  /** Render segment predictions',start);
-  const context={window:{PredictModel:model},markets:[open,settled,{id:'queued'}],marketElements,Date:{now:()=>100000},
+  const context={window:{PredictSegmentCard:require('../../src/frontend/segment-card.js'),PredictModel:model},markets:[open,settled,{id:'queued'}],marketElements,Date:{now:()=>100000},
     renderStatusLine(){},renderExecutionState(){},renderReviewChance(){},price:String,
     setText(element,value){if(element.textContent!==value)element.textContent=value;}};
   vm.createContext(context);vm.runInContext(source.slice(start,end),context);
@@ -140,6 +199,7 @@ test('segment refresh preserves stable DOM values and clears stale live movement
   assert.equal(live.change.textContent,'Up +1.00%');assert.equal(closed.price.dataset.direction,'down');
   const initialWrites=writes;render();assert.equal(writes,initialWrites,'Unchanged ticks must not rewrite DOM attributes');
   model.feedConnection='disconnected';render();assert.equal(live.price.textContent,'—');assert.equal(live.direction.hidden,true);
+  model.dataStatus=()=>({ready:false});render();assert.equal(live.action.disabled,true);assert.equal(live.up.disabled,true);assert.equal(closed.action.disabled,false);
   assert.equal(live.price.dataset.direction,'');assert.equal(closed.price.textContent,'99');assert.equal(closed.direction.hidden,false);
 });
 
@@ -174,4 +234,18 @@ test('NO CREDITS banner follows the signed-in balance and hides on read-only int
   account.ready=true;account.user=null;assert.equal(render(),false);
   account.user={id:1};context.market.status='settled';assert.equal(render(),false);
   context.market.status='queued';assert.equal(render(),false);
+});
+
+test('prediction interval clock follows every supported play duration',()=>{
+ const start=source.indexOf('  function renderIntervalClock()');
+ const end=source.indexOf('  /** Render interval details',start);
+ const clock={dataset:{},setAttribute(key,value){this[key]=value;}},number={};
+ const context={market:{minutes:15},$:id=>id==='ticket-interval-clock'?clock:number};
+ vm.runInNewContext(source.slice(start,end)+';this.renderIntervalClock=renderIntervalClock;',context);
+ for(const minutes of [5,15,30,60]){
+  context.market.minutes=minutes;context.renderIntervalClock();
+  assert.equal(clock.dataset.duration,String(minutes));
+  assert.equal(clock['aria-label'],`${minutes}-minute interval`);
+  assert.equal(number.textContent,String(minutes));
+ }
 });

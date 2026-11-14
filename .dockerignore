@@ -8,6 +8,7 @@
 .venv
 .env
 .env.*
+docker.env
 *.key
 *.pem
 data

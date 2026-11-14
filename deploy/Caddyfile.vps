@@ -22,3 +22,8 @@ phunk.free-vibe.com {
 	reverse_proxy 127.0.0.1:{$PHUNK_PORT:8086}
 	log
 }
+
+dna.free-vibe.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8087
+}

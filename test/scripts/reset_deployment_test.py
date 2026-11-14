@@ -54,6 +54,18 @@ class DeploymentResetTest(unittest.TestCase):
             self.assertEqual(run.call_args.kwargs['env']['PREDICT60_DB'],
                              '/var/lib/predict60/p60.sqlite3')
 
+    def test_profile_image_override_preserves_selected_container_volume_and_database(self):
+        info = {'Name': '/p60-local', 'Id': 'selected-id', 'Image': 'sha256:deleted',
+                'Config': {'Env': ['PREDICT60_DB=/app/data/live.sqlite3'], 'User': '10001', 'Labels': {}}}
+        with patch.object(reset, 'output', return_value=json.dumps([info])), \
+                patch.object(reset.subprocess, 'run') as run:
+            reset.reset_docker(Namespace(container='selected-id', db=None), maintenance_image='p60:local-dev')
+        command = run.call_args.args[0]
+        self.assertEqual(command[command.index('--volumes-from') + 1], 'selected-id')
+        self.assertIn('PREDICT60_DB=/app/data/live.sqlite3', command)
+        self.assertIn('p60:local-dev', command)
+        self.assertNotIn('sha256:deleted', command)
+
     def test_list_docker_does_not_stop_or_reset(self):
         info = {'Name': '/p60-local', 'Id': 'container-id', 'Image': 'sha256:image',
                 'Config': {'Env': ['PREDICT60_DB=/app/data/live.sqlite3'], 'User': '10001',

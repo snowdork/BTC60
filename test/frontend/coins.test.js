@@ -23,3 +23,23 @@ test('default catalog contains ten tradable coins with local icons',()=>{
  const fs=require('node:fs'),path=require('node:path');
  assert(catalog.available.every(coin=>fs.existsSync(path.join(__dirname,'../../src/frontend',coin.icon))));
 });
+
+test('reused formatters preserve every supported precision and missing-price behavior',()=>{
+ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+ let created=0;
+ class CountingFormatter extends Intl.NumberFormat{constructor(...args){super(...args);created++;}}
+ const context={module:{exports:{}},Intl:{NumberFormat:CountingFormatter}};
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../src/frontend/coins.js'),'utf8'),context);
+ const inputs=Array.from({length:13},(_,precision)=>({...records[0],symbol:'P'+precision,precision}));
+ const catalog=context.module.exports.createCatalog(inputs);
+ for(let repeat=0;repeat<3;repeat++)for(const coin of inputs){
+  for(const value of [0,-0,.000000123456789,67450.125,-1245.555,1e12]){
+   assert.equal(catalog.formatPrice(value,coin.symbol),value.toLocaleString('en-US',{style:'currency',currency:'USD',minimumFractionDigits:coin.precision,maximumFractionDigits:coin.precision}));
+  }
+ }
+ assert.equal(created,13,'formatter construction is bounded by precision, not price ticks');
+ for(const value of [NaN,Infinity,-Infinity,null,undefined,'1'])assert.equal(catalog.formatPrice(value,'P2'),'—');
+ assert.equal(created,13);
+ assert.equal(catalog.formatPrice(12.5,'unknown'),catalog.formatPrice(12.5,'P0'));
+ assert.equal(context.module.exports.createCatalog([]).formatPrice(12.5,'unknown'),'$12.50');
+});

@@ -3,11 +3,11 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 
-function chartHarness({oil=false,live=false,spotError=false,transformCandles=c=>c,quote=({now})=>({price:'108.00',time:new Date(now).toISOString()}),startTime=Date.UTC(2026,9,12,17,25,30)}={}){
+function chartHarness({oil=false,live=false,spotError=false,historyError=false,transformCandles=c=>c,quote=({now})=>({price:'108.00',time:new Date(now).toISOString()}),startTime=Date.UTC(2026,9,12,17,25,30)}={}){
  let now=startTime;
  const elements=new Map(),hour=Math.floor(now/3600000)*3600000;
  function element(id){
-  if(!elements.has(id))elements.set(id,{textContent:'',hidden:false,dataset:{},style:{setProperty(){}},classList:{},listeners:{},
+  if(!elements.has(id))elements.set(id,{textContent:'',hidden:false,dataset:{},style:{setProperty(key,value){this[key]=value;}},classList:{},listeners:{},get ownerDocument(){return context.document;},
    addEventListener(type,fn){this.listeners[type]=fn;},setAttribute(k,v){this[k]=v;},removeAttribute(k){delete this[k];},
    getBoundingClientRect(){return {left:0,width:1000};},replaceChildren(...children){this.children=children;}});
   return elements.get(id);
@@ -24,21 +24,137 @@ function chartHarness({oil=false,live=false,spotError=false,transformCandles=c=>
   if(url.startsWith('/api/spot'))return spotError?{ok:false,json:async()=>({error:'Oil feed needs a Twelve Data API key on the server.'})}:{ok:true,json:async()=>({price:110.25,time:live?now-30000:now,source:live?'Twelve Data':'oil-simulation-v1'})};
   if(oil&&url.startsWith('/api/pricing-history'))return {ok:true,json:async()=>({candles:Array.from({length:90},(_,i)=>[(hour/1000)-5400+i*60,99,102,100,100+i*.01,0])})};
   if(url.startsWith('/api/pricing-history'))return new Promise(resolve=>pending.push(resolve));
+  if(historyError)throw new TypeError('Browser provider request failed');
   const query=new URL(url,'http://localhost').searchParams;
   const start=oil?Number(query.get('start'))*1000:Date.parse(query.get('start'));
-  const end=Math.min(now,start+3660000);
+  const end=oil?Number(query.get('end'))*1000:Date.parse(query.get('end'));
   const candles=[];
-  for(let t=start;t<end;t+=60000) candles.push([t/1000,99,102,100,100+(t-start)/600000,1]);
+  for(let t=start;t<end;t+=60000) candles.push([t/1000,99,120,100,100+(t-hour+60000)/600000,1]);
   return {ok:true,json:async()=>transformCandles(candles)};
  };
  class FakeDate extends Date{static now(){return now;}}
  class Socket{constructor(){this.readyState=1;socket=this;}close(){}send(){}}
- const window={PredictModel:model,PredictCoins:{available:coins,getCoin:symbol=>coins.find(c=>c.symbol===symbol)||coin,formatPrice:v=>'$'+v.toFixed(2)},dispatchEvent(){},addEventListener:(name,fn)=>{events[name]=fn;}};
+ const window={PredictMinuteTrend:require('../../src/frontend/minute-trend.js'),PredictModel:model,PredictCoins:{available:coins,getCoin:symbol=>coins.find(c=>c.symbol===symbol)||coin,formatPrice:v=>'$'+v.toFixed(2)},dispatchEvent(){},addEventListener:(name,fn)=>{events[name]=fn;}};
  const context={window,document:{getElementById:element,querySelector:s=>s.startsWith('[data-remaining')?null:element(s),querySelectorAll:s=>s==='[data-coin]'?buttons:[],addEventListener(){},createElement:()=>({dataset:{},style:{setProperty(){}},setAttribute(k,v){this[k]=v;}})},Date:FakeDate,Intl,URLSearchParams,fetch,AbortController,WebSocket:Socket,Event:class{},localStorage:{getItem(){return null;},setItem(){}},setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout(){},performance:{now:()=>frameStamp},console};
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../../src/frontend/btc-chart.js'),'utf8'),context);
- return {element,pending,model,hour,requests,events,select(symbol){element(`coin-${symbol}`).listeners.click();},step(){now+=1000;frameStamp+=1000;timers.at(-1)();},tick(price,elapsed=0){now+=elapsed;frameStamp+=Math.max(1000,elapsed);socket.onmessage({data:JSON.stringify({type:'ticker',product_id:model.coin.product,price:String(price),time:new Date(now).toISOString()})});timers.at(-1)();}};
+ return {element,pending,model,hour,requests,events,advance(elapsed){now+=elapsed;frameStamp+=elapsed;},select(symbol){element(`coin-${symbol}`).listeners.click();},step(){now+=1000;frameStamp+=1000;timers.at(-1)();},tick(price,elapsed=0){now+=elapsed;frameStamp+=Math.max(1000,elapsed);socket.onmessage({data:JSON.stringify({type:'ticker',product_id:model.coin.product,price:String(price),time:new Date(now).toISOString()})});timers.at(-1)();}};
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
+
+test('second-by-second prices survive history refreshes, coin switches and hour rollover',async()=>{
+ const h=chartHarness({quote:({url,now})=>({price:url.includes('ETH-USD')?'208':'108',time:new Date(now).toISOString()})});
+ await flush();h.tick(110,1000);h.tick(111,1000);
+ const btc=h.model.secondPoints;
+ assert(btc.some(p=>p.price===110));assert(btc.some(p=>p.price===111));
+ h.pending.shift()({ok:true,json:async()=>({candles:[]})});await flush();
+ assert.equal(h.model.secondPoints,btc,'minute history does not replace the observed trail');
+ assert(btc.some(p=>p.price===110));
+ h.select('ETH');await flush();h.tick(222,1000);
+ assert.notEqual(h.model.secondPoints,btc);
+ assert(h.model.secondPoints.every(p=>p.price>=200),'coin trails do not mix');
+ h.select('BTC');await flush();
+ assert.equal(h.model.secondPoints,btc);assert(btc.some(p=>p.price===110));
+ h.tick(112,3600000);
+ assert.equal(h.model.secondPoints,btc,'hour rollover keeps recent observations');
+ assert(btc.some(p=>p.price===110));assert(btc.some(p=>p.price===112));
+});
+
+test('live price, chart and clock refresh on each one-second tick',async()=>{
+ const h=chartHarness();await flush();
+ assert.equal(h.element('chart-pair-label').textContent,'17:00 – 18:00 UTC');
+ let previousPath=h.element('btc-line').d,previousClock=h.element('workspace-clock').textContent;
+ for(const price of [110.25,111.75]){
+  h.tick(price,1000);
+  assert.equal(h.element('btc-spot').children[0],'$'+Math.floor(price)+'.');
+  assert.notEqual(h.element('btc-line').d,previousPath);
+  assert.notEqual(h.element('workspace-clock').textContent,previousClock);
+  assert.equal(h.model.now,h.model.priceUpdatedAt);
+  previousPath=h.element('btc-line').d;previousClock=h.element('workspace-clock').textContent;
+ }
+});
+
+test('switching back to a coin reconnects its chart after short and long absences',async()=>{
+ for(const elapsed of [4000,20000,120000]){
+  const h=chartHarness({quote:({url,now})=>({price:url.includes('ETH-USD')?'208':'108',time:new Date(now).toISOString()})});
+  await flush();h.tick(110,1000);h.tick(111,1000);
+  const trail=h.model.secondPoints;
+  h.select('ETH');await flush();h.tick(210,elapsed);
+  h.select('BTC');await flush();
+  assert.equal(h.model.secondPoints,trail);
+  assert(trail.some(p=>p.price===110)&&trail.some(p=>p.price===111),'observed movement survives navigation');
+  assert(trail.every(p=>p.price<200),'other coin prices do not enter the restored chart');
+  assert.equal((h.element('btc-line').d.match(/M/g)||[]).length,1,`${elapsed}ms away does not break the line`);
+ }
+});
+
+test('returning from another page reconnects the chart without losing recorded prices',async()=>{
+ for(const elapsed of [5000,120000]){
+  const h=chartHarness();await flush();h.tick(110,1000);
+  h.events.pagehide();h.advance(elapsed);
+  h.events.pageshow({persisted:true});await flush();
+  assert(h.model.secondPoints.some(p=>p.price===110));
+  assert.equal((h.element('btc-line').d.match(/M/g)||[]).length,1);
+ }
+});
+
+test('hourly banner pairs the dollar move with its signed percentage, including small changes',async()=>{
+ for(const [spot,label,color] of [
+  [110,'+$10.00 (+10.00%) this hour','var(--green)'],
+  [90,'−$10.00 (−10.00%) this hour','var(--red)'],
+  [100,'+$0.00 (+0.00%) this hour','var(--green)'],
+  [100.0015,'+$0.00 (+0.0015%) this hour','var(--green)']
+ ]){
+  const h=chartHarness({quote:({now})=>({price:String(spot),time:new Date(now).toISOString()})});await flush();
+  assert.equal(h.element('btc-change').textContent,label);
+  assert.equal(h.element('btc-change').style.color,color);
+ }
+});
+
+test('hourly banner waits for the exact opening benchmark before showing a percentage',async()=>{
+ const opening=Date.UTC(2026,9,12,16,59)/1000;
+ for(const value of [null,0]){
+  const h=chartHarness({transformCandles:rows=>value===null?rows.filter(c=>c[0]!==opening):rows.map(c=>c[0]===opening?[...c.slice(0,4),value,1]:c)});await flush();
+  assert.equal(h.element('btc-change').textContent,'Waiting for price data');
+ }
+});
+
+test('historical banner calculates the percentage from the selected hour opening and close',async()=>{
+ const closing=Date.UTC(2026,9,12,16,59)/1000;
+ const h=chartHarness({transformCandles:rows=>rows.map(c=>[...c.slice(0,4),c[0]===closing?110:100,1])});await flush();
+ h.element('previous-hour').listeners.click();await flush();
+ assert.equal(h.element('btc-change').textContent,'+$10.00 (+10.00%) that hour');
+});
+
+test('full-hour rows and graph share a moving time axis after resize and hide it for history',async()=>{
+ const h=chartHarness();await flush();
+ const stack=h.element('timeline-stack'),chart=h.element('btc-chart');
+ stack.getBoundingClientRect=()=>({left:20,top:100,width:1000});
+ chart.getBoundingClientRect=()=>({left:75,top:180,width:890});
+ h.events.resize();
+ const fraction=(h.model.now-h.hour)/3600000;
+ assert.equal(stack.style['--hour-progress'],`${fraction*100}%`);
+ assert.equal(stack.style['--cursor-x'],`${55+fraction*890}px`);
+ assert.equal(stack.style['--cursor-top'],'80px');
+ const before=parseFloat(stack.style['--hour-progress']);
+ h.step();
+ assert(parseFloat(stack.style['--hour-progress'])>before);
+ assert.equal(h.element('time-cursor').hidden,false);
+ h.element('previous-hour').listeners.click();await flush();
+ assert.equal(h.element('hour-overview').dataset.state,'completed');
+ assert.equal(h.element('time-cursor').hidden,true);
+});
+
+test('chart history falls back to the server when the browser cannot reach the provider',async()=>{
+ const h=chartHarness({historyError:true});await flush();
+ assert.equal(h.pending.length,1);
+ h.pending.shift()({ok:true,json:async()=>({candles:Array.from({length:90},(_,i)=>[h.hour/1000-3900+i*60,99,120,100,105,1])})});
+ await flush();
+ assert.equal(h.model.historyStatus,'ready');
+ assert(h.model.candles.length>0);
+ assert.match(h.element('btc-line').d,/^M/);
+ // Resolve the independent longer pricing refresh as well.
+ h.pending.shift()?.({ok:false});await flush();
+});
 
 test('returning through the browser page cache restarts live quotes and the chart clock',async()=>{
  let price=108;
@@ -148,36 +264,36 @@ test('an expired price is replaced by unavailable until a fresh quote arrives',a
  assert.equal(h.element('feed-message').hidden,true);
 });
 
-test('a fresh quote just before the hour is displayed without inventing a chart point',async()=>{
+test('a fresh quote before the hour holds the exact new-hour benchmark at the active playhead',async()=>{
  const h=chartHarness({startTime:Date.UTC(2026,9,12,18,0,1),quote:({now})=>({price:'120',time:new Date(now-2000).toISOString()})});await flush();
  assert.equal(h.model.spot,120);
  assert.equal(h.model.spotStatus,'ready');
  assert.equal(h.element('btc-spot').children[0],'$120.');
- assert.equal(h.element('btc-line').d,'M0.000,65.000');
+ assert.match(h.element('btc-line').d,/^M0\.000,65\.000 L0\.278,65\.000$/);
+ assert.equal(h.model.priceUpdatedAt,h.hour-1000,'display projection does not change the provider timestamp');
 });
 
 test('initial current hour backfills to its start before pricing history completes',async()=>{
  const h=chartHarness();await flush();
  assert.equal(h.pending.length,1);
  assert.match(h.element('btc-line').d,/^M0\.000,/);
- assert.match(h.element('btc-line').d,/ 416\.667,/);
+ assert.match(h.element('btc-line').d,/L416\.667,/);
  h.pending[0]({ok:false});await flush();
  assert.match(h.element('btc-line').d,/^M0\.000,/);
  assert.equal(h.model.historyStatus,'ready');
  assert.equal(h.model.pricingHistoryStatus,'error');
 });
 
-test('minute heat map renders sixty time-aligned candle directions',async()=>{
+test('minute summary arrows align with the hour candle centers',async()=>{
  const h=chartHarness();await flush();
- const map=h.element('minute-heatmap'),dots=map.children;
- assert.equal(dots.length,60);
- assert.equal(dots[14].style.left,'25%');
- assert.equal(dots[29].style.left,'50%');
- assert.equal(dots[44].style.left,'75%');
- assert.equal(dots[59].style.left,'100%');
- assert.equal(dots.filter(dot=>dot.className.includes(' up')).length,25);
- assert.equal(dots[25].className,'minute-dot current');
- assert.match(dots[0].title,/17:00–17:01 UTC · Up/);
+ const map=h.element('minute-heatmap'),markers=map.children;
+ assert.equal(markers.length,60);
+ const candleCenters=[...h.element('minute-bars-up').d.matchAll(/M([-\d.]+),[-\d.]+V/g)].map(match=>Number(match[1]));
+ assert.equal(candleCenters.length,25);
+ candleCenters.forEach((center,index)=>assert(Math.abs(parseFloat(markers[index].style.left)*10-center)<.001,'each summary arrow sits below its candle wick'));
+ assert.equal(markers.filter(marker=>marker.className.includes(' up')).length,25);
+ assert.equal(markers[25].className,'minute-arrow current');
+ assert.match(markers[0].title,/17:00–17:01 UTC · Up/);
  assert.match(map['aria-label'],/25 up, 0 down, 35 pending or unavailable/);
 });
 
@@ -188,10 +304,21 @@ test('returning to current hour restores history and ignores old pricing respons
  h.element('current-hour').listeners.click();await flush();
  assert.equal(h.model.isHistorical,false);
  assert.match(h.element('btc-line').d,/^M0\.000,/);
- assert.match(h.element('btc-line').d,/ 416\.667,/);
+ assert.match(h.element('btc-line').d,/L416\.667,/);
  const currentPath=h.element('btc-line').d;
  h.pending[0]({ok:true,json:async()=>({candles:[]})});await flush();
  assert.equal(h.element('btc-line').d,currentPath);
+});
+
+test('returning from an interval can select its containing hour without accepting malformed times',async()=>{
+ const h=chartHarness();await flush();
+ h.events['market-hour-select']({detail:{hour:h.hour-3600000}});await flush();
+ assert.equal(h.model.displayHour,h.hour-3600000);
+ assert.equal(h.model.isHistorical,true);
+ for(const hour of [null,NaN,h.hour-1])h.events['market-hour-select']({detail:{hour}});
+ assert.equal(h.model.displayHour,h.hour-3600000);
+ h.events['market-hour-select']({detail:{hour:h.hour+3600000}});await flush();
+ assert.equal(h.model.displayHour,h.hour,'future hours remain clamped to the current hour');
 });
 
  test('banner fractional digits follow price moves and reset on navigation',async()=>{
@@ -210,15 +337,16 @@ test('returning to current hour restores history and ignores old pricing respons
  assert.equal(digits().dataset.trend,'');
 });
 
-test('live banner prices update every two seconds while clocks keep ticking each second',async()=>{
+test('live banner coalesces intrasecond quotes and refreshes alongside the one-second clock',async()=>{
  const h=chartHarness();await flush();
  const digits=()=>h.element('btc-spot').children;
  const initial=digits(),clock=h.element('workspace-clock').textContent;
- h.tick(110.25);h.step();
- assert.equal(digits(),initial,'one-second update retains the displayed price');
+ h.tick(110.25);
+ assert.equal(digits(),initial,'quotes within the same second retain the displayed price');
+ h.step();
  assert.notEqual(h.element('workspace-clock').textContent,clock);
- h.step();assert.equal(digits()[0],'$110.');assert.equal(digits()[1].textContent,'25');
- h.tick(112.75);h.step();assert.equal(digits()[0],'$110.');
+ assert.equal(digits()[0],'$110.');assert.equal(digits()[1].textContent,'25');
+ h.tick(112.75);assert.equal(digits()[0],'$110.');
  h.step();assert.equal(digits()[0],'$112.');assert.equal(digits()[1].textContent,'75');
 });
 
@@ -256,7 +384,7 @@ test('missing oil credentials show an actionable error without simulated substit
  assert(!Number.isFinite(h.model.spot));
 });
 
-test('completed quarters show a green direction arrow with an outcome-colored dot',async()=>{
+test('completed quarters show a green direction arrow with an outcome-colored marker',async()=>{
  const h=chartHarness();await flush();
  const markers=h.element('segment-results').children;
  assert.equal(markers.length,1);assert.equal(markers[0].textContent,'↑');
@@ -275,44 +403,83 @@ test('missing boundary candle leaves completed segment without an invented winne
  assert.equal(h.element('segment-results').children.length,0);
 });
 
- test('smooth plot refreshes every five seconds while live prices remain current',async()=>{
+ test('minute plot refreshes each second while preserving candle wicks and the price tip',async()=>{
  const h=chartHarness();await flush();
  const initial=h.element('btc-line').d;
- assert.match(initial,/ C/);
- assert.doesNotMatch(initial,/ L/);
+ assert.match(initial,/ L/);
+ assert.doesNotMatch(initial,/ C/);
  h.tick(110);
  assert.equal(h.model.spot,110);
- for(let i=0;i<4;i++)h.step();
- assert.equal(h.element('btc-line').d,initial);
+ assert.equal(h.element('btc-line').d,initial,'quotes within the same second are coalesced');
  h.step();
  const refreshed=h.element('btc-line').d;
  assert.notEqual(refreshed,initial);
- assert.ok(h.element('btc-area').d.startsWith(refreshed));
- const end=refreshed.trim().split(' ').at(-1).split(',').map(Number);
+ assert.equal(h.element('btc-area').d,undefined,'no shaded area bridges missing minute data');
+ assert.match(h.element('minute-bars-up').d,/V/,'minute high and low wicks are visible');
+ const end=refreshed.trim().split(' ').at(-1).slice(1).split(',').map(Number);
  assert.ok(Math.abs(end[0]-h.element('btc-tip').cx)<.001);
  assert.ok(Math.abs(end[1]-h.element('btc-tip').cy)<.001);
 });
 
-test('smooth curve control points stay between neighboring prices at peaks and troughs',async()=>{
- const h=chartHarness({transformCandles:cs=>cs.map((c,i)=>[...c.slice(0,4),100+(i%3===1?5:0),c[5]])});await flush();
+test('minute chart keeps straight closes and separates missing minutes',async()=>{
+ const h=chartHarness({transformCandles:rows=>rows.filter(c=>c[0]*1000!==Date.UTC(2026,9,12,17,10))});await flush();
  const path=h.element('btc-line').d;
- const coordinates=path.match(/-?\d+\.\d+/g).map(Number);
- let previous=coordinates.slice(0,2);
- for(let i=2;i<coordinates.length;i+=6){
-  const [x1,y1,x2,y2,x,y]=coordinates.slice(i,i+6);
-  assert.ok(x1>=previous[0]&&x2>=x1&&x>=x2);
-  assert.ok(y1>=Math.min(previous[1],y)&&y1<=Math.max(previous[1],y));
-  assert.ok(y2>=Math.min(previous[1],y)&&y2<=Math.max(previous[1],y));
-  previous=[x,y];
- }
+ assert.doesNotMatch(path,/ C/);
+ assert.equal((path.match(/M/g)||[]).length,2,'a missing minute starts a new path');
+ assert.match(h.element('chart-description').textContent,/one-minute OHLC/);
 });
 
-test('segment countdown shows Locked exactly in the final thirty seconds',async()=>{
- const h=chartHarness({startTime:Date.UTC(2026,9,12,17,59,29)});await flush();
+test('segment countdown shows Locked exactly in the final five seconds',async()=>{
+ const h=chartHarness({startTime:Date.UTC(2026,9,12,17,59,54)});await flush();
  const market=h.model.markets.find(m=>m.id==='60-0');
- assert.equal(market.remaining,'0m 31s');
- h.step();assert.equal(market.remaining,'0m 30s - Locked');
- for(let i=0;i<29;i++)h.step();
+ assert.equal(market.remaining,'0m 06s');
+ h.step();assert.equal(market.remaining,'0m 05s - Locked');
+ for(let i=0;i<4;i++)h.step();
  assert.equal(market.remaining,'0m 01s - Locked');
  h.step();assert.equal(market.remaining.includes('Locked'),false);
+});
+
+test('a newly opened five-minute market refreshes its benchmark just after the minute boundary',async()=>{
+ const h=chartHarness({startTime:Date.UTC(2026,10,2,17,29,58)});await flush();
+ h.pending[0]({ok:true,json:async()=>({candles:[]})});await flush();
+ const next=h.model.markets.find(m=>m.id==='5-6');
+ assert.equal(next.status,'queued');assert.equal(next.strike,null);
+ for(let i=0;i<4;i++){h.step();await flush();}
+ assert.equal(next.status,'open');assert(Number.isFinite(next.strike));
+ const requests=h.requests.filter(url=>url.includes('/candles?'));
+ assert.equal(requests.length,2,'history refresh follows the minute boundary instead of waiting another full minute');
+ assert(requests.every(url=>new URL(url,'http://localhost').searchParams.get('granularity')==='60'));
+});
+
+test('price ticks reuse minute annotations until the minute changes',async()=>{
+ const h=chartHarness();await flush();
+ const markers=h.element('minute-heatmap').children,results=h.element('segment-results').children;
+ h.tick(109,1000);
+ assert.equal(h.element('minute-heatmap').children,markers);
+ assert.equal(h.element('segment-results').children,results);
+ h.tick(110,30000);
+ assert.notEqual(h.element('minute-heatmap').children,markers);
+ assert.notEqual(h.element('segment-results').children,results);
+});
+
+test('digital title clock updates in UTC across midnight',async()=>{
+ const h=chartHarness({startTime:Date.UTC(2026,9,12,23,59,59)});
+ await flush();
+ assert.equal(h.element('workspace-clock').textContent,'23:59:59 UTC');
+ h.step();
+ assert.equal(h.element('workspace-clock').textContent,'00:00:00 UTC');
+});
+
+test('local clock avoids unchanged text and tooltip writes between second ticks',async()=>{
+ const h=chartHarness();await flush();
+ const node=h.element('workspace-local-clock');
+ let text=node.textContent,title=node.title,textWrites=0,titleWrites=0;
+ Object.defineProperty(node,'textContent',{get:()=>text,set:value=>{text=value;textWrites++;}});
+ Object.defineProperty(node,'title',{get:()=>title,set:value=>{title=value;titleWrites++;}});
+ h.tick(110);
+ assert.equal(textWrites,0);
+ assert.equal(titleWrites,0);
+ h.step();
+ assert.equal(textWrites,1);
+ assert.equal(titleWrites,0);
 });

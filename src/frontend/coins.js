@@ -13,7 +13,14 @@
     }));
     const available=Object.freeze(coins.filter(coin=>coin.enabled&&coin.category===category).slice(0,10));
     const /** Find an instrument by symbol, falling back to the first available catalog entry. */ getCoin=symbol=>coins.find(coin=>coin.symbol===symbol)||available[0]||coins[0];
-    const /** Format a finite instrument price with its configured precision, or show an unknown-value marker. */ formatPrice=(value,symbol)=>Number.isFinite(value)?value.toLocaleString('en-US',{style:'currency',currency:'USD',minimumFractionDigits:getCoin(symbol)?.precision??2,maximumFractionDigits:getCoin(symbol)?.precision??2}):'—';
+    const formatters=new Map();
+    /** Reuse currency formatters by catalog precision during live price updates. */
+    function formatPrice(value,symbol){
+      if(!Number.isFinite(value))return '—';
+      const precision=getCoin(symbol)?.precision??2;
+      if(!formatters.has(precision))formatters.set(precision,new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:precision,maximumFractionDigits:precision}));
+      return formatters.get(precision).format(value);
+    }
     return {coins,available,getCoin,formatPrice};
   }
   if(typeof module!=='undefined'&&module.exports)module.exports={createCatalog};

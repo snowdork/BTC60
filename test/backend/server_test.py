@@ -25,6 +25,8 @@ class AccountsTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls.signup_policy=patch.object(server.CONST, 'SIGNUP_CODE_REQUIRED', True)
+        cls.signup_policy.start()
         cls.oil_config=patch('oilprice_api.configured',return_value=False)
         cls.oil_config.start()
         cls.temp = tempfile.TemporaryDirectory()
@@ -36,6 +38,7 @@ class AccountsTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        cls.signup_policy.stop()
         cls.http.shutdown()
         cls.http.server_close()
         cls.temp.cleanup()
@@ -68,6 +71,23 @@ class AccountsTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(self.request('GET', '/api/account', cookie=cookie)[0], 401)
         self.assertEqual(self.request('GET', '/api/account', cookie=replacement)[0], 200)
+
+    def test_signup_code_fields_follow_server_policy_and_cache_revalidates(self):
+        self.assertEqual(self.request('GET', '/signup.html')[0], 200)
+        etag = self.last_headers['ETag']
+        with patch.object(server.CONST, 'SIGNUP_CODE_REQUIRED', False):
+            for encoding in ('identity', 'gzip'):
+                status, body, _ = self.request('GET', '/signup.html', extra_headers={
+                    'Accept-Encoding': encoding, 'If-None-Match': etag})
+                self.assertEqual(status, 200)
+                if encoding == 'gzip':
+                    body = server.gzip.decompress(body)
+                self.assertNotIn(b'id="signup-code"', body)
+                self.assertNotIn(b'id="google-signup-code"', body)
+                self.assertIn(b'name="website"', body)
+        status, body, _ = self.request('GET', '/signup.html')
+        self.assertEqual(status, 200)
+        self.assertIn(b'id="signup-code"', body)
 
     def test_password_storage_uses_unique_salted_scrypt_hashes(self):
         password = 'same-password'
@@ -336,11 +356,14 @@ class AccountsTest(unittest.TestCase):
     def test_additional_public_origin_accepts_alias_and_rejects_lookalikes(self):
         with patch.dict('os.environ', {
             'P60_HOST': 'https://predict60.com',
-            'P60_ADDITIONAL_ORIGINS': 'https://predict60.free-vibe.com',
+            'P60_ADDITIONAL_ORIGINS': 'https://predict60.free-vibe.com,http://localhost:8085',
         }):
             for origin, expected in (
                 ('https://predict60.com', 415),
                 ('https://predict60.free-vibe.com', 415),
+                ('http://localhost:8085', 415),
+                ('http://localhost:8086', 403),
+                ('http://localhost.evil.example:8085', 403),
                 ('http://predict60.free-vibe.com', 403),
                 ('https://predict60.free-vibe.com.evil.example', 403),
             ):
@@ -372,6 +395,73 @@ class AccountsTest(unittest.TestCase):
                         self.assertEqual(self.request('POST', '/api/login', {}, extra_headers=headers)[0], expected)
         with patch.dict('os.environ', {'P60_HOST': 'https://predict60.com'}):
             self.assertEqual(self.request('POST', '/api/login', {}, extra_headers={'Content-Type': 'text/plain'})[0], 415)
+
+    def test_five_minute_predictions_accept_all_twelve_intervals_and_settle(self):
+        _, _, cookie = self.request('POST', '/api/signup', {
+            'name': 'Five minute', 'email': 'five@example.com', 'password': 'pass-five',
+            'confirmPassword': 'pass-five', 'signupCode': '777'})
+        account = self.request('GET', '/api/account', cookie=cookie)[1]
+        csrf = account['csrf']
+        hour = int(server.time.time()) // 3600 * 3600
+        for index in range(12):
+            start = hour + index * 300
+            order = {'coin': 'BTC', 'marketId': f'5-{index}', 'side': 'up', 'budget': 1,
+                     'requestId': f'five-minute-request-{index:04}', 'startsAt': start * 1000}
+            with patch('server.time.time', return_value=start + 20), patch('server.candle_close', return_value=100), patch('server.fresh_spot', return_value=100), patch('server.market_up', return_value=50):
+                status, saved, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
+                self.assertEqual(status, 201, saved)
+                prediction = next(p for p in saved['predictions'] if p['market_id'] == f'5-{index}')
+                self.assertEqual(prediction['starts_at'], start)
+                self.assertEqual(prediction['ends_at'], start + 300)
+            with patch('server.time.time', return_value=start + 295):
+                status, error, _ = self.request('POST', '/api/predictions',
+                    dict(order, requestId=f'five-minute-locked-{index:04}'), cookie, csrf)
+                self.assertEqual(status, 400)
+                self.assertIn('Betting closed', error['error'])
+        with patch('server.time.time', return_value=hour + 3606), patch('server.candle_close', return_value=100):
+            server.settle_due()
+            settled = self.request('GET', '/api/account', cookie=cookie)[1]['predictions']
+        self.assertEqual(len(settled), 12)
+        self.assertTrue(all(p['outcome'] == 'up' and p['payout_cents'] == 200 for p in settled))
+        catalog = self.request('GET', '/api/coins', cookie=cookie)[1]
+        for index in range(12):
+            self.assertEqual(catalog['marketConfig']['quotes'][f'5-{index}'], 50)
+        for market in ('5-12', '5--1', '1-60'):
+            rejected = self.request('POST', '/api/predictions', dict(order, marketId=market), cookie, csrf)
+            self.assertEqual(rejected[0], 400)
+
+    def test_one_minute_crypto_predictions_are_not_offered_or_accepted(self):
+        _, _, cookie = self.request('POST', '/api/signup', {
+            'name': 'Removed duration', 'email': 'minute@example.com', 'password': 'pass-minute',
+            'confirmPassword': 'pass-minute', 'signupCode': '777'})
+        account = self.request('GET', '/api/account', cookie=cookie)[1]
+        hour = int(server.time.time()) // 3600 * 3600
+        for index in range(60):
+            order = {'coin': 'BTC', 'marketId': f'1-{index}', 'side': 'up', 'budget': 1,
+                     'requestId': f'removed-minute-{index:04}', 'startsAt': (hour+index*60)*1000}
+            self.assertEqual(self.request('POST', '/api/predictions', order, cookie, account['csrf'])[0], 400)
+        quotes = self.request('GET', '/api/coins', cookie=cookie)[1]['marketConfig']['quotes']
+        self.assertFalse(any(key.startswith('1-') for key in quotes))
+        self.assertEqual(len(quotes), 19)
+        self.assertEqual(self.request('GET', '/api/account', cookie=cookie)[1]['predictions'], [])
+
+    def test_legacy_one_minute_predictions_still_settle_and_remain_in_history(self):
+        _, _, cookie = self.request('POST', '/api/signup', {
+            'name': 'Legacy duration', 'email': 'legacy-minute@example.com', 'password': 'pass-minute',
+            'confirmPassword': 'pass-minute', 'signupCode': '777'})
+        account = self.request('GET', '/api/account', cookie=cookie)[1]
+        hour = int(server.time.time()) // 3600 * 3600
+        with server.connect() as conn:
+            conn.execute('INSERT INTO predictions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                         ('legacy-minute',account['user']['id'],'legacy-minute-request','BTC','1-0',
+                          'up',hour,hour+60,100,50,2,100,hour))
+        with patch('server.time.time', return_value=hour+66), patch('server.candle_close', return_value=101):
+            server.settle_due()
+            predictions = self.request('GET', '/api/account', cookie=cookie)[1]['predictions']
+        self.assertEqual(len(predictions), 1)
+        self.assertEqual(predictions[0]['market_id'], '1-0')
+        self.assertEqual(predictions[0]['outcome'], 'up')
+        self.assertEqual(predictions[0]['payout_cents'], 200)
 
     def test_account_prediction_settlement_lifecycle(self):
         status, _, cookie = self.request('POST', '/api/signup', {'confirmPassword': 'pass-123', 'signupCode': '777', 'name': '<Test>', 'email': 'one@example.com', 'password': 'pass-123'})
@@ -432,7 +522,7 @@ class AccountsTest(unittest.TestCase):
         csrf = self.request('GET', '/api/account', cookie=cookie)[1]['csrf']
         start = int(server.time.time()) // 3600 * 3600
         order = {'coin': 'BTC', 'marketId': '60-0', 'side': 'up', 'budget': 50, 'requestId': 'live-request-00000001', 'startsAt': start * 1000, 'strike': 99, 'cents': 10}
-        with patch('server.time.time', return_value=start + 3569), patch('server.candle_close', return_value=100), patch('server.fresh_spot', return_value=101), patch('server.market_up', return_value=70):
+        with patch('server.time.time', return_value=start + 3594), patch('server.candle_close', return_value=100), patch('server.fresh_spot', return_value=101), patch('server.market_up', return_value=70):
             status, account, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
             self.assertEqual(status, 201, account)
             with server.connect() as conn:
@@ -442,7 +532,7 @@ class AccountsTest(unittest.TestCase):
                 self.assertAlmostEqual(saved['contracts'], 5000/70)
                 self.assertEqual(saved['cost_cents'], 5000)
             balance = account['user']['balance_cents']
-        with patch('server.time.time', return_value=start + 3570):
+        with patch('server.time.time', return_value=start + 3595):
             order['requestId'] = 'live-request-00000002'
             status, _, _ = self.request('POST', '/api/predictions', order, cookie, csrf)
             self.assertEqual(status, 400)
@@ -567,13 +657,27 @@ class AccountsTest(unittest.TestCase):
                 self.assertEqual(network.call_count, 2)
 
     def test_benchmark_does_not_retry_permanent_provider_rejection(self):
-        error = server.urllib.error.HTTPError('https://example.invalid', 404, 'Not found', {}, None)
+        from io import BytesIO
+        body = BytesIO(b'Not found')
+        error = server.urllib.error.HTTPError('https://example.invalid', 404, 'Not found', {}, body)
         with patch.dict(server.HISTORY_CACHE, {}, clear=True), patch('server.time.sleep') as sleep, patch(
                 'server.urllib.request.urlopen', side_effect=error) as network:
             with self.assertRaises(server.urllib.error.HTTPError):
                 server.candle_close('BTC', 120, {'feed': 'coinbase', 'product': 'BTC-USD'})
             self.assertEqual(network.call_count, 1)
             sleep.assert_not_called()
+        self.assertTrue(body.closed)
+
+    def test_benchmark_closes_http_responses_before_retrying(self):
+        from io import BytesIO
+        bodies = [BytesIO(b'Try later') for _ in range(2)]
+        errors = [server.urllib.error.HTTPError('https://example.invalid', code, 'Try later', {}, body)
+                  for code, body in zip((429, 503), bodies)]
+        with patch.dict(server.HISTORY_CACHE, {}, clear=True), patch('server.time.sleep'), patch(
+                'server.urllib.request.urlopen', side_effect=[*errors, BytesIO(b'[[60,0,0,0,101]]')]) as network:
+            self.assertEqual(server.candle_close('BTC', 120, {'feed': 'coinbase', 'product': 'BTC-USD'}), 101)
+            self.assertEqual(network.call_count, 3)
+        self.assertTrue(all(body.closed for body in bodies))
 
     def test_benchmark_retry_is_bounded_and_never_uses_another_minute(self):
         from io import BytesIO
@@ -646,9 +750,11 @@ class AccountsTest(unittest.TestCase):
         self.assertLess(len(body),len(gzip.decompress(body)))
         conn.request('GET','/styles.css',headers={'Accept-Encoding':'gzip','If-None-Match':etag})
         response=conn.getresponse();self.assertEqual(response.status,304);self.assertEqual(response.read(),b'')
-        conn.request('HEAD','/responsive.css')
-        response=conn.getresponse();self.assertEqual(response.status,200);self.assertEqual(response.read(),b'')
-        self.assertGreater(int(response.getheader('Content-Length')),0)
+        for path in ('/responsive.css', '/hud.css'):
+            with self.subTest(path=path):
+                conn.request('HEAD', path)
+                response=conn.getresponse();self.assertEqual(response.status,200);self.assertEqual(response.read(),b'')
+                self.assertGreater(int(response.getheader('Content-Length')),0)
         conn.close()
 
     def test_weather_is_coming_soon(self):

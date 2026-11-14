@@ -32,6 +32,7 @@ def download(product,output,days=30):
                 with urllib.request.urlopen(request,timeout=10) as response:batch=json.load(response)
                 break
             except urllib.error.HTTPError as error:
+                error.close()
                 if error.code not in (429,500,502,503,504) or attempt==2:raise
                 time.sleep(1+attempt)
             except urllib.error.URLError:

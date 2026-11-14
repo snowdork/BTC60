@@ -11,7 +11,8 @@
     {id:'15-0',minutes:15,start:'17:00',end:'17:15',status:'settled',strike:67450,close:67440,up:49},
     {id:'15-1',minutes:15,start:'17:15',end:'17:30',status:'settled',strike:67440,close:67500,up:57},
     {id:'15-2',minutes:15,start:'17:30',end:'17:45',status:'open',strike:67500,up:62,remaining:'2m 48s'},
-    {id:'15-3',minutes:15,start:'17:45',end:'18:00',status:'queued',strike:null,up:null}
+    {id:'15-3',minutes:15,start:'17:45',end:'18:00',status:'queued',strike:null,up:null},
+    ...Array.from({length:12},(_,index)=>({id:`5-${index}`,minutes:5,start:`17:${String(index*5).padStart(2,'0')}`,end:index===11?'18:00':`17:${String((index+1)*5).padStart(2,'0')}`,status:'queued',strike:null,up:50}))
   ];
   /** Validate market state, side, budget, and balance before calculating fractional shares and rounded payout. */ function quote(market,side,budget,balance) {
     const cents = side === 'up' ? market.up : 100-market.up;
@@ -58,7 +59,7 @@
     const up=Math.max(1,Math.min(99,Math.round(100*calibratedProbability(normalCDF(z),calibration))));
     return {up,down:100-up,label:'ESTIMATE'};
   }
-  /** Explain whether current feed, history, quote, and interval state permit placing a prediction. */ function dataStatus(model,market,now=Date.now()) {
+  /** Explain whether current feed, history, quote, and interval state permit placing a prediction. */ function dataStatus(model,market,now=Date.now(),{allowLocked=false}={}) {
     if(model.isHistorical)return {ready:false,reason:'Historical market',age:null};
     if(model.coin?.feed==='oilpriceapi'&&model.feedMode!=='demo')return {ready:false,reason:'Spot assessments lack hourly benchmarks',age:Number.isFinite(model.priceUpdatedAt)?Math.max(0,Math.floor((now-model.priceUpdatedAt)/1000)):null};
     // Synthetic preview values are never eligible for executable predictions.
@@ -75,7 +76,7 @@
     if(!model.quoteReady||!Number.isInteger(market.up))return {ready:false,reason:'Purchase quote unavailable',age};
     // Reject invalid order state before any monetary arithmetic.
     if(market.status!=='open'||!Number.isFinite(market.endsAt)||now>=market.endsAt)return {ready:false,reason:'Market closed',age};
-    if(now>=market.endsAt-30000)return {ready:false,reason:'Betting closed · final 30 seconds',age};
+    if(!allowLocked&&now>=market.endsAt-5000)return {ready:false,reason:'Betting closed · final 5 seconds',age};
     return {ready:true,reason:'Ready',age};
   }
   /** Validate server purchase quote configuration before enabling model quotes. */ function configure(config){
@@ -83,7 +84,76 @@
     markets.forEach(m=>{m.up=config.quotes[m.id];});model.quoteReady=true;model.settlement=config.settlement;model.calibrations=config.calibrations||{};
   }
   /** Resolve equal or rising benchmark values as Up and falling values as Down. */ function outcome(start,close) { return close >= start ? 'up' : 'down'; }
-  const model={maxPredictionCredits,markets,quote,outcome,estimateChances,minuteVolatility,normalCDF,calibratedProbability,dataStatus,configure,quoteReady:false,initialBalance:10000,spot:67528.50,coin:typeof window!=='undefined'?window.PredictCoins.available[0]:null};
+  /** Build adjacent UTC intervals, including neighbors across an hour or day boundary. */
+  function adjacentMarkets(minutes,anchor,now,candles=[]){
+    const duration=minutes*60000,start=Math.floor(anchor/duration)*duration;
+    const closes=new Map(candles.filter(c=>Array.isArray(c)&&Number.isFinite(c[4])&&c[4]>0&&c[0]*1000+60000<=now).map(c=>[c[0]*1000+60000,c[4]]));
+    const /** Format the interval's UTC hour and minute. */ time=t=>new Date(t).toISOString().slice(11,16);
+    return [-1,0,1].map((offset)=>{
+      const startsAt=start+offset*duration,endsAt=startsAt+duration;
+      const status=now>=endsAt?'settled':now>=startsAt?'open':'queued';
+      return {id:`${minutes}-${Math.floor((startsAt%3600000+3600000)%3600000/duration)}`,minutes,startsAt,endsAt,start:time(startsAt),end:time(endsAt),status,
+        strike:status==='queued'?null:closes.get(startsAt)??null,close:status==='settled'?(closes.get(endsAt)??null):null,up:50};
+    });
+  }
+  /** Combine minute history with observed one-second prices and align the live edge to display time. */
+  function minutePlot(candles,start,end,now,live=null,secondPoints=[]){
+    const byMinute=new Map();
+    for(const c of candles){
+      if(!Array.isArray(c)||c.length<5||!Number.isFinite(c[0]))continue;
+      const t=c[0]*1000;
+      // Exclude history outside this interval before validating OHLC values.
+      if(!(t>=start-60000&&t<end&&t+60000<=now)||c[0]%60!==0)continue;
+      if(!Number.isFinite(c[1])||!Number.isFinite(c[2])||!Number.isFinite(c[3])||!Number.isFinite(c[4])
+          ||c[1]<=0||c[2]<=0||c[3]<=0||c[4]<=0
+          ||c[1]>Math.min(c[3],c[4])||c[2]<Math.max(c[3],c[4]))continue;
+      byMinute.set(c[0],c);
+    }
+    const rows=[...byMinute.values()].sort((a,b)=>a[0]-b[0]);
+    const bars=rows.filter(c=>c[0]*1000>=start),closes=rows.map(c=>({t:c[0]*1000+60000,price:c[4]}));
+    const bySecond=new Map(),lastTime=Math.min(now,end);
+    for(const p of secondPoints||[]){
+      if(p&&Number.isFinite(p.t)&&p.t%1000===0&&Number.isFinite(p.price)&&p.price>0&&p.t>=start&&p.t<=lastTime){
+        bySecond.set(p.t,{t:p.t,price:p.price});
+      }
+    }
+    const recorded=[...bySecond.values()];
+    // Final minute closes remain authoritative at settlement boundaries. Loading
+    // those closes never discards the second-by-second observations in between.
+    const byTime=new Map(closes.map(p=>[p.t,p]));
+    for(const point of recorded){
+      if((point.t!==start&&point.t!==end)||!byTime.has(point.t))byTime.set(point.t,point);
+    }
+    const samples=[...byTime.values()].sort((a,b)=>a.t-b.t);
+    const lastClose=closes.at(-1);
+    if(now>=start&&now<end&&live&&Number.isFinite(live.price)&&live.price>0&&Number.isFinite(live.t)&&live.t>=start-60000&&live.t<=now+5000&&(!lastClose||now>lastClose.t)){
+      // Quote timestamps are observations, not the playhead. Small provider clock
+      // differences and gaps between trades must not pull the live edge backwards.
+      const price=!lastClose||live.t>lastClose.t?live.price:lastClose.price;
+      if(samples.at(-1)?.t===now)samples.pop();
+      samples.push({t:now,price});
+    }
+    let low=Infinity,high=-Infinity;
+    for(const c of bars){low=Math.min(low,c[1]);high=Math.max(high,c[2]);}
+    for(const p of samples){low=Math.min(low,p.price);high=Math.max(high,p.price);}
+    if(low===Infinity)return {line:'',up:'',down:'',tip:null,count:0,secondCount:0};
+    const pad=Math.max((high-low)*.12,high*.000001);low-=pad;high+=pad;
+    const /** Project a timestamp onto the interval's horizontal axis. */ x=t=>(t-start)/(end-start)*1000;
+    const /** Project a price using the range of recorded minute highs and lows. */ y=p=>116-(p-low)/(high-low)*102;
+    const /** Format an SVG coordinate pair without changing the source values. */ xy=(t,p)=>`${x(t).toFixed(3)},${y(p).toFixed(3)}`;
+    // Use the history's minute cadence for continuity, including observed seconds.
+    // Navigation and delayed browser timers can skip recordings without missing
+    // market history. Longer outages still split unless minute closes backfill them.
+    const line=samples.map((p,i)=>`${i&&p.t-samples[i-1].t<=60000?'L':'M'}${xy(p.t,p.price)}`).join(' ');
+    const paths={up:'',down:''},half=60000/(end-start)*1000*.22;
+    for(const c of bars){
+      const center=x(c[0]*1000+30000),open=y(c[3]),close=y(c[4]),top=Math.min(open,close),height=Math.max(.8,Math.abs(open-close));
+      paths[c[4]>=c[3]?'up':'down']+=`M${center.toFixed(3)},${y(c[2]).toFixed(3)}V${y(c[1]).toFixed(3)} M${(center-half).toFixed(3)},${top.toFixed(3)}h${(half*2).toFixed(3)}v${height.toFixed(3)}h${(-half*2).toFixed(3)}Z `;
+    }
+    const last=samples.at(-1);
+    return {line,...paths,tip:last?{x:x(last.t),y:y(last.price),price:last.price}:null,low,high,count:bars.length,secondCount:recorded.length};
+  }
+  const model={maxPredictionCredits,markets,quote,outcome,estimateChances,minuteVolatility,normalCDF,calibratedProbability,dataStatus,configure,adjacentMarkets,minutePlot,quoteReady:false,initialBalance:10000,spot:67528.50,coin:typeof window!=='undefined'?window.PredictCoins.available[0]:null};
   if (typeof module !== 'undefined' && module.exports) module.exports=model;
   else root.PredictModel=model;
 })(typeof globalThis!=='undefined'?globalThis:this);

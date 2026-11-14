@@ -16,6 +16,7 @@ from docker_control import stop_docker
 
 sys.path.insert(0, str(ROOT / 'src/backend'))
 from p60_logging import LOG_PATH, write_or_rotate
+from local_settings import local_signup_code
 
 
 def main():
@@ -64,8 +65,8 @@ def configure_signup_code(prompt=False):
             os.replace(temporary, code_file)
         finally:
             Path(temporary).unlink(missing_ok=True)
-    elif 'P60_SIGNUP_CODE' not in os.environ and code_file.exists():
-        code = code_file.read_text()
+    elif 'P60_SIGNUP_CODE' not in os.environ:
+        code = code_file.read_text() if code_file.exists() else local_signup_code(DATA.parent)
     os.environ['P60_SIGNUP_CODE'] = code
     print('Local signup: enabled.' if code else 'Local signup: disabled. Run with --signup-code to configure it.')
 

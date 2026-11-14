@@ -2,36 +2,174 @@
 
 ## Workspace and visual language
 
-The primary view presents a complete UTC hour: one 60-minute card, two aligned 30-minute cards, and four aligned 15-minute cards. There are no 5-minute markets. A single chart sits above the 60-minute card, matching its width; cards do not contain individual graphs. One red dashed UTC cursor crosses the live chart and all tiers.
+One sticky header owns the title bar, duration selector and coin selector,
+keeping them locked together during scroll. The top row groups the P60/Predict60 brand,
+a single illuminated player/C$ readout, **Interval | Hour**, local/UTC clocks,
+and account tools. The readout shares a dark instrument-panel surface across
+themes with a static mint accent, player icon, name and tabular coin balance. Player names are rendered as plain text, limited to ten displayed Unicode
+code points with the full saved name in a tooltip. The saved name is not changed.
+The clock sits beside the player mini HUD on the left, with local time above UTC, both
+in the same font. Both use wall time independently of the viewed hour. The clock is digital only, with fixed-width digits and no
+clock icon, flip animations or layout shifts. Responsive layouts wrap across
+multiple rows. `src/frontend/hud.css` owns the pinned HUD and Interval HUD
+layouts; `responsive.css` retains the shared chart/card and selector styles.
 
-The ticket opens in a dialog from each segment action. Screens from 601 to 850 pixels keep the timeline in its own horizontal scroll container; at 600 pixels and below, duration tiers stack readable cards beneath a full-width chart. Coin selection and portfolio tables have independent scroll containers. Account and welcome pages reflow to the viewport.
+The selected coin icon, USD price, and hourly dollar/percentage change are in
+a shared graph header outside the top HUD. It is visible in Hour view; Interval
+hides it and uses the selected interval’s live/closing and starting prices in
+its combined HUD, avoiding duplicate price panes. Coin and
+duration controls are inside the pinned HUD above the graph. Coin buttons show
+larger icons without repeated ticker text; accessible names and tooltips identify
+each coin, and a missing/failed image reveals the ticker fallback. The redundant time/cutoff legend is
+removed while its graph markers remain active. C$ denotes game credits; USD
+prices remain instrument prices. Interval is the default and
+shows one 5-, 15-, 30-, or 60-minute play. Hour shows one 60-minute card, two
+30-minute cards, four 15-minute cards, and twelve 5-minute cards. One-minute
+candles are data resolution, not a tradable duration.
 
-Dark surfaces use near-black tones with emerald Up/selection, crimson Down, amber data warnings, and cyan explanatory cues. Light and dark themes use shared variables. Financial values use monospace styling with native font fallbacks. Theme preference is applied before rendering, stored locally, and synchronized across tabs. Coin logos are local SVGs; the welcome page links a static terminal preview.
+Interval view places its existing detail card into one HUD above the graph,
+sharing a row between identity and Up/Down prediction controls. Identity reads
+selected duration clock, coin icon, then UTC range; the clock uses the same duration
+colors as the selector. The redundant lower panel and duplicate card identity are removed from the layout;
+prices, status, countdown, saved predictions and Result/Details remain in the HUD.
+Live/closing price, starting price and actual percentage movement share one
+bordered price block. The countdown sits alongside the UTC range and wraps under
+it on narrow screens; neither field occupies a separate footer row. Result or
+unavailable-data messages remain inside the price block.
+The same card data fields, delegated prediction actions and double-click handling
+remain active.
+
+The title-bar controls and card-body double-clicks change modes. Double-clicking
+an Hour card opens its exact start and duration; double-clicking an Interval card
+returns to Hour. A past interval returns to its containing UTC hour. Interactive
+buttons/links/form fields do not trigger the shortcut. Entering Hour clears
+duration and segment selection highlights. Choosing a duration or segment while in Hour keeps it visible and
+prepares the selected interval; selecting Interval then opens it. In Interval,
+left/right arrows move by one play and Back to live resumes following. In Hour,
+left/right arrows move by one UTC hour and Back to now restores the live hour.
+
+Both graph backgrounds stay black in either theme and across live, completed,
+and upcoming states. Hour has a white price line and green/red candles.
+Interval's line, grid, and endpoint use the duration palette: 60 purple, 30 blue,
+15 pink, and 5 amber. Alternating red/yellow dotted markers show current time;
+orange dashed markers show prediction cutoffs 5 seconds before the end. Historical views hide current
+time markers. The theme applies to the surrounding controls and cards, not the
+black plot background.
+
+Hour chart and card identities use the same duration clock, coin icon and UTC
+range as Interval, without an additional ticker or duration label. Five-minute
+cards use smaller versions of those icons and place the range below them.
+
+The Hour graph and all duration rows share their left/right bounds, in
+60, 15, 30, and 5-minute order. All twelve five-minute cards fit the same hourly
+axis. Narrow screens scroll the chart and every row together, with a shared
+minimum width of 1,200 pixels to keep cards readable. Time markers use the same
+full-hour scale and span the full graph or row height. Duration labels stay pinned
+at the left while the playfield scrolls; Now scrolls the shared timeline to the
+current segment. Coin
+controls remain pinned above the scrolling playfield.
+
+## Registration policy
+
+Registration policy is centralized in `src/backend/CONST.py`. Organizer codes
+are optional (off by default). Both identity methods allow registration without
+an account cap or per-network attempt/success budgets. Account and Google
+identity insertion share a SQLite writer transaction. A honeypot rejects basic
+bots and general authentication throttling remains active. Password registration
+does not verify email ownership. Switching the optional code gate changes the
+served signup fields, its cache key and the static export.
+See [setup and abuse controls](../deploy/SETUP.md#registration-abuse-controls).
 
 ## Segment layout and refresh
 
-Segment layout lives in the final, shared segment section of `responsive.css`;
-`styles.css` supplies the reusable arrow shape. Keep viewport/state changes in
-that section rather than appending successive overrides. Time range, bold model
-probabilities and status lead; benchmark → current/closing price follows;
-action and countdown share the control row. Open uses blue, price direction
-uses green/red, and benchmark text contrasts with the actual card background.
-Completed cards use darker direction colors against their pale surfaces.
+`segment-card.js` supplies the shared card markup. `responsive.css` owns the
+final state and viewport layout. Keep new state/viewport rules with their existing section
+instead of appending competing overrides.
 
-The lower-right arrow has its signed movement percentage above it. This measures
-`(current - benchmark) / benchmark`, not the model's chance of winning. Phones
-wrap probabilities below time/status and use buttons at least 44 pixels tall.
-Upcoming and pending-result cards omit price, odds and countdown markup entirely.
+Cards include UTC range, coin, status, starting and live/closing prices, actual
+movement, available model estimates, saved bet amount/execution percentage, and
+the relevant action.
+Each card has a compact coin/interval/status header and emphasizes the live or
+closing price, with a smaller starting benchmark and actual percentage change.
+Green Up and red Down percentage shortcuts sit beside Predict. Wide cards share
+one row for prices and controls; narrow cards stack them, retaining touch targets
+of at least 44 pixels. The countdown is a short footer. Live/upcoming cards omit
+the repeated date; historical cards retain it. Direction selection and the normal
+freshness/cutoff gates remain in force. Actual movement
+is `(current - starting price) / starting price`; it is separate from Up/Down
+probabilities. Completed results have an outcome-colored heading arrow only
+when both exact settlement benchmarks are available. Missing values remain
+placeholders. Live cards use a duration tint, completed cards use a light gray
+surface, and upcoming cards use light yellow.
 
-`renderMarkets` builds structural state only when the market view changes.
-`renderChances` reuses indexed nodes and writes text, direction attributes and
-accessible labels only when values change. It calculates quote freshness once
-per refresh. Disconnected or paused live prices clear the live comparison;
-completed prices remain based on their exact historical close.
+`renderMarkets` rebuilds structural state on market/view changes and preserves
+horizontal scroll. `renderChances` reuses indexed nodes and avoids rewriting
+unchanged values. Disconnected or paused live quotes clear live comparisons;
+completed comparisons retain their exact historical close. Explicit Hour card
+selection is kept in the grid's dataset and survives a structural refresh, but
+is cleared on entering Hour or changing the displayed instrument/hour.
+
+`market-detail.js` caches stable workspace elements separately from replaceable
+card fields. DOM properties and serialized SVG/image attributes are written only
+when their values change. Saved orders are indexed by coin, market and exact
+start/end boundaries; replacing the account snapshot or emitting `account-update`
+invalidates that index. Readiness is still evaluated on every update, including
+wall-clock cutoff and quote-expiry checks. The main action uses its own
+`data-detail-action` marker so an Up/Down shortcut cannot capture its disabled
+state by appearing earlier in the card.
+
+`coins.js` reuses an `Intl.NumberFormat` per supported price precision (0–12)
+within each catalog. Price strings and missing-value placeholders stay unchanged.
+The bootstrap header indexes unsettled predictions when the account snapshot or
+user changes, or an `account-update` event arrives. Direction markers refresh at
+the next start/end boundary and after backwards clock changes. Stable ticks skip
+history scans and unchanged duration attributes; coin, hour and demo navigation
+still select the corresponding cached markers immediately.
+
+## Compact charts
+
+`market-model.js` projects valid minute OHLC bars at each minute's midpoint and
+closes at minute ends. It merges those closes with observed one-second prices.
+The live endpoint uses display time so quote arrival timing does not pull the
+line backwards. Candle range checks precede OHLC validation, duplicate seconds
+are collected in a single pass, and min/max reduction avoids temporary range
+arrays. Unsorted/duplicate inputs still resolve by timestamp, with exact boundary
+closes remaining authoritative. Samples up to one minute apart stay connected, including when
+coin switches, page returns, or delayed browser timers skip second recordings.
+Minute backfills reconnect longer absences; gaps longer than a minute without
+history remain visible. No second observations are invented, and synthetic and
+incomplete data do not replace settlement candles.
+
+Both views inherit `--price-chart-height` from the workspace: 180 pixels on
+desktop and 150 pixels at widths of 700 pixels or less. The Hour cursor uses
+that same height so it spans the entire plot. Time labels sit directly below
+the chart and its compact minute summary. Probability estimates remain in the
+segment controls.
+
+`minute-trend.js` renders a 16-pixel summary row beneath each graph. Its arrows
+align with candle midpoints and use the same OHLC validity rules as `minutePlot`.
+Completed minutes are green Up when close is at least open, otherwise red Down.
+Current minutes use an amber dash; missing/upcoming minutes remain neutral.
+The renderer caches candle identity, interval bounds, minute, and historical
+state so price ticks reuse the row. Common arrow styles live in `styles.css`;
+`responsive.css` aligns the row with the corresponding chart gutters.
+
+The title-bar hourly movement uses the exact close before the UTC hour starts.
+Live views compare a valid quote with that benchmark; historical views compare
+the selected hour's close. The percentage is `100 * dollar change / opening
+benchmark`, displayed with two to four decimals. Quotes refresh the model
+immediately; displayed prices coalesce to one-second updates. Missing quotes or
+opening benchmarks leave the change unavailable.
 
 ## Market state and navigation
 
-Selecting a card changes the ticket without rebuilding the playfield. Open intervals support orders when data is ready; upcoming and completed intervals support inspection. UTC dates distinguish midnight boundaries. Previous hour, Next, and Current hour navigate history; switching coins preserves the selected hour. Historical charts cover the full hour, label the close, and hide the live cursor. Missing candles leave affected benchmarks or results unavailable.
+Selecting a segment highlights it and updates the ticket without changing views.
+Predict opens the review workflow for an available live interval; Result and
+Details inspect completed or upcoming intervals. The five-minute row's Now
+control scrolls to the current card and Select chooses its duration. Neither
+control changes the chart view. Historical navigation preserves the selected
+instrument and does not switch modes. Dates distinguish midnight boundaries.
+Missing candles leave affected benchmarks or results unavailable.
 
 Crypto is the only active category. Oil and Weather render as non-navigable
 **Coming soon** cards. Direct Oil/Weather terminal requests are redirected, and
@@ -73,7 +211,7 @@ Up = clamp(round(100 × probability), 1, 99)
 Down = 100 − Up
 ```
 
-The first second responds to live price movement. The 30-second betting cutoff does not change time to settlement. Ties resolve Up. Upcoming cards hide probabilities; completed cards show confirmed 100/0 outcomes. Quotes remain simulated prices, not exchange order-book prices.
+The first second responds to live price movement. The 5-second betting cutoff does not change time to settlement. Ties resolve Up. Upcoming cards hide probabilities; completed cards show confirmed 100/0 outcomes. Quotes remain simulated prices, not exchange order-book prices.
 
 The server caches 24 hours of Coinbase candles per product per minute. Cold loads fetch six batches with three concurrent requests and eight-second request timeouts; subsequent minutes fetch only the missing delta from a recent snapshot. Each batch stays below Coinbase's 300-candle request limit. The browser uses this history alongside its chart history. Python and JavaScript implement equivalent algorithms, with parity tests. Execution recalculates using authoritative live prices, so a displayed quote can move before confirmation.
 
@@ -83,7 +221,12 @@ Without a validated artifact for a coin, the normal-CDF model remains explicitly
 
 ## Review and execution
 
-Users select a side and a budget of at least $1 within their available demo balance. Fractional shares use the full budget; fees are zero. Stakes with sub-cent precision round up to the next cent. Winning payouts use integer arithmetic to round up to the next cent: `(cost_cents * 100 + price_cents - 1) // price_cents`. A winning contract returns $1 and a losing contract returns $0. Potential profit is winning return minus cost.
+Users select a side and a budget of 1–1,000 credits within their available hourly
+balance. Fractional shares use the full budget; fees are zero. Stakes with
+sub-cent precision round up to the next credit cent. Winning payouts use integer
+arithmetic: `(cost_cents * 100 + price_cents - 1) // price_cents`. A winning
+contract returns 1 credit and a losing contract returns zero. Potential profit
+is winning return minus cost; USD market prices are distinct from game credits.
 
 Review remains live as spot, benchmark, and model prices change. It shows contract price, count, cost, potential return, profit, and interval countdown. Confirmation authorizes execution at the server's current model price within the selected budget. The server does not enforce the browser quote or benchmark, and there is no 2¢ tolerance. Final quantity and return can differ from review. Expired intervals, unavailable authoritative data, and insufficient balance prevent saving.
 
@@ -102,7 +245,10 @@ The terminal lists unsettled predictions with countdowns and marks account wager
 | Component | Responsibility |
 | --- | --- |
 | `bootstrap.js`, `coins.js` | Catalog loading, coin controls, startup errors |
-| `market-model.js` | Pure quote, estimate, volatility, and readiness logic |
+| `market-model.js` | Pure quote, estimate, volatility, readiness, and minute-plot logic |
+| `market-detail.js` | Explicit view controls, interval selection, and range-history loading |
+| `minute-trend.js` | Shared candle-aligned summary arrows with cached DOM updates |
+| `segment-card.js` | Shared interval cards and observed price-movement labels |
 | `app.js` | Market selection, ticket, live review, wager displays |
 | `btc-chart.js` | Feed, candle history, chart, UTC market lifecycle |
 | `account.js`, `auth.js`, `password.js` | Session/account API, authentication UI, and password changes |
@@ -112,6 +258,15 @@ The terminal lists unsettled predictions with countdowns and marks account wager
 | `scripts/database.py` | Explicit initialization, status, backup, reset |
 
 SQLite stores users, hashed sessions, predictions, settlements, coins, and migration versions. Each player receives 1,000 contest credits per hour, with a fresh balance at each GMT hour boundary independently of prior settlements. Passwords use salted scrypt; sessions use HttpOnly/SameSite cookies and CSRF tokens. Account data persists across browser sessions and server restarts. Local storage holds presentation preferences rather than balances or saved orders.
+
+Browser POST origins must exactly match `P60_HOST` or an alias in
+`P60_ADDITIONAL_ORIGINS`, including scheme and port. Localhost access to the
+public Docker stack requires an explicit `http://localhost:8085` alias; the
+signup page path is not part of that origin. Compose environment changes require
+recreating the app container. Google authentication additionally checks the
+requested-with header, CSRF token, and signed Google credential. Google's
+Authorized JavaScript origins are configured separately from the app allowlist.
+See [deployment login configuration](../deploy/DOCKER.md).
 
 Authenticated `POST /api/change-password` requires the session CSRF token and
 `currentPassword`, `newPassword`, and `confirmPassword` fields. It verifies the
@@ -126,6 +281,15 @@ expired session as success, clears account and contest-wallet state, and returns
 to the welcome page. Settlement requests pause while logout is in progress.
 
 UI/chart updates run once per second; incoming prices update the model immediately. The controller caches controls, delegates market selection, and avoids rebuilding unchanged rows and totals. Volatility is cached until candles change or a minute closes. Hidden tabs skip rendering and account polling. Static text assets support gzip and ETag revalidation; account/API responses are uncached.
+
+Settlement fetches provider benchmarks outside SQLite writer transactions and
+deduplicates each coin/boundary/source per pass. Finalization uses an indexed
+read-only preflight: only an ended hourly contest with no unsettled entries
+needs a writer transaction. The transaction still rechecks the contest before
+persisting ranks and prizes. Empty closed contests finalize normally; active,
+already-finalized and still-pending periods do not acquire the idle writer lock.
+Retain the single application process and nonblocking settlement lock; increasing
+replicas is not a substitute for reducing repeated work.
 
 The local server is a demo development service. Production hosting needs HTTPS, a production server, Secure cookies, and account recovery/email verification. See [README.md](../README.md) for development and [the maintenance guide](DATABASE_MAINTENANCE.md) for database operations.
 

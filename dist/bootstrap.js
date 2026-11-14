@@ -33,48 +33,79 @@
     if(!window.PredictCoins.available.length)throw Error('No instruments are currently available for predictions.');
     picker.replaceChildren(...window.PredictCoins.available.map(coin=>{
       const button=document.createElement('button');button.type='button';button.className='coin-button';button.dataset.coin=coin.symbol;button.setAttribute('aria-label',`Select ${coin.name}`);button.setAttribute('aria-pressed','false');button.title=`${coin.name} (${coin.symbol})`;
-      if(coin.icon){const icon=document.createElement('img');icon.src=coin.icon;icon.alt='';icon.width=24;icon.height=24;icon.addEventListener('error',()=>{icon.hidden=true;});button.append(icon);}
-      const label=document.createElement('span');label.textContent=coin.symbol;button.append(label);return button;
+      const label=document.createElement('span');label.textContent=coin.symbol;label.hidden=!!coin.icon;
+      if(coin.icon){const icon=document.createElement('img');icon.src=coin.icon;icon.alt='';icon.width=36;icon.height=36;icon.addEventListener('error',()=>{icon.hidden=true;label.hidden=false;});button.append(icon);}
+      button.append(label);return button;
     }));
     const coinButtons=[...picker.querySelectorAll('[data-coin]')];
+    const durationButtons=[...document.querySelectorAll('[data-detail-duration]')];
     const hourlyPredictions=new Map();
-    /** Index contest directions by hour when account data changes, including settled orders. */ function updateCoinPredictions(){
-      hourlyPredictions.clear();
+    const hourlyDurationPredictions=new Map();
+    let predictionSource=null,predictionUser=null,predictionsDirty=true,pendingPredictions=[];
+    let lastPredictionTime=-Infinity,nextPredictionChange=0;
+    /** Reindex pending directions only when account data or time boundaries change. */ function updateCoinPredictions(){
       const account=window.Predict60Account;
-      for(const prediction of account.user?account.predictions||[]:[]){
-        if(prediction.mode!=='contest'||!Number.isFinite(prediction.starts_at))continue;
-        if(prediction.side!=='up'&&prediction.side!=='down')continue;
+      const changed=predictionsDirty||predictionSource!==account.predictions||predictionUser!==account.user;
+      const now=Date.now()/1000;
+      if(!changed&&now>=lastPredictionTime&&now<nextPredictionChange){lastPredictionTime=now;return;}
+      if(changed){
+        predictionSource=account.predictions;predictionUser=account.user;predictionsDirty=false;
+        pendingPredictions=account.user?(account.predictions||[]).filter(prediction=>prediction.mode==='contest'&&prediction.settled_at==null&&Number.isFinite(prediction.starts_at)&&Number.isFinite(prediction.ends_at)&&(prediction.side==='up'||prediction.side==='down')):[];
+      }
+      hourlyPredictions.clear();hourlyDurationPredictions.clear();
+      lastPredictionTime=now;nextPredictionChange=Infinity;
+      for(const prediction of pendingPredictions){
+        if(prediction.ends_at<=now)continue;
+        nextPredictionChange=Math.min(nextPredictionChange,prediction.starts_at>now?prediction.starts_at:prediction.ends_at);
+        if(prediction.starts_at>now)continue;
         const hour=Math.floor(prediction.starts_at/3600)*3600;
         if(!hourlyPredictions.has(hour))hourlyPredictions.set(hour,new Map());
         const states=hourlyPredictions.get(hour);
         states.set(prediction.coin,(states.get(prediction.coin)||0)|(prediction.side==='up'?1:2));
+        const minutes=Number(prediction.market_id?.split('-')[0])||(prediction.ends_at-prediction.starts_at)/60;
+        if(![5,15,30,60].includes(minutes))continue;
+        if(!hourlyDurationPredictions.has(hour))hourlyDurationPredictions.set(hour,new Map());
+        const durations=hourlyDurationPredictions.get(hour),key=`${prediction.coin}:${minutes}`;
+        durations.set(key,(durations.get(key)||0)|(prediction.side==='up'?1:2));
       }
-      renderCoinPredictions();
     }
     /** Show predictions for the displayed hour independently of the selected coin's inner highlight. */ function renderCoinPredictions(){
+      updateCoinPredictions();
       const model=window.PredictModel;
       const displayedStart=model?.markets?.find(m=>m.minutes===60)?.startsAt;
       const hour=Number.isFinite(displayedStart)?displayedStart/1000:Math.floor(Date.now()/3600000)*3600;
       const states=model?.feedMode==='demo'?null:hourlyPredictions.get(hour);
       for(const button of coinButtons){
         const state=states?.get(button.dataset.coin)||0;
-        const direction=state===3?'Up and Down':state===1?'Up':state===2?'Down':'';
         const coin=window.PredictCoins.getCoin(button.dataset.coin);
-        const marker=state===3?'mixed':state===1?'up':state===2?'down':'none';
+        const marker=state?'pending':'none';
         if(button.dataset.prediction===marker)continue;
         button.dataset.prediction=marker;
-        const detail=direction?` · ${direction} prediction${state===3?'s':''} in this hour`:'';
+        const detail=state?' · Active pending predictions in this hour':'';
         button.title=`${coin.name} (${coin.symbol})${detail}`;
         button.setAttribute('aria-label',`Select ${coin.name}${detail}`);
       }
+      const durations=model?.feedMode==='demo'?null:hourlyDurationPredictions.get(hour);
+      for(const button of durationButtons){
+        const minutes=Number(button.dataset.detailDuration),symbol=model?.coin?.symbol;
+        const state=symbol?durations?.get(`${symbol}:${minutes}`)||0:0;
+        const marker=state===3?'mixed':state===1?'up':state===2?'down':'none';
+        const context=`${minutes}-minute plays${symbol?' for '+symbol:''}`;
+        const direction=state===3?'Up and Down':state===1?'Up':state===2?'Down':'';
+        const detail=direction?` · ${direction} prediction${state===3?'s':''} in this hour`:'';
+        if(button.title===context+detail)continue;
+        button.dataset.prediction=marker;
+        button.title=context+detail;
+        button.setAttribute('aria-label','Select '+context+detail);
+      }
     }
-    window.addEventListener('account-update',updateCoinPredictions);
+    window.addEventListener('account-update',()=>{predictionsDirty=true;renderCoinPredictions();});
     window.addEventListener('btc-market-update',renderCoinPredictions);
     window.addEventListener('coin-change',renderCoinPredictions);
-    updateCoinPredictions();
+    renderCoinPredictions();
     const coinPredictionTimer=setInterval(renderCoinPredictions,1000);
     window.addEventListener('pagehide',()=>clearInterval(coinPredictionTimer),{once:true});
-    for(const src of ['market-model.js','app.js','btc-chart.js'])await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=/** Handle the load event for the current transport or resource. */ ()=>{try{if(src==='market-model.js')window.PredictModel.configure(window.Predict60MarketConfig);resolve();}catch(error){reject(error);}};script.onerror=/** Handle the error event for the current transport or resource. */ ()=>reject(Error('Unable to load the terminal.'));document.head.append(script);});
+    for(const src of ['market-model.js','minute-trend.js','segment-card.js','app.js','market-detail.js','btc-chart.js'])await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=/** Handle the load event for the current transport or resource. */ ()=>{try{if(src==='market-model.js')window.PredictModel.configure(window.Predict60MarketConfig);resolve();}catch(error){reject(error);}};script.onerror=/** Handle the error event for the current transport or resource. */ ()=>reject(Error('Unable to load the terminal.'));document.head.append(script);});
   }catch(error){
     picker.textContent='Markets unavailable';
     const connectionError=error instanceof TypeError||error.name==='AbortError'||error instanceof SyntaxError;

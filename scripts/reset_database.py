@@ -68,7 +68,7 @@ def reset_service(args, command_name='reset'):
         print('Service database reset. Service remains stopped; start with sudo systemctl start predict60.')
 
 
-def reset_docker(args, command_name='reset'):
+def reset_docker(args, command_name='reset', maintenance_image=None):
     """Run a database command against one app container's volumes, stopping only for a reset."""
     if args.container:
         ids = [args.container]
@@ -95,7 +95,7 @@ def reset_docker(args, command_name='reset'):
                '--entrypoint', 'python3', '--workdir', info['Config'].get('WorkingDir') or '/app']
     if info['Config'].get('User'):
         command.extend(['--user', info['Config']['User']])
-    command.extend(['-e', 'PREDICT60_DB=' + db, info['Image'],
+    command.extend(['-e', 'PREDICT60_DB=' + db, maintenance_image or info['Image'],
                     '/app/scripts/database.py', command_name])
     if command_name == 'reset':
         command.append('--confirm-reset')

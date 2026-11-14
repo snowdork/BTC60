@@ -3,16 +3,19 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from decimal import Decimal, ROUND_CEILING
 import argparse
+import CONST
 import ipaddress
 import odds
 import contests
-from google_login import verify_google_login
+from google_login import DEFAULT_CLIENT_ID, GoogleVerificationUnavailable, configured_client_id, verify_google_login
+from local_settings import local_signup_code
 import simulated_prices
 import live_oil
 import oilprice_api
 import weather
 import fcntl
 import hashlib
+import html
 import gzip
 import json
 import math
@@ -43,6 +46,7 @@ if not DEFAULT_DB.exists() and LEGACY_DB.exists():
 DB = Path(os.environ.get('PREDICT60_DB') or os.environ.get('P60_DB')
           or os.environ.get('BTC60_DB') or DEFAULT_DB)
 QUOTES = {'60-0': 68, '30-0': 54, '30-1': 58, '15-0': 49, '15-1': 57, '15-2': 62, '15-3': 50}
+QUOTES.update({f'5-{index}': 50 for index in range(12)})
 MAX_PREDICTION_CREDITS = 1000
 COMING_SOON_CATEGORIES = {'oil', 'weather'}
 AUTH_ATTEMPTS = {}
@@ -54,6 +58,8 @@ PUBLIC_ASSETS = {
     'assets/previews/prediction-playfield.png',
     'assets/previews/welcome-splash.png',
     'assets/backgrounds/hourly-markets.webp',
+    'assets/backgrounds/icy-coins-color.webp',
+    'assets/backgrounds/sea-islands.webp',
     'assets/backgrounds/playfield.webp',
     'assets/brand/p60-mark.svg',
     'assets/fonts/manrope-latin.woff2',
@@ -62,11 +68,11 @@ PUBLIC_ASSETS = {
     'assets/fonts/spacegrotesk-OFL.txt',
 }
 PUBLIC_FILES = {
-    'brand.css',
+    'brand.css', 'hud.css',
     'password.html', 'password.js',
     'contests.html', 'contests.js', 'contests.css', 'sponsor.js',
     'account.js',
-    'app.js',
+    'app.js', 'segment-card.js',
     'auth.css',
     'auth.js', 'google-onboarding.js', 'google-link.html',
     'bootstrap.js',
@@ -79,6 +85,8 @@ PUBLIC_FILES = {
     'index.html',
     'login.html',
     'market-model.js',
+    'market-detail.js',
+    'minute-trend.js',
     'portfolio-model.js',
     'portfolio.css',
     'portfolio.html',
@@ -89,7 +97,9 @@ PUBLIC_FILES = {
     'theme.css',
     'theme.js',
     'orientation.js',
+    'island-auth.css',
     'welcome.css',
+    'welcome.js',
     'welcome.html',
 }
 
@@ -136,10 +146,7 @@ def configured_signup_code():
     hostname = urllib.parse.urlsplit(origin).hostname if origin else None
     if hostname not in (None, 'localhost', '127.0.0.1', '::1'):
         return ''
-    try:
-        return (ROOT / 'data' / 'local-signup-code').read_text()
-    except FileNotFoundError:
-        return ''
+    return local_signup_code(ROOT)
 
 
 def trusted_proxies():
@@ -202,6 +209,8 @@ class AuthenticationError(ValueError):
 
 def validate_signup_code(provided):
     """Apply the same organizer-code gate to password and Google registration."""
+    if not CONST.SIGNUP_CODE_REQUIRED:
+        return
     expected = configured_signup_code()
     if not expected:
         raise AuthenticationError('Signup is currently unavailable.', status=503)
@@ -287,6 +296,11 @@ def initialize():
         CREATE TABLE IF NOT EXISTS google_identities (
           google_sub TEXT PRIMARY KEY, user_id INTEGER UNIQUE NOT NULL REFERENCES users(id),
           created_at INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS signup_events (
+          address TEXT NOT NULL, created_at INTEGER NOT NULL,
+          successful INTEGER NOT NULL CHECK(successful IN (0,1)));
+        CREATE INDEX IF NOT EXISTS signup_events_address ON signup_events(address,successful,created_at);
+        CREATE INDEX IF NOT EXISTS signup_events_time ON signup_events(created_at);
         CREATE TABLE IF NOT EXISTS sessions (
           token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
           csrf TEXT NOT NULL, expires_at INTEGER NOT NULL);
@@ -486,6 +500,7 @@ def candle_close(coin, boundary, source=None):
             if close is not None:
                 return close
         except urllib.error.HTTPError as error:
+            error.close()
             if error.code != 429 and error.code < 500:
                 raise
         except (urllib.error.URLError, TimeoutError, ConnectionError, IncompleteRead, json.JSONDecodeError):
@@ -643,8 +658,10 @@ def settle_due(user_id=None):
         try:
             _settle_due(user_id)
             with connect() as conn:
-                conn.execute('BEGIN IMMEDIATE')
-                contests.finalize(conn)
+                now = int(time.time())
+                if contests.ready_to_finalize(conn, now):
+                    conn.execute('BEGIN IMMEDIATE')
+                    contests.finalize(conn, now)
         finally:
             SETTLE_LOCK.release()
 
@@ -911,10 +928,16 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(404, {'error': 'Not found.'})
         stat = path.stat()
         compressed = path.suffix in {'.html','.css','.js','.svg'} and 'gzip' in self.headers.get('Accept-Encoding','')
-        key = (relative,stat.st_mtime_ns,stat.st_size,compressed)
+        client_id = configured_client_id() if relative in {'login.html', 'signup.html', 'google-link.html'} else None
+        key = (relative,stat.st_mtime_ns,stat.st_size,compressed,client_id,CONST.SIGNUP_CODE_REQUIRED)
         cached = STATIC_CACHE.get(key)
         if cached is None:
             raw = path.read_bytes()
+            if relative == 'signup.html' and not CONST.SIGNUP_CODE_REQUIRED:
+                raw = re.sub(rb'[ \t]*<!-- signup-code:start -->.*?<!-- signup-code:end -->\n?', b'', raw, flags=re.S)
+            if client_id is not None:
+                raw = raw.replace(f'data-client_id="{DEFAULT_CLIENT_ID}"'.encode(),
+                                  f'data-client_id="{html.escape(client_id, quote=True)}"'.encode())
             body = gzip.compress(raw,compresslevel=6) if compressed else raw
             etag = '"' + hashlib.sha256(body).hexdigest()[:24] + '"'
             cached = (body,etag)
@@ -1050,6 +1073,7 @@ class Handler(SimpleHTTPRequestHandler):
         if self.auth_rate_limited():
             return self.reply(429, {'error': 'Too many attempts. Try again in a minute.'})
         if path == '/api/signup':
+            self.validate_signup_request(data)
             validate_signup_code(data.get('signupCode'))
         email, password = data.get('email', ''), data.get('password', '')
         if not isinstance(email, str) or not isinstance(password, str):
@@ -1072,6 +1096,7 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError('Enter your name (up to 60 characters).')
                 salt = secrets.token_hex(16)
                 digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
+                conn.execute('BEGIN IMMEDIATE')
                 user_id = conn.execute('INSERT INTO users(name,email,password_hash,salt,created_at,balance_cents) VALUES(?,?,?,?,?,?)', (name.strip(), email, digest, salt, int(time.time()), 1000000)).lastrowid
             else:
                 user = conn.execute('SELECT * FROM users WHERE email=?', (email,)).fetchone()
@@ -1083,6 +1108,11 @@ class Handler(SimpleHTTPRequestHandler):
             token = self.create_session(conn, user_id)
         LOG.info('Authentication action=%s user=%s', path.rsplit('/', 1)[-1], user_id)
         return self.reply(200, {'ok': True}, session_cookie(token, 604800))
+
+    def validate_signup_request(self, data):
+        """Reject the hidden bot-trap field without limiting registrations."""
+        if data.get('website'):
+            raise AuthenticationError('Unable to register. Please try again.', status=400)
 
     def create_session(self, conn, user_id):
         """Rotate a caller's session and reuse the normal SQLite session store."""
@@ -1128,10 +1158,17 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(403, {'error': 'Refresh the page and try again.', 'code': 'csrf_mismatch'})
         if self.auth_rate_limited():
             return self.reply(429, {'error': 'Too many attempts. Try again in a minute.'})
+        if signup and link_session is None:
+            self.validate_signup_request(data)
         try:
             identity = verify_google_login(data.get('credential'))
         except ValueError:
             return self.reply(401, {'error': 'Google credential is invalid or expired.'})
+        except GoogleVerificationUnavailable as exc:
+            LOG.warning('Google sign-in verification unavailable reason=%s', exc.reason)
+            if exc.reason == 'dependencies_missing':
+                LOG.warning('Install requirements.txt in the server Python environment and restart the server')
+            return self.reply(503, {'error': 'Google sign-in is temporarily unavailable.'})
         except Exception:
             # Never log credentials, decoded claims, or upstream response bodies.
             LOG.warning('Google sign-in verification unavailable')
@@ -1150,7 +1187,7 @@ class Handler(SimpleHTTPRequestHandler):
                 if exists or not signup:
                     code = 'LINK_REQUIRED' if exists else 'SIGNUP_REQUIRED'
                     return self.reply(409, {'code': code, 'error': 'Link your existing account.' if exists
-                                           else 'Register with your organizer signup code first.'})
+                                           else 'Create an account first.'})
                 # Registration and identity association commit together; a code never links an existing user.
                 validate_signup_code(data.get('signupCode'))
                 name = data.get('name', '')
@@ -1196,9 +1233,9 @@ class Handler(SimpleHTTPRequestHandler):
         start = now // 3600 * 3600 + index * duration * 60
         end = start + duration * 60
         requested_start = data.get('startsAt')
-        if isinstance(requested_start, (int, float)) and time.time() >= requested_start / 1000 + duration * 60 - 30:
-            raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
-        if not start <= now < end - 30 or data.get('startsAt') != start * 1000:
+        if isinstance(requested_start, (int, float)) and time.time() >= requested_start / 1000 + duration * 60 - 5:
+            raise ValueError('Betting closed. Bets must be placed at least 5 seconds before the interval ends.')
+        if not start <= now < end - 5 or data.get('startsAt') != start * 1000:
             raise ValueError('This market is closed or changed. Review again.')
         source=instrument_source(coin)
         strike = candle_close(coin, start, source=source)
@@ -1207,8 +1244,8 @@ class Handler(SimpleHTTPRequestHandler):
         # benchmark/history or displayed quote changed during confirmation.
         up = market_up(coin, strike, spot, now, start, end, source=source)
         cents = up if side == 'up' else 100 - up
-        if not start <= time.time() < end - 30:
-            raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
+        if not start <= time.time() < end - 5:
+            raise ValueError('Betting closed. Bets must be placed at least 5 seconds before the interval ends.')
         cost = int((Decimal(str(budget))*100).to_integral_value(rounding=ROUND_CEILING))
         contracts = cost / cents
         created = False
@@ -1217,8 +1254,8 @@ class Handler(SimpleHTTPRequestHandler):
             if conn.execute('SELECT id FROM predictions WHERE user_id=? AND request_id=?', (session['user_id'], request_id)).fetchone():
                 pass
             else:
-                if time.time() >= end - 30:
-                    raise ValueError('Betting closed. Bets must be placed at least 30 seconds before the interval ends.')
+                if time.time() >= end - 5:
+                    raise ValueError('Betting closed. Bets must be placed at least 5 seconds before the interval ends.')
                 prediction_id = secrets.token_hex(16)
                 conn.execute('INSERT INTO predictions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', (prediction_id, session['user_id'], request_id, coin, market_id, side, start, end, strike, cents, contracts, cost, now))
                 conn.execute('INSERT INTO prediction_sources VALUES(?,?,?)', (prediction_id, source['feed'], source['product']))

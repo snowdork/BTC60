@@ -1,10 +1,68 @@
-# Deployment readiness review — October 25, 2026
+# Deployment readiness review — November 14, 2026
 
-The current source passes local regression checks for a single-instance VPS
+The local cleanup is ready for review before updating the VPS. The worktree is
+based on Phase-10 commit `144a808`; no VPS deployment, real container restart,
+database reset or proxy change was performed in this pass.
+
+## Current changes and evidence
+
+- Interval identity shows duration clock, coin icon and UTC range. Larger coin
+  buttons omit duplicate tickers and retain accessible names/image fallbacks.
+- Hour aligns 60, 15, 30 and 5-minute rows with the chart. All twelve five-minute
+  cards share its axis; narrow screens scroll the full timeline with pinned labels.
+- Price formatters are reused, idle header ticks skip prediction-history scans,
+  and handled provider HTTP errors close their response streams. Removed obsolete
+  CSS and test connection leaks. See [performance measurements](VPS_PERFORMANCE.md).
+- `restart-docker.sh` restarts existing containers by default. `--recreate` builds
+  before stopping the app, then replaces it and waits for health. Initial-start
+  helpers explicitly recreate. Docker lifecycle regressions use mocks.
+- The full regression suite, offline desktop/phone layout checks, shell syntax,
+  static export and Compose configuration checks pass; the dated
+  [test report](TEST_RESULTS.md) records counts, commands and limits.
+
+## Next VPS update (not yet executed)
+
+1. Review and synchronize the intended source revision on the VPS. Confirm the
+   existing deployment mode and retain its previous image/version for rollback.
+2. Take a consistent database backup and copy it off-host using
+   [Docker data and upgrades](../deploy/DOCKER.md#data-and-upgrades). Record the
+   backup and rollback image privately; preserve the existing volume and settings.
+3. Validate the VPS profile and Compose configuration from that checkout:
+
+   ```bash
+   bash scripts/setup-vps.sh --check
+   sudo docker compose --env-file .env -f compose.yaml config --quiet
+   ```
+
+4. For the existing VPS Docker deployment, apply code and environment changes:
+
+   ```bash
+   sudo bash scripts/restart-docker.sh --recreate
+   ```
+
+   A plain restart keeps the old image/environment and will not apply this source
+   update. Recreation preserves the data volume and shared HTTPS proxy. Startup
+   applies migrations without a reset; a failed build leaves the current app up.
+5. Run `bash deploy/check-vps.sh` and inspect app health/logs. Verify existing-user
+   login, the two layouts, live quotes, a controlled prediction/settlement cycle,
+   and the next hour's balance. Check the other shared-proxy site as described in
+   [VPS operation](../deploy/VPS.md). Follow the [release checklist](QA_CHECKLIST.md)
+   for persistence and backup restoration using separate test storage.
+
+Production provider availability, public HTTPS, container startup and load
+capacity still require verification on the VPS. Keep one app process and measure
+before tuning concurrency. Full account-history responses and live standings
+remain scaling limits; finalized standings already use bounded database reads.
+
+---
+
+## Archived deployment review — October 25, 2026
+
+The source reviewed on October 25 passed local regression checks for a single-instance VPS
 installation. Actual VPS configuration, capacity, public HTTPS, and container
 startup still need verification on the deployment host. No deployment was made.
 
-## October 25 maintenance update
+### October 25 maintenance update
 
 The segment controller and responsive styles are consolidated; unavailable
 pending/upcoming data is omitted rather than hidden. Benchmark reads reuse exact
@@ -12,7 +70,7 @@ cached minutes, retry wider windows and validate malformed/truncated provider
 responses. Missing exact data still blocks execution; no order replay or session
 replacement is added. Maintenance-script source documentation now passes.
 
-The latest local run passes all **240 tests**, with mocked providers and temporary
+The October 25 local run passed all **240 tests**, with mocked providers and temporary
 databases. Phone/laptop segment fixtures were inspected; these checks do not
 establish live order recovery or production capacity. See
 [test results](TEST_RESULTS.md) and [performance review](VPS_PERFORMANCE.md).
@@ -21,7 +79,7 @@ image. Source is served from `src/frontend/`; the regenerated `dist/` is a stati
 export. The ten-coin expansion uses one-time catalog migration 6; no data reset is
 required. Saved accounts/bets and custom coin selections are preserved.
 
-## Corrections completed
+### Corrections completed
 
 | Finding | Correction |
 | --- | --- |
@@ -32,7 +90,7 @@ required. Saved accounts/bets and custom coin selections are preserved.
 | Removed prediction-pane sections still had obsolete CSS and an unused interval-cap constant. | Removed the unused styles and constant, and refreshed the tracked static export from root sources. |
 | Docker ignored key files and account data but did not exclude local credential, agent, and editor directories. | Added `.aws`, `.agents`, `.codex`, `.openai`, `.vscode`, and `.venv` to `.dockerignore`. The Dockerfile still copies an explicit set of application files. |
 
-## Verification
+### Earlier verification
 
 `python3 scripts/run_tests.py` completed with **180 passed, zero failed**:
 88 JavaScript tests, 77 Python application tests, and 15 Python script tests.
@@ -52,7 +110,7 @@ Docker and Caddy executables are unavailable in this environment. No container
 image build, Caddy configuration validation, remote host inspection, production
 load test, or public HTTPS smoke test was performed.
 
-## Remaining performance limits
+### Performance limits recorded at that time
 
 1. `Handler.account()` returns complete prediction history on every account or
    settlement refresh. The browser polls while active, so both response size and
@@ -69,7 +127,7 @@ load test, or public HTTPS smoke test was performed.
    The known removed-pane rules were cleaned up; a broader consolidation should
    be backed by browser screenshots across the laptop and phone breakpoints.
 
-## VPS rollout checks
+### VPS rollout checks recorded at that time
 
 1. Preserve the current database with `scripts/database.py backup`, copy the
    backup off-host, and retain the previous application version/image for rollback.

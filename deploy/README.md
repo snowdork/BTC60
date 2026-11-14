@@ -5,18 +5,32 @@ and private ports. Start with [the shared VPS address plan](VPS.md).
 
 ## Choose an operating mode
 
+For guided environment configuration and rollout, start with
+[local testing and VPS setup](SETUP.md). Use `bash scripts/setup-local.sh` for
+`.env.local` or `bash scripts/setup-vps.sh` for `.env`; add `--start` to deploy.
+
 | Environment | Start/update | Persistent data | Logs |
 | --- | --- | --- | --- |
 | Local Python | `python3 src/backend/server.py` | `data/p60.sqlite3` by default | Terminal |
-| Local Docker, no Compose | `bash scripts/restart-docker.sh --local` | `p60-local-data` volume | `docker logs p60-local` |
+| Local Docker, no Compose | `bash scripts/restart-docker.sh --local --recreate` | `p60-local-data` volume | `docker logs p60-local` |
 | Local Compose | `docker compose -f compose.local.yaml --env-file .env.local up -d --build` | `p60-local-data` volume | Compose logs |
-| VPS Docker + HTTPS | `bash deploy/start-docker.sh` initially; `bash scripts/restart-docker.sh` for updates | Compose `p60-data` volume | Compose logs |
+| VPS Docker + HTTPS | `bash deploy/start-docker.sh` initially; `bash scripts/restart-docker.sh --recreate` for updates | Compose `p60-data` volume | Compose logs |
 | VPS systemd + HTTPS | `sudo systemctl restart predict60` | Configured database path | systemd journal |
 
 Use one supervisor per deployment and one app process per database. Local Docker
 and local Compose share a volume/container name: stop the previous mode before
 switching. See [local operation](LOCAL.md) for setup, backups, and troubleshooting,
 and [Docker operation](DOCKER.md) for VPS upgrades and rollback.
+
+Omit `--recreate` from a restart command to restart existing containers with their
+current image and environment. First startup and source/configuration updates
+require recreation; the setup `--start` and `start-docker.sh` entrypoints request it automatically.
+
+The local image is `p60:local-dev`; VPS images use `p60:${P60_IMAGE_TAG}`.
+When running both on one host, set a different `P60_PORT` in `.env.local`.
+Keep `.env` and `.env.local` private and use the examples under `deploy/` for
+new installations. Configure `GOOGLE_CLIENT_ID` in the selected environment
+file; the backend and all Google sign-in pages use that same value.
 
 Python serves the files in `src/frontend/`; server code lives in `src/backend/`.
 Docker copies the `src/` tree into the image.
@@ -53,7 +67,7 @@ For a systemd deployment, copy `deploy/Caddyfile` to `/etc/caddy/Caddyfile`
 `sudo caddy validate --config /etc/caddy/Caddyfile`, then run
 `sudo systemctl reload caddy`. Refresh the sign-in page after the reload.
 Google's OAuth client must also list the site's exact origin under Authorized
-JavaScript origins, and its client ID must match the frontend and backend.
+JavaScript origins. The server supplies `GOOGLE_CLIENT_ID` to the browser.
 
 ## VPS capacity and upkeep
 
@@ -82,7 +96,7 @@ logs, and `unless-stopped` crash recovery. Run one app instance. The app binds t
 From the repository root, after installing Docker Engine and Compose:
 
 ```bash
-cp deploy/docker.env.example .env
+cp -n deploy/docker.env.example .env
 chmod 600 .env
 # Edit .env: set P60_DOMAIN to your domain, without https:// or a path.
 sudo systemctl enable --now docker

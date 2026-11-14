@@ -11,9 +11,10 @@
     <link rel="stylesheet" href="responsive.css">
     <link rel="stylesheet" href="welcome.css">
     <link rel="stylesheet" href="brand.css">
+    <link rel="stylesheet" href="island-auth.css">
     <link rel="icon" href="assets/brand/p60-mark.svg" type="image/svg+xml">
   </head>
-  <body class="auth-page retro-auth-page">
+  <body class="auth-page retro-auth-page island-auth-page">
     <header class="auth-nav">
       <a class="brand" href="welcome.html">
       <img class="p60-mark" src="assets/brand/p60-mark.svg" width="66" height="36" alt="">
@@ -22,13 +23,13 @@
         <div class="community-counts" aria-label="Community statistics">
           <span><strong data-user-count>—</strong> Users</span><span title="Signed-in users active in the last 5 minutes"><i aria-hidden="true"></i><strong data-active-count>—</strong> Active</span>
         </div>
-        <button class="theme-toggle" data-theme-toggle type="button" aria-label="Switch to light mode" title="Switch to light mode">☼</button><a href="welcome.html">Home</a><a href="login.html">Log in</a>
+        <button class="theme-toggle" data-theme-toggle type="button" aria-label="Switch to light mode" title="Switch to light mode">☼</button><a href="welcome.html">Home</a><a href="signup.html">Join</a>
       </nav>
     </header>
     <main class="panel auth-card">
       <span class="eyebrow">YOUR NEXT CALL STARTS HERE</span>
       <h1>Welcome back</h1>
-      <p>Your markets, predictions, and settlements—all in one place.</p>
+      <p>Log in and make your next call.</p>
       <form id="auth-form" data-mode="login">
         <label for="email">Email</label>
         <input id="email" name="email" type="email" autocomplete="email" maxlength="254" required>

@@ -3,7 +3,7 @@
 Run one shared reverse proxy on the VPS for all projects. Predict60 publishes
 HTTP only on `127.0.0.1:8085`; set `P60_PORT` in the project's `.env` to change it.
 Phunky uses `127.0.0.1:8086` and `https://phunk.free-vibe.com`.
-For now these are the two applications on this VPS; see [the shared address plan](VPS.md).
+Other shared applications have their own ports; see [the shared address plan](VPS.md).
 Each project needs a distinct Compose project name and non-overlapping network.
 Predict60 keeps its existing `p60` project and data volume.
 
@@ -18,7 +18,36 @@ When changing `P60_PORT`, update the proxy upstream too: Compose's `.env` does
 not set the host Caddy service environment. Set that service's `P60_PORT` or edit
 the upstream in its configuration. Keep the existing shared site's blocks.
 Google OAuth Authorized JavaScript origins must include both HTTPS origins.
+Configure them under [Google Auth Platform → Clients](https://console.cloud.google.com/auth/clients).
 Accounts share the database; browser login cookies are separate per hostname.
+
+For password signup/login and Google authentication at `http://localhost:8085`
+on this same stack, add that exact
+origin to the existing comma-separated `P60_ADDITIONAL_ORIGINS` in `.env`:
+
+```dotenv
+P60_ADDITIONAL_ORIGINS=https://predict60.free-vibe.com,http://localhost:8085
+```
+
+From the project root, apply the setting by recreating the app container:
+
+```bash
+sudo docker compose --env-file .env -f compose.yaml up -d --no-build --wait app
+```
+
+This preserves the database volume. Refresh the signup/login page after the app
+is healthy. Restarting the existing container alone does not load changed Compose
+environment settings. This origin-only change requires no image rebuild.
+Keep `P60_HOST` on the public HTTPS origin and keep the existing aliases.
+Authorize `http://localhost:8085` in Google's web client settings as well.
+An `Invalid request origin.` response from signup, login, Google authentication,
+or another browser POST means the browser origin is missing from the app's
+allowlist. An origin includes scheme, hostname, and port, without a path:
+`http://localhost:8085/signup.html` needs `http://localhost:8085`.
+`http://127.0.0.1:8085` is a different origin and needs its own explicit entry if
+used. Preserve existing public aliases; do not disable origin checks or use a
+wildcard. For a separate local
+development container, use [local Docker mode](LOCAL.md#docker).
 
 Existing deployments: stop the old stack's Caddy with `docker compose stop caddy`
 **before updating the checkout**, then let the shared host proxy own 80/443.
@@ -27,27 +56,54 @@ Do not remove volumes. Existing app data and old certificate volumes are retaine
 The app trusts the host via Docker gateway `172.30.60.1`; keep that subnet free.
 
 ```bash
-cp deploy/docker.env.example .env
-chmod 600 .env
-# Edit .env and set P60_DOMAIN to your real domain.
+bash scripts/setup-vps.sh
 sudo systemctl enable --now docker
 bash deploy/start-docker.sh
 docker compose logs --tail=100 app
 ```
 
-`start-docker.sh` can be called from any directory. It requires the repository’s
-`.env`, validates Compose without printing secrets, checks daemon access, builds
-the images, and waits up to 120 seconds for service readiness. Use a recent
+See [guided setup](SETUP.md) for saved-profile checks, updates, and automation.
+
+Restart helpers use a shared `.docker-restart.lock` in this checkout. If another
+restart is in progress, the second exits before any Docker or service changes;
+wait for the first to finish, then retry. The operating system releases the lock
+when the helper exits, including failures. Do not delete the lock file while a
+restart is running. Direct `docker compose` commands do not acquire this lock;
+avoid running them during a helper restart.
+
+A container-name conflict involving `p60-app-1` and a temporary name such as
+`b66613c94523_p60-app-1` can occur when two Compose replacements overlap. Wait
+for the active operation, then check `sudo docker compose ps` and retry the
+restart helper if needed. Keep the database volume; a transient name conflict
+does not require resetting accounts or removing volumes.
+
+
+`start-docker.sh` delegates to `scripts/restart-docker.sh --recreate`; both can
+be called from any directory. They explicitly use this checkout's `compose.yaml`
+and `.env`, validate Compose without printing secrets, and check daemon access.
+Recreation builds the app and waits up to 120 seconds for service readiness. Use a recent
 Compose plugin supporting `up --wait`. If startup fails, containers remain
 available for log inspection; correct the problem and rerun the command. App
 startup does not verify public DNS or certificate issuance, so check the public
-HTTPS endpoint separately. The helper does not stop host services or import an
-existing database; complete the data import below before first startup if needed.
+HTTPS endpoint separately. After a successful build, the helper stops an installed
+`predict60.service` before starting the container; run with `sudo` when required.
+It does not import an existing database; complete the data import below before
+first startup if needed.
 
 The shared host proxy provides HTTPS and sends a single `X-Forwarded-For`
 address. The app port stays on loopback. The image runs as user 10001; Docker
 restarts exited containers with `unless-stopped`. Keep one app replica and do
 not run the host app service against the same database.
+
+VPS builds use `p60:${P60_IMAGE_TAG}` (default `p60:local`). Local development
+uses `p60:local-dev`, so rebuilding a local image cannot replace the VPS image
+tag. Set `GOOGLE_CLIENT_ID` in the selected environment file; the server supplies
+the same ID to the login, signup, and account-linking pages and verifies tokens
+against it. No frontend edits or client secret are required.
+
+`P60_ADDITIONAL_ORIGINS` accepts exact origins separated by commas. Set it to
+an empty value to remove all aliases, or list only the aliases this deployment
+serves. Google must authorize every origin on which its sign-in button is used.
 
 The image health check probes `/healthz`. An unhealthy status alone does not
 restart a running container; monitor public HTTP availability separately.
@@ -55,11 +111,20 @@ See [Docker restart policies](https://docs.docker.com/engine/containers/start-co
 
 ## Data and upgrades
 
-To build an updated image and recreate changed VPS containers:
+To restart the existing VPS app with its current image and configuration:
 
 ```bash
 sudo bash scripts/restart-docker.sh
 ```
+
+To build an updated image and recreate the VPS app after code or environment changes:
+
+```bash
+sudo bash scripts/restart-docker.sh --recreate
+```
+
+The default never builds or creates containers. If the app container is missing,
+it exits with instructions to use `--recreate`. Both paths check app readiness.
 
 After a successful build, the restart helper stops `predict60.service` when it
 is installed, before replacing/starting the Docker app. Run the helper with
@@ -92,13 +157,14 @@ not automatically imported into the host database. The shared host proxy continu
 
 ### Rebuild behavior and persistent data
 
-Run `sudo bash scripts/restart-docker.sh` after updating the checkout and making
+Run `sudo bash scripts/restart-docker.sh --recreate` after updating the checkout and making
 a database backup. The script
 uses the VPS `compose.yaml` and `.env`, checks configuration and Docker access
 before building, and retains all database and certificate volumes. Existing
 containers continue serving during the build. If the build fails, they remain
-untouched. After a successful build, Compose recreates changed services and waits
-for readiness. Expect a brief interruption while the single app instance is
+untouched. After a successful build, Compose forcibly recreates only the app and
+waits for readiness. Without `--recreate`, the helper restarts the existing app
+without applying image or environment changes. Expect a brief interruption when an app instance is
 replaced; this is not a zero-downtime deployment. The shared host proxy continues running. It does not restart the Docker daemon or
 stop unrelated containers. This command does not use `compose.local.yaml`.
 
@@ -172,10 +238,12 @@ See the [performance review](../doc/VPS_PERFORMANCE.md) for measurements and lim
 
 ## Signup code configuration
 
-Set `P60_SIGNUP_CODE` in the private environment file. There is no built-in
-default: unset or empty values disable new signups with HTTP 503; existing users
-can still log in. The code is checked server-side and is not included in public
-assets or API responses.
+Registration requires no code by default. The optional invite-code policy lives
+in `src/backend/CONST.py`; see [registration protections](SETUP.md#registration-abuse-controls).
+To enable invite codes, set `SIGNUP_CODE_REQUIRED = True` and set
+`P60_SIGNUP_CODE` in the private environment file. With the gate enabled,
+unset/empty codes disable new signups with HTTP 503; existing users can still
+log in. The expected code is never included in public assets or API responses.
 
 For Docker, edit the root `.env` and run `docker compose up -d` to recreate the
 app with the new environment. For systemd, edit `/etc/predict60/predict60.env`
@@ -193,7 +261,7 @@ docker compose logs --tail=100 app
 docker stats --no-stream
 
 # Apply application code changes after taking a backup
-bash scripts/restart-docker.sh
+bash scripts/restart-docker.sh --recreate
 
 # Apply .env changes without rebuilding the image
 docker compose up -d --no-build --wait --wait-timeout 120

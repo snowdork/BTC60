@@ -33,14 +33,7 @@ body.welcome-page footer.welcome-footer>span:last-child{display:block}
 html[data-theme="light"] .welcome-page:before{background-image:linear-gradient(90deg,#f6f6eef5 0%,#f6f6eedb 45%,#f6f6ee99 100%),linear-gradient(0deg,#f6f6eeee,transparent 65%),url('assets/backgrounds/hourly-markets.webp')}
 @media(max-width:680px){.welcome-page:before{background-position:35% top}}
 
-/* The game splash is a contained preview on the welcome screen only. */
 .welcome-page .welcome-copy{max-width:600px}
-.welcome-preview{width:100%;max-width:440px;min-width:0;margin:0;justify-self:center;padding:10px;border:1px solid var(--welcome-line);border-radius:16px;background:var(--welcome-panel);box-shadow:0 20px 60px #0003}
-.welcome-preview img{display:block;width:100%;height:auto;border-radius:9px}
-.welcome-preview figcaption{display:flex;flex-direction:column;gap:3px;padding:13px 8px 6px;color:var(--welcome-muted);font-size:11px;line-height:1.6}
-.welcome-preview figcaption strong{color:var(--welcome-text);font-size:13px;font-weight:700}
-@media(max-width:680px){.welcome-preview{max-width:400px}}
-
 
 /* Signup keeps all fields visible on short laptop screens. */
 .signup-page .auth-nav{max-width:1100px;padding:10px 24px;gap:12px;min-height:56px}
@@ -89,4 +82,112 @@ html[data-theme="light"] .welcome-page:before{background-image:linear-gradient(9
  .signup-page .auth-nav .brand{font-size:15px;gap:5px}
  .signup-page .auth-nav .p60-mark{width:42px}
  .signup-page .auth-card{padding-inline:14px}
+}
+
+/* Icy coin artwork provides the welcome backdrop. */
+.welcome-page{--welcome-bg:#0b1724;--welcome-panel:#132638;--welcome-accent:#a8e8ff}
+.welcome-page:before{background:linear-gradient(90deg,#081522eb 0%,#081522a8 45%,#08152225 100%),linear-gradient(0deg,#081522ed,transparent 75%),url('assets/backgrounds/icy-coins-color.webp') center top/cover no-repeat}
+html[data-theme="light"] .welcome-page:before{background:linear-gradient(90deg,#edf7ffeb 0%,#edf7ffc4 45%,#edf7ff50 100%),linear-gradient(0deg,#edf7ffeb,transparent 75%),url('assets/backgrounds/icy-coins-color.webp') center top/cover no-repeat}
+@media(max-width:680px){.welcome-page:before{background-position:60% top}}
+
+/* Stacked P60 mark and a bold inscription-style wordmark. */
+.welcome-nav .brand{flex-direction:column;align-items:center;gap:8px;flex-shrink:0}
+.welcome-nav .brand .p60-mark{width:88px;height:48px;filter:drop-shadow(0 3px 10px #7edcff40)}
+.welcome-nav .welcome-brand-name{font-family:Palatino,'Palatino Linotype','Book Antiqua',Georgia,serif;font-size:27px;font-weight:900;line-height:1.1;letter-spacing:1px;text-shadow:0 2px 6px #0005}
+@media(max-width:680px){
+ .welcome-nav .brand{gap:6px}
+ .welcome-nav .brand .p60-mark{width:70px;height:38px}
+ .welcome-nav .welcome-brand-name{font-size:22px;letter-spacing:.5px}
+}
+
+/* The demo opens separately so the icy artwork can fill the hero. */
+.welcome-actions{flex-wrap:wrap;gap:18px}
+.welcome-demo-button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:12px 20px;background:var(--welcome-panel);border:1px solid var(--welcome-accent);border-radius:8px;color:var(--welcome-text);font-weight:700}
+.welcome-demo-button:hover{background:var(--welcome-bg);box-shadow:0 0 18px #a8e8ff25}
+.welcome-page .welcome-demo{width:min(960px,calc(100vw - 32px));max-width:none;max-height:90dvh;overflow:auto;padding:18px;background:var(--welcome-panel);color:var(--welcome-text);border:1px solid var(--welcome-line);border-radius:14px}
+.welcome-demo::backdrop{background:#020b15d9;backdrop-filter:blur(8px)}
+.welcome-demo-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
+.welcome-page .welcome-demo-header h2{font-size:24px;margin:0}
+.welcome-demo-header button{min-width:44px;min-height:44px;border:1px solid var(--welcome-line);border-radius:8px;background:transparent;color:inherit}
+.welcome-demo-media img{display:block;width:100%;height:auto;border-radius:8px}
+.welcome-page .welcome-demo-caption{margin:12px 0 0;color:var(--welcome-muted);font-size:12px}
+
+/* Account actions stay together at the top on laptops and phones. */
+.welcome-nav nav{gap:12px}
+.welcome-nav :is(.welcome-nav-login,.welcome-nav-join){display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:46px;padding:10px 17px;border:1px solid var(--welcome-line);border-radius:10px;font-weight:700;transition:box-shadow .2s,background .2s}
+.welcome-nav :is(.welcome-nav-login,.welcome-nav-join) svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.welcome-nav .welcome-nav-login{background:var(--welcome-panel);color:var(--welcome-text)}
+.welcome-nav .welcome-nav-join{background:#b5f76b;color:#15200e;border-color:#b5f76b;box-shadow:0 0 18px #b5f76b25}
+.welcome-nav .welcome-nav-join svg{fill:currentColor;stroke-width:1}
+.welcome-nav .welcome-nav-login:hover{border-color:var(--welcome-accent);box-shadow:0 0 16px #a8e8ff25}
+.welcome-nav .welcome-nav-join:hover{background:#ccff94;box-shadow:0 0 24px #b5f76b45}
+@media(max-width:680px){
+ .welcome-nav nav{gap:7px;flex-wrap:wrap;justify-content:flex-end}
+ .welcome-nav :is(.welcome-nav-login,.welcome-nav-join){gap:6px;padding:9px 10px;font-size:12px;min-height:44px}
+ .welcome-nav :is(.welcome-nav-login,.welcome-nav-join) svg{width:18px;height:18px}
+ .welcome-nav .theme-toggle{width:32px;height:44px}
+}
+@media(prefers-reduced-motion:reduce){.welcome-nav :is(.welcome-nav-login,.welcome-nav-join){transition:none}}
+
+/* Compact, centered splash content leaves more of the artwork visible. */
+.welcome-nav{padding-block:14px}
+.welcome-hero{grid-template-columns:minmax(0,1fr);gap:0;padding:32px 0 28px;text-align:center}
+.welcome-page .welcome-copy{width:100%;max-width:720px;margin-inline:auto}
+.welcome-copy .welcome-eyebrow{justify-content:center;margin-bottom:14px}
+.welcome-copy h1{font-size:clamp(42px,5.2vw,64px);line-height:1.05;letter-spacing:-2.5px;margin-bottom:16px}
+.welcome-intro{max-width:570px;margin:0 auto;font-size:15px;line-height:1.65}
+.welcome-actions{justify-content:center;margin-top:20px}
+.welcome-fine{max-width:none;margin:12px auto 0}
+.welcome-stats{padding-block:18px;text-align:center}
+.welcome-stats>div{padding-inline:16px}
+.welcome-stats strong{font-size:24px}
+.welcome-how{padding-block:38px;gap:40px}
+.welcome-steps li{padding-bottom:16px;margin-bottom:16px}
+.welcome-prizes{padding:24px}
+.welcome-footer{margin-top:30px}
+@media(max-width:680px){
+ .welcome-nav{padding-block:10px}
+ .welcome-hero{padding:26px 0 22px}
+ .welcome-copy h1{font-size:clamp(38px,10vw,52px);letter-spacing:-1.8px}
+ .welcome-intro{font-size:14px;max-width:440px}
+ .welcome-copy .welcome-eyebrow{font-size:8px;letter-spacing:1px}
+ .welcome-stats{grid-template-columns:repeat(3,minmax(0,1fr));padding:16px 0}
+ .welcome-stats>div,.welcome-stats>div:first-child{padding:0 8px;border:0;border-left:1px solid var(--welcome-line)}
+ .welcome-stats>div:first-child{border-left:0}
+ .welcome-stats strong{display:block;font-size:clamp(16px,4vw,23px);letter-spacing:-.5px}
+ .welcome-stats strong span{font-size:11px}
+ .welcome-stats p{font-size:10px;line-height:1.5;margin-top:5px}
+ .welcome-how{padding-block:28px;gap:18px}
+ .welcome-page h2{font-size:29px}
+ .welcome-prizes{padding:20px;gap:16px}
+}
+
+/* Keep title-screen copy and controls readable over every part of the artwork. */
+.welcome-page.title-screen{--welcome-text:#ffffff;--welcome-muted:#dcecff;--welcome-accent:#bcefff;--welcome-line:#a8dfff66;--welcome-panel:#10283e;--text:var(--welcome-text);--muted:var(--welcome-muted)}
+.welcome-page.title-screen:before{background:linear-gradient(#061422c9,#061422e6),url('assets/backgrounds/icy-coins-color.webp') center top/cover no-repeat}
+.title-screen .welcome-nav{border-bottom-color:var(--welcome-line)}
+.title-screen .welcome-brand-name,.title-screen .welcome-copy h1{color:var(--welcome-text);text-shadow:0 2px 8px #0009}
+.title-screen .welcome-nav .p60-mark{filter:brightness(1.25) drop-shadow(0 2px 8px #020b15)}
+.title-screen .welcome-nav :is(.winners-link,.theme-toggle){display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 12px;border:1px solid var(--welcome-line);border-radius:10px;background:var(--welcome-panel);color:var(--welcome-text)}
+.title-screen .welcome-nav .theme-toggle{min-width:44px;font-size:22px}
+.title-screen .welcome-nav :is(.welcome-nav-login,.welcome-nav-join) svg{stroke-width:2.2}
+.title-screen .welcome-nav .welcome-nav-join svg{stroke-width:1}
+.title-screen .welcome-demo-button{background:#bcefff;color:#062139;border-color:#bcefff;box-shadow:0 2px 12px #0005}
+.title-screen .welcome-demo-button:hover{background:#e4f8ff;color:#062139}
+.title-screen .welcome-demo-button>span{font-size:18px}
+.title-screen :is(.welcome-intro,.welcome-fine,.welcome-stats p,.welcome-steps p,.section-intro>p:last-child,.welcome-prizes p:last-child,.welcome-footer){color:var(--welcome-muted)}
+.title-screen .welcome-fine{font-size:12px;font-weight:600}
+.title-screen .welcome-footer{font-size:11px}
+.title-screen .welcome-eyebrow{font-weight:700}
+.title-screen :is(a,button):focus-visible{outline-color:var(--welcome-accent);outline-offset:4px}
+html[data-theme="light"] .welcome-page.title-screen{--welcome-text:#10293e;--welcome-muted:#29485e;--welcome-accent:#07567a;--welcome-line:#254d7266;--welcome-panel:#f3f9ff}
+html[data-theme="light"] .welcome-page.title-screen:before{background:linear-gradient(#edf7ffeb,#edf7fff5),url('assets/backgrounds/icy-coins-color.webp') center top/cover no-repeat}
+html[data-theme="light"] .title-screen :is(.welcome-brand-name,.welcome-copy h1){text-shadow:none}
+html[data-theme="light"] .title-screen .welcome-nav .p60-mark{filter:drop-shadow(0 1px 2px #10293e33)}
+@media(max-width:680px){
+ .title-screen .welcome-nav .winners-link{display:none}
+ .title-screen .welcome-nav .theme-toggle{padding:8px;min-width:44px}
+ .title-screen .welcome-copy .welcome-eyebrow{font-size:10px;letter-spacing:.8px}
+ .title-screen .welcome-stats p{font-size:11px}
+ .welcome-page.title-screen:before{background-position:60% top}
 }

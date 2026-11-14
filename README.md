@@ -1,6 +1,6 @@
 # Predict60 — Hourly prediction terminal
 
-Predict60 is a buildless web app for exploring hourly direction predictions with game credits. See a complete UTC hour at once: one 60-minute market, two 30-minute markets, and four 15-minute markets, with a live chart and prediction popups.
+Predict60 is a buildless web app for exploring hourly direction predictions with game credits. See a complete UTC hour at once: one 60-minute market, two 30-minute markets, four 15-minute markets, twelve 5-minute markets, with a live chart and prediction popups.
 
 ![Predict60 terminal with an hourly chart, aligned prediction intervals, and an order ticket](src/frontend/assets/previews/prediction-playfield.png)
 
@@ -9,13 +9,27 @@ Predict60 is a buildless web app for exploring hourly direction predictions with
 ## Overview
 
 - **Complete-hour workspace:** inspect open, upcoming, and completed intervals without hiding duration tiers; navigate previous hours and return to the current hour.
-- **Readable segment cards:** time and bold Up/Down probabilities lead, benchmark → current/closing price follows, and controls stay grouped. Phone layouts wrap the header; pending/upcoming cards omit unavailable values.
-- **Live market context:** Coinbase Exchange ticker updates and minute-candle history, with separate spot freshness, history, and order-readiness indicators.
-- **Points predictions:** choose Up or Down, set a budget, and review fractional shares, cost, possible return, and potential profit. Model percentages determine simulated contract prices.
+- **Interval and Hour views:** Interval opens by default with one 5-, 15-, 30-, or 60-minute play. Hour shows all duration tiers. Use the title-bar view controls or double-click a card to switch views; single-click segment and duration selections stay in the current view.
+- **Readable interval cards:** UTC time, starting/live or closing prices, actual movement, model estimates, and saved execution terms stay together. Missing values use placeholders; confirmed results have a green/red outcome arrow.
+- **Top HUD:** pinned player name (ten displayed characters), C$ game-coin balance, local/UTC clocks, Interval/Hour controls, theme switch and account menu. Compact screens wrap the controls across rows. Larger coin icons replace repeated ticker labels.
+- **Live market context:** Hour shows the selected coin, USD price and hourly movement above the graph. Interval shows the selected duration clock, coin icon and UTC range together with its prices and prediction controls. Green/red minute candles and matching trend arrows retain gaps for missing data.
+- **Points predictions:** choose Up or Down, set a budget, and review fractional shares, cost, possible return, and potential profit. Segment percentages estimate outcomes; the ticket shows the contract quote and execution terms.
 - **Live confirmation:** review follows the market; the server executes at its current model price within your budget. Final quantity and return can differ from review.
 - **Persistent accounts:** signup/login, password changes, 1,000 hourly contest credits, saved predictions, and automatic settlement backed by SQLite.
 - **Portfolio tracking:** pending orders, wins, losses, returns, and realized profit/loss, with committed funds shown separately.
-- **Display controls:** light/dark themes, responsive layouts, chart pause, reconnect, and an explicit synthetic preview mode.
+- **Display controls:** light/dark themes, black chart backgrounds, aligned time markers, and 60, 15, 30, and 5-minute rows on the same hourly scale. Narrow screens scroll the chart and all rows together.
+
+### Chart views
+
+The title bar shows **Interval | Hour**. Entering Hour clears interval highlights;
+a single click highlights a segment without switching views. Double-click an
+Hour card to open its exact interval, or an Interval card to return to Hour.
+Hour uses a white price line with green/red candles. Interval's line, grid, and
+endpoint use the duration color. Both use compact black graphs with alternating
+red/yellow dotted time markers: 180 pixels high on desktop and 150 pixels on
+phones. A compact row of green up/red down summary arrows sits below the minute
+candles. See the
+[user guide](doc/USER_GUIDE.md#read-the-terminal) for navigation and display details.
 
 ### Default prediction coins
 
@@ -55,7 +69,7 @@ invalid/missing minutes still block an order. A successful 60-minute prediction
 does not supply the benchmark for a later 15-minute interval. A history failure
 is a provider-data problem, not a reason to log out. See the
 [user guide](doc/USER_GUIDE.md#troubleshooting) and
-[performance review](doc/VPS_PERFORMANCE.md#october-25-2026-segment-and-benchmark-maintenance).
+[performance review](doc/VPS_PERFORMANCE.md#november-14-2026-pre-vps-cleanup).
 
 These are uncalibrated model estimates, simulated prices, and Coinbase minute-close proxy results. Predict60 does not trade real money or claim official Kalshi or CF Benchmarks settlement. Synthetic preview and historical views cannot place orders.
 
@@ -78,28 +92,37 @@ Open http://127.0.0.1:8000 for the welcome page or http://127.0.0.1:8000/index.h
 
 ### Run locally with Docker
 
+Use [guided local and VPS setup](deploy/SETUP.md) to configure testing or
+production: `bash scripts/setup-local.sh` or `bash scripts/setup-vps.sh`.
+Add `--start` to build and launch the selected deployment.
+
 Without the Compose plugin, use the plain-Docker restart script:
 
 ```bash
 cp -n deploy/local.env.example .env.local
 chmod 600 .env.local
-sudo bash scripts/restart-docker.sh --local
+sudo bash scripts/restart-docker.sh --local --recreate
 ```
 
-Repeat the last command after edits. It builds first, replaces `p60-local`,
-preserves `p60-local-data`, and checks readiness at http://localhost:8085.
-Edit `.env.local` to change the signup code (the example uses `777`).
+Repeat the last command after code or environment edits. `--recreate` builds
+first, replaces `p60-local`, preserves `p60-local-data`, and checks readiness at
+http://localhost:8085. Omit `--recreate` to restart the existing container with
+its current image and configuration. A missing container requires `--recreate`.
+Signup requires no organizer code by default; see [registration policy](deploy/SETUP.md). If port
+8085 is already used by the VPS stack, set `P60_PORT=18085` in `.env.local`
+and open `http://localhost:18085` instead. The VPS `.env` configuration does not
+provide the local signup code.
 
 Requires Docker Engine and the Docker Compose plugin. From the project root:
 
 ```bash
-cp deploy/local.env.example .env.local
+cp -n deploy/local.env.example .env.local
 chmod 600 .env.local
 sudo docker compose -f compose.local.yaml --env-file .env.local up -d --build
 ```
 
-Open **http://localhost:8085**. The example signup code is `777`; change it in
-`.env.local` if preferred. An empty code disables signup. Repeat the last command
+Open **http://localhost:8085**. Registration has no account cap or per-network
+signup limits. Repeat the last command
 after code changes to rebuild and recreate the app, then refresh your browser.
 Local Docker uses its own persistent `p60-local-data` volume and leaves the
 checkout's database unchanged.
@@ -124,8 +147,9 @@ Behind an HTTPS reverse proxy, set `P60_HOST` to the exact public origin
 P60_HOST=https://predict60.com python3 scripts/restart-server.py
 ```
 
-POST requests with an `Origin` header must match this value exactly. If
-`P60_HOST` is unset or empty, the existing `http://<Host header>` check applies.
+POST requests with an `Origin` header must match `P60_HOST` or an exact alias
+in `P60_ADDITIONAL_ORIGINS`. If neither is configured, the existing
+`http://<Host header>` check applies.
 Requests without an `Origin` header retain their existing behavior; authenticated
 mutations still require a valid session and CSRF token. Restart the server after
 changing the environment. An HTTPS origin automatically adds `Secure` to login
@@ -229,11 +253,14 @@ the console and support the same `--log-level` option.
 - [Admin guide](doc/ADMIN_GUIDE.md): server scripts, log levels, rotation, maintenance, and troubleshooting.
 - [Contest operations](doc/CONTEST_OPERATIONS.md): UTC scoring, sponsor strip, and prize review.
 - [Test guide](doc/TEST_GUIDE.md): regression tests, Docker health, crash recovery, and restore checks.
+- [Test engineer checklist](doc/QA_CHECKLIST.md): expected outcomes, acceptance matrix, performance checks, and release evidence.
+- [Latest test results](doc/TEST_RESULTS.md): dated suite totals, browser checks, and unverified deployment checks.
 - [User guide](doc/USER_GUIDE.md): accounts, predictions, history, portfolio, and troubleshooting.
 - [Design](doc/DESIGN.md): interaction, pricing, settlement, architecture, and persistence.
 - [Database maintenance](doc/DATABASE_MAINTENANCE.md): initialization, inspection, backups, and explicit reset.
 - [VPS performance review](doc/VPS_PERFORMANCE.md): resource limits, query improvements, and local measurements.
 - [VPS deployment](deploy/README.md): Caddy, systemd, secrets, backups, and cutover checks.
+- [VPS update handoff](doc/DEPLOYMENT_REVIEW.md): current changes, backup/recreation steps, and post-update checks.
 
 ## Code documentation (Sphinx)
 
@@ -243,7 +270,7 @@ inventories, plus an architecture guide. Build it without executing app modules:
 
 ```bash
 python3 -m pip install -r doc/requirements.txt
-npm install --prefix doc
+npm ci --prefix doc
 python3 -m sphinx -W --keep-going -b html doc doc/_build/html
 ```
 
@@ -258,8 +285,8 @@ Application sources live under `src/backend`, `src/frontend`, and `src/seeds`. `
 
 ```bash
 python3 scripts/run_tests.py
-node --check app.js
-node --check btc-chart.js
+node --check src/frontend/app.js
+node --check src/frontend/btc-chart.js
 ```
 
 The runner executes the JavaScript, application Python, and scripts Python
@@ -267,7 +294,7 @@ suites. Every run prints a colored summary and saves the complete colored log
 as `/tmp/test_results/test_result_<date_time>.log`. Use `less -R` to retain the
 PASS/FAIL colors while reading a saved log.
 
-Tests cover market calculations, catalog/bootstrap behavior, portfolio summaries, restored and expired sessions, login/signup errors, logout and settlement retries, community polling, weather benchmark boundaries, static build isolation, account/order/settlement handling, and database maintenance. They do not establish live Coinbase availability.
+Tests cover manual Interval/Hour selection, candle-aligned summary arrows, hourly price changes, market calculations, catalog/bootstrap behavior, portfolio summaries, restored and expired sessions, login/signup errors, logout and settlement retries, community polling, weather benchmark boundaries, static build isolation, account/order/settlement handling, and database maintenance. They do not establish live Coinbase availability.
 
 ## Data and catalog
 
@@ -307,8 +334,8 @@ Both commands report progress. Rerun the download command after interruption to 
 
 The entry screen at `/` (or `welcome.html`) offers login and signup. Signed-in visitors go directly to `categories.html`, which loads category buttons from `/api/categories`. Oil and Weather are visible as Coming soon; neither category can open a terminal or accept predictions while their data feeds are being completed. See [weather preparation](doc/WEATHER.md).
 Choose **Crypto** to open the one-hour playfield at
-`index.html?category=crypto`. The existing 15-, 30-,
-and 60-minute intervals remain aligned inside that hour. Each category has its own
+`index.html?category=crypto`. The 5-, 15-, 30-,
+and 60-minute intervals cover that hour; all four rows share the chart's hourly scale and scroll together on narrow screens, with **Now** and **Select** controls beside the five-minute row. Each category has its own
 background, accent, instrument selection, and remembered instrument. The portfolio
 shows both categories and can filter history and statistics by category; the demo
 balance is shared.
@@ -422,9 +449,10 @@ The login page uses Google Identity Services. The Python backend verifies tokens
 with `google-auth`, checks the configured audience and verified email, and maps
 Google's stable `sub` to `google_identities.user_id`. Google sign-in creates the
 same SQLite session and HttpOnly cookie as password login. The supplied public
-web client ID is the default; `GOOGLE_CLIENT_ID` overrides the backend setting
-(and must match `data-client_id` in `src/frontend/login.html`). No Google client
-secret is used in this ID-token flow.
+web client ID is the default; `GOOGLE_CLIENT_ID` overrides it for both backend
+verification and the served login, signup, and account-linking pages. Set it in
+`.env.local` for local Docker or `.env` for the VPS, then rebuild/recreate the
+app. No frontend edits or Google client secret are needed.
 
 Install the runtime dependencies in the Python environment that runs the server:
 
@@ -438,6 +466,13 @@ service's Python environment, rather than an unrelated interactive environment.
 Keep `P60_HOST` set to the exact public HTTPS origin and authorize that same
 origin in the Google web client settings. Local testing uses an authorized
 `http://localhost:<port>` origin.
+For localhost access to the public Docker stack, also add the exact browser
+origin (for example, `http://localhost:8085`) to `P60_ADDITIONAL_ORIGINS` in
+`.env`, preserving the public aliases. This is required for password signup/login
+as well as Google authentication. Recreate the app container to load the change;
+see [allowed origins and the Docker apply command](deploy/DOCKER.md).
+An `Invalid request origin.` response is an app origin-allowlist rejection;
+Google's Authorized JavaScript origins are a separate configuration.
 
 `GET /api/auth/google/csrf` returns a short-lived login CSRF token and sets a
 matching HttpOnly cookie. The login callback sends that token in `X-CSRF-Token`
@@ -449,9 +484,11 @@ fails closed with a retryable error. Tokens and client secrets are not logged.
 An unknown Google subject returns `LINK_REQUIRED` when the email already exists,
 or `SIGNUP_REQUIRED` otherwise. Neither response creates or links an account.
 The login page routes new Google users to `signup.html?google=1`. Google signup
-requires selecting a Google account, a display name, and the organizer's existing
-signup code. `POST /api/auth/google/signup` verifies Google's token again and
-atomically creates the user and subject mapping only after validating the code.
+requires selecting a Google account and a display name. An organizer code is
+required only when `SIGNUP_CODE_REQUIRED` is enabled in `src/backend/CONST.py`.
+`POST /api/auth/google/signup` verifies Google's token again and atomically
+creates the user and subject mapping. Registration has no account cap or
+per-network signup budgets; general authentication throttling remains active.
 Google-only users have no local password; they return using Google. Existing
 password registration remains available.
 

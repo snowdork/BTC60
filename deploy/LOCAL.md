@@ -10,9 +10,6 @@ is needed for JavaScript tests. The full test runner and watchdog target Linux.
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 
-# Read a signup code without storing it in shell history (Bash).
-read -rs -p 'Local signup code: ' P60_SIGNUP_CODE
-export P60_SIGNUP_CODE
 .venv/bin/python src/backend/server.py --bind 127.0.0.1 --port 8000
 ```
 
@@ -20,8 +17,11 @@ The restart helper automatically uses `.venv/bin/python` when it exists.
 For Google testing, use `http://localhost:8000` and register that origin in Google.
 
 Open http://127.0.0.1:8000. Stop with Ctrl-C; restart after Python changes.
-Refresh the browser after HTML/CSS/JS changes. An empty signup code disables new
-signups but existing accounts can log in. Python does not read `.env` files.
+Refresh the browser after HTML/CSS/JS changes. Signup is open without a code by
+default; see [registration policy](SETUP.md). When the code gate is enabled in
+`src/backend/CONST.py`, an empty signup code disables new signups but existing
+accounts can log in. Local Python launches read the signup
+code from `.env.local` when neither an environment override nor a saved code exists.
 Leave `P60_HOST` unset for the default local HTTP origin, or set it to the exact
 origin you use. Do not carry the production HTTPS origin into a local session.
 
@@ -72,13 +72,17 @@ need the same accounts in another deployment.
 ## Docker
 
 ```bash
-cp -n deploy/local.env.example .env.local
-chmod 600 .env.local
-# Edit .env.local; change the example signup code if desired.
-bash scripts/restart-docker.sh --local
+bash scripts/setup-local.sh
+bash scripts/restart-docker.sh --local --recreate
 ```
 
-After a successful build, the restart helper stops `predict60.service` when it
+See [guided setup](SETUP.md) for validation, updates, and automated rollout.
+
+Use `bash scripts/restart-docker.sh --local` for a plain restart of the existing
+container. Add `--recreate` for first startup or to apply code, environment, or
+port changes. Both paths preserve the data volume and check app readiness.
+
+With `--recreate`, after a successful build, the helper stops `predict60.service` when it
 is installed, before replacing/starting the Docker app. Run the helper with
 `sudo` for this handoff. If stopping the service fails, Docker replacement is
 aborted. A failed build leaves the host service running. Stopping the service
@@ -86,10 +90,23 @@ does not disable its boot startup; use `sudo systemctl disable predict60` if
 Docker will permanently replace the host service.
 
 
-Open **http://localhost:8085** (use this hostname to match the configured origin).
+Open **http://localhost:8085** by default, or `http://localhost:<P60_PORT>`
+when you changed the port in `.env.local`. Use the `localhost` hostname to match
+the configured origin.
 This path needs Docker Engine but not Compose. It builds before replacing the
 container, keeps accounts in `p60-local-data`, limits logs, and uses a read-only
 root filesystem with a writable data volume and 64 MiB temporary filesystem.
+
+Local Docker and Compose both build `p60:local-dev`, separate from the VPS
+image. If a VPS container already publishes port 8085, choose another
+`P60_PORT` in `.env.local` (for example, `18085`) before starting locally.
+The restart helper reports Docker port conflicts before replacing a container.
+For example, `P60_PORT=18085` uses `http://localhost:18085`. The production
+`compose.yaml` reads `.env` and does not use the local signup code; use the
+`--local` helper or `compose.local.yaml` for development.
+Authorize `http://localhost:<P60_PORT>` in your Google web client's JavaScript
+origins. Set `GOOGLE_CLIENT_ID` in `.env.local` to use your own client; the server
+updates all three Google sign-in pages automatically.
 
 ```bash
 docker logs --tail=100 -f p60-local
@@ -159,8 +176,16 @@ curl --fail http://localhost:8085/healthz # Docker
 python3 scripts/run_tests.py
 ```
 
-- Signup unavailable: set a nonempty `P60_SIGNUP_CODE` and restart/recreate.
-- Origin rejected: use the configured hostname, scheme, and port exactly.
+- Signup unavailable: if invite codes are enabled, set a nonempty
+  `P60_SIGNUP_CODE` and restart/recreate. No code is needed with the default policy.
+- Origin rejected: the allowed origin must match the browser's scheme, hostname,
+  and port exactly. For `http://localhost:8085/signup.html`, allow
+  `http://localhost:8085` (without `/signup.html`). When accessing the public
+  Docker stack locally, add it to `P60_ADDITIONAL_ORIGINS` in `.env`, retain
+  existing public aliases, and recreate the app container. See
+  [the exact configuration and command](DOCKER.md). Separate local Compose
+  already sets `P60_HOST` to `http://localhost:<P60_PORT>`. Google's authorized
+  origins must also include this address when using Google login.
 - Port in use: stop the other process/supervisor or choose another Python port.
 - Changes missing in Docker: rebuild the image; editing `dist/` has no effect.
 - Missing history or settlement delays: check connectivity and provider errors;
@@ -242,3 +267,5 @@ owner-only permissions and loads it on later restarts. A nonempty exported
 disables signup for that run. Direct local `server.py` and VS Code launches also load the saved code when
 `P60_SIGNUP_CODE` is unset. Explicit environment settings take precedence, and
 production origins continue to require deployment environment configuration.
+When no saved code exists, local launches use `P60_SIGNUP_CODE` from `.env.local`,
+sharing the local Compose setting. Other `.env.local` variables are not loaded.

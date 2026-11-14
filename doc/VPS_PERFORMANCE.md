@@ -1,9 +1,129 @@
 # VPS performance review
 
-Reviewed October 19, 2026. Changes were checked locally with temporary databases
-and mocked providers; this is not a production VPS load test.
+The latest review is November 14, 2026. Earlier dated sections are retained as
+historical evidence. Measurements below use temporary databases and synthetic
+or mocked provider data; they do not establish production VPS capacity.
 
-## Implemented improvements
+## November 14, 2026 pre-VPS cleanup
+
+Reviewed the Phase-10 worktree based on `144a808`, including the Interval/Hour
+layout and explicit Docker recreation changes. This pass removes repeated browser
+work and closes HTTP error streams; it does not change pricing or settlement rules.
+
+- `coins.js` caches `Intl.NumberFormat` by precision within each catalog rather
+  than constructing one for each displayed price. The cache has at most 13 entries.
+- The header indexes unsettled predictions on account/user replacement or an
+  `account-update` event. Stable ticks skip history scans; start/end boundaries
+  and backwards clock movement recompute markers. Duration attributes are written
+  only when their accessible label changes. Coin/hour/demo navigation still works.
+- Candle benchmark retries and the resumable history downloader explicitly close
+  HTTP error responses before retrying or propagating an error. Regression checks
+  cover permanent rejection, throttling, server errors and retry exhaustion.
+  Test database fixtures also close their SQLite connections deterministically.
+- Removed obsolete separate five-minute scrolling rules and duplicate responsive
+  control styles. Hour now has one scrolling timeline and pinned duration labels.
+
+### Local measurements
+
+Node.js 24.22.2 and Python 3.14.4 on this development machine. The comparison uses
+the implementation at `144a808` and the current worktree, with fixture inputs.
+
+| Check | Before | After |
+| --- | ---: | ---: |
+| Median time to format 10,000 prices | 110.194 ms | 3.863 ms |
+| Settled-history item reads across 30 stable header ticks | 30,000 | 0 |
+| Duration accessibility-attribute writes across those ticks | 120 | 0 |
+
+Price formatting was about 28.5× faster in this microbenchmark. Seven runs follow
+warm-up and cover the default ten-coin catalog, fractional/negative/large values
+and missing prices. Outputs compared equal. Regression tests additionally cover
+all supported precisions. Header operation counts use 1,000 settled orders plus
+active/future predictions, with unchanged account data between ticks. An account
+update still scans the snapshot once; this does not reduce the API response size.
+
+```bash
+git show 144a808:src/frontend/coins.js > /tmp/btc60-before-coins.js
+node scripts/benchmark-coin-format.cjs /tmp/btc60-before-coins.js
+node --test test/frontend/coins.test.js test/frontend/bootstrap.test.js
+```
+
+The backend review retains bounded request concurrency, coalesced history loads,
+read-only idle settlement and bounded finalized leaderboard reads. Full account
+history payloads and live standings aggregation remain growth limits; changing
+those APIs is separate work. No production CPU, memory, request latency or load
+capacity was measured. See [verification](TEST_RESULTS.md) and the
+[VPS rollout handoff](DEPLOYMENT_REVIEW.md). No deployment was performed.
+
+## November 13, 2026 runtime and local development cleanup
+
+Reviewed the Phase-10 worktree based on `62efaea`, including the existing local
+setup, reset, registration and compact-segment changes. Focused on reducing
+repeated browser work and idle SQLite contention without changing quote or
+settlement semantics.
+
+- `minutePlot` rejects out-of-range candles before OHLC checks, validates rows
+  without per-candle slices, deduplicates seconds in one pass, and reduces the
+  price range without temporary flattened arrays. Exact-boundary closes,
+  duplicate/unsorted input behavior, gaps and incomplete-candle rejection remain.
+- The detail view caches stable elements and card fields separately. Identical
+  properties and serialized attributes are not rewritten. Saved predictions are
+  indexed once per account snapshot/event instead of scanning complete history
+  on each price update. Account events invalidate the index, including in-place
+  fixture changes; freshness and cutoff gates still run every refresh.
+- The main Predict field is separate from direction shortcuts, so it receives
+  the correct disabled state. Overview updates also avoid unchanged disabled,
+  image-alt, summary and movement writes and share one wall-clock sample.
+- Finalization first reads whether an ended hourly contest has no unsettled
+  entries. Idle passes and unresolved contests do not take the SQLite writer
+  lock. Actual finalization rechecks and commits normally, retaining empty
+  contests, ties, pending-data recovery and payout idempotence.
+- Player instructions, design invariants and the test engineer checklist now
+  match optional signup codes, the 100-account policy, compact segments, separate
+  local/VPS settings and destructive reset semantics.
+
+### Local evidence
+
+Node.js 24.22.2 and Python 3.14.4; values are local computations on this machine.
+The baseline is the source snapshot before this cleanup, not a public endpoint.
+
+| Check | Before | After |
+| --- | ---: | ---: |
+| Median chart preparation per interval | 0.3927 ms | 0.3185 ms |
+| DOM writes on an identical detail refresh | 45 | 0 |
+| Detail element/field lookups on that refresh | 26 | 0 |
+| SQLite `BEGIN IMMEDIATE` on an idle settlement pass | 1 | 0 |
+
+The chart fixture has 1,440 minute candles and 3,600 recorded seconds, cycling
+through 5/15/30/60-minute intervals. Seven runs of 400 plots follow warm-up;
+medians improved about 19%. Complete outputs compared equal. A separate 1,000-case
+deterministic mixed-data comparison also preserved complete outputs, including
+unsorted/duplicate samples and invalid/missing observations. A 1,000-order detail
+fixture shows no repeated history scan between account updates.
+
+The DOM counts use instrumented fixtures; the actual browser renderer also
+passed a MutationObserver check for zero unchanged mutations. Offline Firefox
+fixtures passed at 1366, 390 and 320 pixels in dark and light themes, checking
+changed prices, disconnected controls, direction events, fit and 44-pixel action
+heights. They do not exercise live Google login, provider calls or accepted orders.
+
+Reproduce the chart comparison from the repository root:
+
+```bash
+git show 62efaea:src/frontend/market-model.js > /tmp/btc60-before-market-model.js
+node scripts/benchmark-market-model.cjs /tmp/btc60-before-market-model.js
+```
+
+Use operation-count regressions as correctness gates rather than CI time limits.
+Keep one app process, the existing 32-handler default and SQLite durability
+settings. Full account-history responses and live standings remain growth
+limits. Public p95 latency, memory and production throughput were not measured.
+No production service was rebuilt/restarted and no real database was reset.
+
+See [current verification](TEST_RESULTS.md), [test commands](TEST_GUIDE.md), and
+[release acceptance](QA_CHECKLIST.md). The older Docker-availability notes below
+refer to their dated reviews, not the current environment.
+
+## Earlier backend improvements (historical)
 
 - Catalog reads now batch instrument/provider metadata: `/api/coins` uses one
   SELECT and `/api/categories` uses two, regardless of the instrument count.
@@ -67,14 +187,15 @@ cache state; the request/query reductions are the more useful evidence.
 PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest performance_test
 python3 scripts/run_tests.py
 docker compose config --quiet
-docker compose up -d --build
+sudo bash scripts/restart-docker.sh --recreate
 docker compose ps
 docker compose logs --tail=100 app
 ```
 
 Back up before deploying. Creating indexes on a large database can extend the
-first startup. Docker build/runtime validation still requires a Docker-capable
-host; Docker is not installed in the development environment used for this review.
+first startup. This earlier review did not have Docker available. The November 14
+pass validated the Compose configuration with Docker but did not build or start
+an image. Runtime validation remains part of the VPS rollout.
 
 Resource tests cover connection commit/rollback/closure, contest reads while
 another connection owns the writer lock, history request coalescing and retries,
@@ -85,9 +206,11 @@ settlement retry deduplication, and overload recovery.
 The app still uses ThreadingHTTPServer behind Caddy and one SQLite writer. The
 concurrency bound is not a production-server refactor or a capacity guarantee.
 SQLite connections are scoped rather than pooled. Account snapshots still return
-complete prediction history, and the contest dashboard computes all recent
-standings before limiting displayed rows. Pagination and narrower leaderboard
-requests are the next changes if accumulated histories become large.
+complete prediction history, and live contest standings aggregate current entries
+before limiting displayed rows. Finalized standings already use bounded reads,
+including complete tied winners and the caller's rank. Account pagination and
+narrower live standings queries are the next changes if histories or participation
+become large.
 
 Slow external providers still consume request slots. Authentication hashing also
 uses CPU/memory, so test login bursts as well as reads. Monitor 503 responses,

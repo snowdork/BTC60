@@ -92,6 +92,43 @@ class ResourceTest(unittest.TestCase):
                 self.assertFalse(reader.in_transaction)
                 self.assertFalse(any(s.startswith(('INSERT', 'UPDATE', 'DELETE')) for s in statements))
 
+    def test_idle_settlement_poll_does_not_take_writer_lock_even_with_unsettled_contests(self):
+        now = 86400 * 20000
+        with server.connect() as conn:
+            contests.ensure_period(conn, 'hourly', now)
+            previous = contests.ensure_period(conn, 'hourly', now - 3600)
+            conn.execute("INSERT INTO users(id,name,email,password_hash,salt,created_at) VALUES(1,'Test','test@example.com','','',0)")
+            conn.execute('INSERT INTO predictions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                         ('pending', 1, 'pending', 'BTC', '60-0', 'up', now - 3600, now, 100, 50, 2, 100, now - 3600))
+            conn.execute('INSERT INTO contest_entries VALUES(?,?,?)', ('pending', None, previous['id']))
+        original_connect = server.connect
+        statements = []
+
+        @contextmanager
+        def traced_connect():
+            with original_connect() as conn:
+                conn.execute('PRAGMA busy_timeout=10')
+                conn.set_trace_callback(statements.append)
+                yield conn
+
+        with original_connect() as writer:
+            writer.execute('BEGIN IMMEDIATE')
+            with patch('server.connect', traced_connect), patch('server.time.time', return_value=now + 10), \
+                    patch('server.candle_close', side_effect=ValueError('offline')):
+                server.settle_due()
+        self.assertFalse(any(s.startswith(('BEGIN IMMEDIATE', 'INSERT', 'UPDATE', 'DELETE')) for s in statements))
+
+    def test_finalization_preflight_retains_closed_empty_contests_and_skips_them_after_commit(self):
+        now = 86400 * 20000
+        with server.connect() as conn:
+            period = contests.ensure_period(conn, 'hourly', now - 3600)
+            self.assertTrue(contests.ready_to_finalize(conn, now))
+        with patch('server.time.time', return_value=now):
+            server.settle_due()
+        with server.connect() as conn:
+            self.assertEqual(conn.execute('SELECT finalized_at FROM contests WHERE id=?', (period['id'],)).fetchone()[0], now)
+            self.assertFalse(contests.ready_to_finalize(conn, now))
+
     def test_final_dashboard_bounds_leaders_without_losing_personal_ranks_or_tied_winners(self):
         now = 86400 * 20000
         with server.connect() as conn:

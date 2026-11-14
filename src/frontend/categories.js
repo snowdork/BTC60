@@ -61,7 +61,15 @@
         }
         instruments.append(row);
       }
-      link.append(count,icon,title,description,state,instruments,source,action);return link;
+      link.append(count,icon,title,description,state,instruments,source);
+      if(comingSoon&&['oil','weather'].includes(category.id)){
+        const caution=document.createElement('span');caution.className='category-caution';caution.setAttribute('aria-hidden','true');
+        for(let i=0;i<2;i++){
+          const tape=document.createElement('span');tape.className='category-caution-tape';tape.textContent='COMING SOON • COMING SOON';caution.append(tape);
+        }
+        link.append(caution);
+      }
+      link.append(action);return link;
     }));
     status.textContent='';
     refreshQuotes();setInterval(refreshQuotes,5000);

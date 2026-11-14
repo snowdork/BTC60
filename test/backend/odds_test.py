@@ -3,8 +3,11 @@ import math
 import subprocess
 import runpy
 import tempfile
+from io import BytesIO
+from datetime import datetime
 from pathlib import Path
 import urllib.error
+import urllib.parse
 import unittest
 from unittest.mock import patch
 import odds
@@ -57,8 +60,11 @@ class OddsTest(unittest.TestCase):
             def __exit__(self,*args):pass
         with tempfile.TemporaryDirectory() as directory:
             output=Path(directory)/'candles.json'
-            with patch('time.time',return_value=3600000),patch('time.sleep'),patch('urllib.request.urlopen',side_effect=[Response(),urllib.error.HTTPError('url',403,'Forbidden',{},None)]),patch('json.load',return_value=[[2736000,0,0,0,100]]):
+            body=BytesIO(b'Forbidden')
+            error=urllib.error.HTTPError('url',403,'Forbidden',{},body)
+            with patch('time.time',return_value=3600000),patch('time.sleep'),patch('urllib.request.urlopen',side_effect=[Response(),error]),patch('json.load',return_value=[[2736000,0,0,0,100]]):
                 with self.assertRaises(urllib.error.HTTPError):workflow['download']('BTC-USD',output,10)
+            self.assertTrue(body.closed)
             state=json.loads(output.with_suffix('.json.partial').read_text())
             self.assertEqual(state['next'],state['start']+14400)
             # Complete the final page on resume; avoid any further network requests.
@@ -69,18 +75,38 @@ class OddsTest(unittest.TestCase):
                 self.assertEqual(fetch.call_count,1)
             self.assertEqual(len(json.loads(output.read_text())),2)
 
+    def test_download_closes_retry_responses_and_preserves_checkpoint(self):
+        workflow=runpy.run_path('scripts/download-odds-history.py')
+        with tempfile.TemporaryDirectory() as directory:
+            output=Path(directory)/'candles.json'
+            checkpoint=output.with_suffix('.json.partial')
+            checkpoint.write_text(json.dumps({'product':'BTC-USD','start':0,'end':60,'next':0,'candles':[]}))
+            bodies=[BytesIO(b'Try later') for _ in range(3)]
+            errors=[urllib.error.HTTPError('url',code,'Try later',{},body) for code,body in zip((429,503,500),bodies)]
+            with patch('time.sleep'),patch('urllib.request.urlopen',side_effect=errors) as fetch:
+                with self.assertRaises(urllib.error.HTTPError):workflow['download']('BTC-USD',output,10)
+            self.assertEqual(fetch.call_count,3)
+            self.assertTrue(all(body.closed for body in bodies))
+            self.assertEqual(json.loads(checkpoint.read_text())['next'],0)
+            self.assertFalse(output.exists())
+
     def test_history_paginates_deduplicates_and_caches(self):
         class Response:
+            def __init__(self, request):
+                query = urllib.parse.parse_qs(urllib.parse.urlsplit(request.full_url).query)
+                end = int(datetime.fromisoformat(query['end'][0]).timestamp())
+                candle = [end - 60, 0, 0, 0, 100]
+                # The response belongs to its requested interval regardless of worker order.
+                self.batch = [candle, candle, [end, 0, 0, 0, 100]]
             def __enter__(self):return self
             def __exit__(self,*args):pass
         server.HISTORY_CACHE.clear()
-        batches=[[[86400-i*14400-60,0,0,0,100]] for i in range(6)]
-        with patch('server.urllib.request.urlopen',return_value=Response()) as fetch,patch('server.json.load',side_effect=batches):
+        with patch('server.urllib.request.urlopen',side_effect=lambda request, **kwargs: Response(request)) as fetch,patch('server.json.load',side_effect=lambda response: response.batch):
             history=server.pricing_history('TEST-USD',86401)
             self.assertEqual(len(history),6)
             self.assertEqual(server.pricing_history('TEST-USD',86420),history)
             self.assertEqual(fetch.call_count,6)
-        with patch('server.urllib.request.urlopen',return_value=Response()) as fetch,patch('server.json.load',return_value=[[86400,0,0,0,101]]):
+        with patch('server.urllib.request.urlopen',side_effect=lambda request, **kwargs: Response(request)) as fetch,patch('server.json.load',return_value=[[86400,0,0,0,101]]):
             updated=server.pricing_history('TEST-USD',86461)
             self.assertEqual(fetch.call_count,1)
             self.assertEqual(updated[-1][4],101)

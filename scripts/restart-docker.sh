@@ -1,16 +1,40 @@
 #!/usr/bin/env bash
-# Rebuild the VPS stack or local container without deleting persistent volumes.
+# Restart existing containers; rebuild and replace only with --recreate.
 set -euo pipefail
 
-if [[ $# -gt 1 || (${1:-} != '' && ${1:-} != '--local') ]]; then
-  echo 'Usage: sudo bash scripts/restart-docker.sh [--local]' >&2
-  exit 1
-fi
+local_mode=false
+recreate=false
+for arg in "$@"; do
+  case "$arg" in
+    --local) local_mode=true ;;
+    --recreate) recreate=true ;;
+    *)
+      echo 'Usage: sudo bash scripts/restart-docker.sh [--local] [--recreate]' >&2
+      exit 1
+      ;;
+  esac
+done
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
 
-# Hand supervision to Docker only after a successful image build.
+# Serialize both entrypoints and modes before changing containers.
+# Read-open the lock so sudo and Docker-group users can share the same file.
+if ! command -v flock >/dev/null 2>&1; then
+  echo 'Install flock (util-linux) before restarting Docker.' >&2
+  exit 1
+fi
+lock_file="$root/.docker-restart.lock"
+if [[ ! -e $lock_file ]]; then
+  (umask 022; set -o noclobber; : > "$lock_file") 2>/dev/null || [[ -f $lock_file ]]
+fi
+exec 9< "$lock_file"
+if ! flock --exclusive --nonblock 9; then
+  echo 'Another Predict60 Docker restart is already running. Wait for it to finish, then retry.' >&2
+  exit 75
+fi
+
+# Hand supervision to Docker after preflight checks (and any requested build).
 stop_host_service() {
   local load_state
   command -v systemctl >/dev/null 2>&1 || return 0
@@ -23,18 +47,45 @@ stop_host_service() {
   fi
 }
 
+# Check the existing app's HTTP endpoint without relying on host port settings.
+wait_for_health() {
+  local attempt
+  for attempt in {1..30}; do
+    if "$@" python3 -c \
+      "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).read()" >/dev/null 2>&1; then
+      return 0
+    fi
+    if (( attempt < 30 )); then sleep 2; fi
+  done
+  return 1
+}
+
 if ! command -v docker >/dev/null 2>&1; then
   echo 'Install Docker Engine and the Docker Compose plugin first.' >&2
   exit 1
 fi
-if [[ ${1:-} == --local ]]; then
-  if [[ ! -f .env.local ]]; then
-    echo 'First run: cp deploy/local.env.example .env.local && chmod 600 .env.local' >&2
-    echo 'Edit .env.local to set your local signup code, then rerun with --local.' >&2
-    exit 1
-  fi
+if [[ $local_mode == true ]]; then
   if ! docker info >/dev/null 2>&1; then
     echo 'Cannot access Docker. Start the daemon and check Docker permissions.' >&2
+    exit 1
+  fi
+  if [[ $recreate == false ]]; then
+    if ! docker container inspect p60-local >/dev/null 2>&1; then
+      echo 'No existing local app container. Run: sudo bash scripts/restart-docker.sh --local --recreate' >&2
+      exit 1
+    fi
+    stop_host_service
+    docker restart --time 30 p60-local
+    if wait_for_health docker exec p60-local; then
+      echo 'Local app restarted and healthy. Existing image, environment and port settings retained.'
+      exit 0
+    fi
+    echo 'Local app did not become ready. Inspect: sudo docker logs --tail=100 p60-local' >&2
+    exit 1
+  fi
+  if [[ ! -f .env.local ]]; then
+    echo 'First run: bash scripts/setup-env.sh --local' >&2
+    echo 'Then rerun this script with --local --recreate.' >&2
     exit 1
   fi
   # Read only the port; never execute the environment file as shell code.
@@ -49,8 +100,16 @@ if [[ ${1:-} == --local ]]; then
     echo 'P60_PORT must be a port number from 1 to 65535.' >&2
     exit 1
   fi
+  # Refuse a conflict before stopping anything or replacing the current local app.
+  published_ports=$(docker ps --format '{{.Names}}|{{.Ports}}')
+  while IFS='|' read -r container_name container_ports; do
+    if [[ $container_name != p60-local && $container_ports == *":${local_port}->"* ]]; then
+      echo "Port ${local_port} is already published by ${container_name}. Set a different P60_PORT in .env.local or stop that deployment first." >&2
+      exit 1
+    fi
+  done <<< "$published_ports"
   # Build first so a failed build leaves the existing local app available.
-  docker build -t p60:local .
+  docker build -t p60:local-dev .
   stop_host_service
   if docker container inspect p60-local >/dev/null 2>&1; then
     docker stop p60-local
@@ -72,15 +131,11 @@ if [[ ${1:-} == --local ]]; then
     -e "P60_HOST=http://localhost:${local_port}" \
     -e PREDICT60_DB=/app/data/p60.sqlite3 \
     -v p60-local-data:/app/data \
-    p60:local
-  for attempt in {1..30}; do
-    if docker exec p60-local python3 -c \
-      "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).read()" >/dev/null 2>&1; then
-      echo "Local app ready: http://localhost:${local_port}"
-      exit 0
-    fi
-    sleep 2
-  done
+    p60:local-dev
+  if wait_for_health docker exec p60-local; then
+    echo "Local app ready: http://localhost:${local_port}"
+    exit 0
+  fi
   echo 'Local app did not become ready. Inspect: sudo docker logs --tail=100 p60-local' >&2
   exit 1
 fi
@@ -89,31 +144,47 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 if [[ ! -f .env ]]; then
-  echo 'Create .env from deploy/docker.env.example and configure your VPS domain and signup code first.' >&2
+  echo 'First run: bash scripts/setup-env.sh --vps to configure .env with your VPS domain and signup code.' >&2
   exit 1
 fi
 compose=(docker compose --project-directory "$root" --env-file "$root/.env" -f "$root/compose.yaml")
 
-# Check configuration and permissions before rebuilding.
+# Check configuration and permissions before changing the app.
 "${compose[@]}" config --quiet
 if ! docker info >/dev/null 2>&1; then
   echo 'Cannot access Docker. Start the daemon and run this script with sudo or Docker group access.' >&2
   exit 1
 fi
 
-echo 'Rebuilding the application image...'
-if ! "${compose[@]}" build app; then
-  echo 'Build failed; existing containers were left running. Fix the build error and rerun this script.' >&2
-  exit 1
-fi
+if [[ $recreate == true ]]; then
+  echo 'Rebuilding the application image...'
+  if ! "${compose[@]}" build app; then
+    echo 'Build failed; existing containers were left running. Fix the build error and rerun this script.' >&2
+    exit 1
+  fi
 
-stop_host_service
+  stop_host_service
 
-echo 'Starting the app behind the shared VPS proxy...'
-if ! "${compose[@]}" up -d --no-build --wait --wait-timeout 120; then
-  "${compose[@]}" ps -a >&2
-  echo 'Startup failed. Inspect: sudo docker compose logs --tail=100 app' >&2
-  exit 1
+  echo 'Recreating the app behind the shared VPS proxy...'
+  if ! "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 120 app; then
+    "${compose[@]}" ps -a >&2
+    echo 'Startup failed. Inspect: sudo docker compose logs --tail=100 app' >&2
+    exit 1
+  fi
+else
+  containers=$("${compose[@]}" ps --all --quiet app)
+  if [[ -z $containers ]]; then
+    echo 'No existing VPS app container. Run: sudo bash scripts/restart-docker.sh --recreate' >&2
+    exit 1
+  fi
+  stop_host_service
+  echo 'Restarting the existing app container...'
+  "${compose[@]}" restart --timeout 30 app
+  if ! wait_for_health "${compose[@]}" exec -T app; then
+    "${compose[@]}" ps -a >&2
+    echo 'App did not become ready. Inspect: sudo docker compose logs --tail=100 app' >&2
+    exit 1
+  fi
 fi
 "${compose[@]}" ps
 echo 'Restart complete. Check https://YOUR_DOMAIN/healthz to verify public HTTPS.'

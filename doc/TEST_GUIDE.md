@@ -3,14 +3,22 @@
 Run commands from the repository root. Use disposable accounts and data for
 crash and restore checks; do not run destructive tests on the live service.
 
+For a release-oriented sequence with explicit expected outcomes, use the
+[test engineer checklist](QA_CHECKLIST.md). The [player guide](USER_GUIDE.md)
+defines visible behavior; [design notes](DESIGN.md) define implementation
+invariants. Keep measurements and execution evidence in
+[test results](TEST_RESULTS.md), rather than marking unperformed checks complete.
+
 ## Automated regression tests
 
 Install Python 3.10+ and Node.js. The documentation coverage tests also need the
 Acorn dependency (Sphinx is only needed to build the reference documentation):
 
 ```bash
-npm install --prefix doc
-python3 scripts/run_tests.py
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+npm ci --prefix doc
+.venv/bin/python scripts/run_tests.py
 ```
 
 The runner executes JavaScript tests, root Python application tests, and Python
@@ -18,6 +26,23 @@ script tests. It prints suite totals and saves a colored log under
 `/tmp/test_results/test_result_<date_time>.log`; inspect it with `less -R`.
 A missing `acorn` module means the documentation dependency must be installed.
 Tests mock provider calls and do not prove live Coinbase or paid-feed access.
+Use the project virtual environment so Google verification dependencies are
+available. A skipped Google verifier check is not equivalent to verified signup.
+HTTP and watchdog tests need loopback sockets; a socket permission error is an
+execution-environment failure. The watchdog fixture creates its own temporary
+checkout and fake Docker executable, leaving real deployments alone.
+
+Node reporter totals can count files instead of individual assertions on some
+installed runtimes. Preserve the raw report and label the unit being counted.
+For assertion-level troubleshooting with this project's Node 24 runtime, run
+one file in isolation, for example:
+
+```bash
+node --test --test-isolation=none --test-reporter=tap test/frontend/market-detail.test.js
+```
+
+Run separate files in separate processes when collecting assertion totals;
+the test harnesses can mutate cached model modules.
 
 For focused checks:
 
@@ -26,6 +51,7 @@ PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest server_test logg
 PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest discover -s test/scripts -p '*_test.py'
 PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest docs_test
 node --test test/frontend/*.test.js
+node --test test/frontend/btc-chart.test.js test/frontend/market-detail.test.js test/frontend/app.test.js test/frontend/bootstrap.test.js
 python3 src/backend/server.py --help
 git diff --check
 ```
@@ -42,22 +68,26 @@ manual procedure explicitly says to use a live feed.
 
 | Suite files | Coverage |
 | --- | --- |
-| `test/frontend/account.test.js`, `test/frontend/auth.test.js`, `test/frontend/password.test.js` | Restored/expired sessions, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery, bounded retries, and request/body timeouts without automatic order replay. |
-| `test/frontend/bootstrap.test.js`, `test/frontend/coins.test.js`, `test/frontend/categories.test.js` | Catalog-first startup, offline/static-server failures, instrument selection, category configuration, coming-soon availability and displayed-hour coin prediction rings (direction, settled retention, hour navigation and logout). |
-| `test/frontend/btc-chart.test.js` | Minute history and heat maps, current/historical-hour navigation, page-cache restoration, two-second price display with one-second clocks, stale response rejection, benchmark/quote freshness and oil-feed error states. |
-| `test/frontend/app.test.js` | Segment popups, omitted pending/upcoming values, stable DOM writes, disconnected live comparisons, winner badges, per-prediction budgets, and pending countdowns that skip settled history and clear after settlement/logout. |
+| `test/frontend/account.test.js`, `test/frontend/auth.test.js`, `test/frontend/password.test.js` | Restored/expired sessions, ten-character HUD names with full-name tooltips, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery, bounded retries, and request/body timeouts without automatic order replay. |
+| `test/frontend/bootstrap.test.js`, `test/frontend/coins.test.js`, `test/frontend/categories.test.js` | Catalog-first startup, offline/static-server failures, larger icon buttons/ticker fallback, category availability, reused price formatters across all precisions, and displayed-hour prediction markers with account/time-boundary invalidation and no stable-tick history scans. |
+| `test/frontend/btc-chart.test.js` | Minute history, candle geometry and summary arrows, current/historical-hour navigation, one-second price/UTC clock updates, digital clock midnight rollover, hourly signed dollar/percentage changes, moving time-axis geometry, stale response rejection, and quote/benchmark freshness. |
+| `test/frontend/market-detail.test.js` | Interval default, view controls and double-click shortcuts, exact interval/past-hour returns, interactive-control guards, cleared and explicit duration highlights, exact selected starts, range-history cancellation/retry, saved execution tags, summary arrows and history across durations, missing candles, minute rollover, and upcoming intervals. |
+| `test/frontend/app.test.js` | Segment selection events and popups, pending/upcoming placeholders, stable DOM writes, disconnected live comparisons, winner badges, per-prediction budgets, and pending countdowns that skip settled history and clear after settlement/logout. |
 | `test/frontend/market-model.test.js`, `test/frontend/portfolio-model.test.js` | Interval layout, Up/Down outcomes, probability and volatility calculations, cutoff rules, credit limits, payout rounding, settled P/L and numeric history sorting. |
 | `test/frontend/community.test.js`, `test/frontend/contests.test.js`, `test/frontend/sponsor.test.js` | Community polling recovery, hourly score states, contest history and lookup, pending resets, safe sponsor links and absent/failed sponsor configuration. |
-| `server_test.py` | Exact-minute benchmark cache reuse, wider-window bounded recovery, malformed/truncated responses, permanent provider rejection, HTTP accounts, signup code, password changes, CSRF/origin/proxy/cookie rules, credit cap, idempotent predictions, settlement, health, catalog, community, protected pages and static allowlist/compression/HEAD. |
+| `server_test.py` | Exact-minute benchmark cache reuse, wider-window bounded recovery, malformed/truncated responses, permanent provider rejection and closed HTTP error streams, HTTP accounts, signup code, password changes, CSRF/origin/proxy/cookie rules, credit cap, idempotent predictions, settlement, health, catalog, community, protected pages and static allowlist/compression/HEAD. |
 | `contests_test.py` | Shared hourly wallet, concurrent spending, reusable winnings, hour boundaries, independent resets, finalization, ties, history, migration, gift-card pools and private-reference isolation. |
 | `categories_test.py` | Idempotent catalog migrations, ten-coin upgrades, custom-capacity preservation, and preservation of legacy simulated settlement sources. |
-| `odds_test.py` | Browser/server parity, volatility response, calibration, settlement horizon and resumable/deduplicated history downloads. |
+| `odds_test.py` | Browser/server parity, volatility response, calibration, settlement horizon, resumable/deduplicated history downloads and closed error responses on retries/exhaustion. |
 | `live_oil_test.py`, `oilprice_api_test.py`, `weather_test.py` | Provider timestamps, exact observation boundaries, unavailable/stale/mismatched data, credential/error handling and dormant category behavior. These tests do not enable Oil or Weather trading. |
 | `performance_test.py` | Bounded HTTP concurrency, database lifecycle, constant catalog query counts, bounded finalized leaderboard reads with complete tied winners/personal ranks, history coalescing, zero provider reads for 32 parallel cached interval benchmarks, and settlement retry deduplication. |
 | `logging_test.py`, `docs_test.py` | Log levels/rotation and source documentation coverage/control-flow ownership. |
 | `test/scripts/build_static_test.py`, `test/scripts/database_test.py` | Public-only static builds, preservation after a missing source, database initialization/backup/reset and process locking. |
-| `test/scripts/server_control_test.py`, `test/scripts/docker_restart_test.py` | Watchdog crash/stop lifecycle and Docker restart command ordering/container options. Docker calls are mocked. |
+| `test/scripts/server_control_test.py`, `test/scripts/docker_restart_test.py` | Watchdog crash/stop lifecycle, plain Docker restart versus explicit `--recreate`, missing containers, build-before-stop ordering and health checks in both profiles. Docker calls are mocked. |
 | `test/scripts/run_tests_test.py` | Timestamped result filenames and Node/Python summary parsing. |
+| `test/scripts/setup_env_test.py` | Isolated local/VPS configuration, signup validation, private backups, legacy migration, read-only checks and mocked rollout selection. |
+| `test/scripts/reset_profile_database_test.py` | Profile isolation, explicit confirmation, image fallback, preflight failures, and reset/restart ordering with Docker mocked. |
+| `signup_protection_test.py` | Optional signup-code gate, concurrent registrations beyond the removed account cap, removal of signup/IP budgets, bot trap and duplicate-email rejection. |
 
 ## Account test isolation and deterministic time
 
@@ -70,8 +100,8 @@ selection is restored when the class finishes.
 
 Order scenarios use a mocked open point within the hour where appropriate.
 Keep cutoff-specific cases separate: an order is accepted before the final
-30 seconds and rejected at the cutoff. Do not make a successful-order assertion
-depend on the wall clock being outside the last 30 seconds of the hour.
+5 seconds and rejected at the cutoff. Do not make a successful-order assertion
+depend on the wall clock being outside the last 5 seconds of the hour.
 
 ## Credit limits
 
@@ -105,14 +135,18 @@ PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest discover -s test
 The tests substitute a fake Docker executable and exercise
 `scripts/restart-docker.sh` in local and VPS modes. Expected behavior:
 
-- A failed build leaves the running deployment untouched: no stop, remove,
+- A default restart uses the existing container without building or creating;
+  a missing container fails before stopping the host service and asks for `--recreate`.
+- A failed `--recreate` build leaves the running deployment untouched: no stop, remove,
   recreate or run command occurs afterward.
-- VPS mode builds before `up -d --no-build --wait` and never calls `down`.
-- Both modes stop an installed `predict60.service` after the build and before
+- VPS recreation builds before `up -d --no-build --no-deps --force-recreate --wait`
+  and never calls `down`. Initial-start and setup `--start` request recreation explicitly.
+- Both modes stop an installed `predict60.service` after preflight and any requested build, before
   replacing/starting Docker. An absent service is skipped; a failed service stop
   aborts Docker replacement. The systemctl commands are mocked.
 - Local mode includes a read-only root, 64 MiB temporary filesystem, dropped
   capabilities, no-new-privileges and bounded local logs.
+- Restart and readiness failures report an error without falling back to recreation.
 
 These assertions verify generated commands and ordering. Real image builds,
 volume ownership, readiness and recovery require the manual Docker checks below.
@@ -189,6 +223,57 @@ measurements, also record the dataset, concurrency, environment and whether
 providers were mocked. A successful mocked run does not establish live-feed
 availability, rendered layout, Docker recovery or production capacity.
 
+## Chart and view acceptance checks
+
+Use a disposable local account or controlled browser fixtures. Repeat in dark
+and light themes at a wide desktop width, 390 pixels, and 320 pixels. Mocked
+fixtures establish layout and interaction behavior; live provider availability
+and order execution require separate checks.
+
+1. Reload the terminal. The title bar reads **Interval | Hour**, with Interval
+   selected. Confirm the small Predict60 label below P60, coin icon beside the
+   price, signed hourly dollar/percentage movement, and a single credits value.
+   Switching coins must update the icon and price without overlapping controls.
+2. Select Hour. No duration button or segment should remain highlighted. Choose
+   a duration and a segment; Hour must stay visible, the segment and its duration
+   must highlight, and a market refresh must preserve only that explicit choice.
+   Select Interval to open the chosen exact time. Select Hour again to clear it.
+3. Change durations, use the five-minute Now/Select controls, and navigate time.
+   None may switch views automatically. The title-bar controls and card-body
+   double-clicks are explicit view changes. Double-click a past, live, or upcoming
+   Hour cell: Interval must show that exact UTC range. Double-click its card to
+   return; a browsed past interval must load its containing hour. Confirm that
+   single clicks stay selections and action buttons never invoke the shortcut.
+4. Verify black plot backgrounds in live, completed, and upcoming states in both
+   themes. Hour has a white line plus green up/red down candles. Interval's line,
+   grid, and endpoint follow the duration color. Completed card backgrounds must
+   not turn the graph gray.
+5. Check alternating red/yellow dotted time markers at the graph and card bounds
+   and orange cutoffs 5 seconds before interval ends. Aligned rows share the
+   graph axis; scrolled five-minute cards and the two rows of phone fifteen-minute cards use their
+   own moving local markers. Historical views hide current-time markers.
+6. Verify both plots are 180 pixels high on desktop and 150 pixels high at
+   viewport widths of 700 pixels or less. A compact 16-pixel summary row places
+   green up/red down arrows beneath completed candle centers; current minutes
+   use an amber dash and missing/upcoming minutes stay neutral. Check all four
+   durations and Hour in both themes, including past/upcoming intervals and
+   minute rollover. Candles, grid, chart navigation, UTC labels, and full-height
+   moving time markers must remain visible and aligned.
+7. Compare the hourly percentage with the displayed hour's exact opening
+   benchmark. Check up, down, zero, and small changes, then remove the benchmark
+   or expire the quote: no stale or infinite percentage should remain.
+8. Ensure one-minute plays, the old view toolbar, and the removed trend title do
+   not reappear. History, predictions, menu navigation, themes, and rotation
+   controls remain usable.
+9. Inspect a compact segment: coin/interval/status header, prominent live/closing
+   price, smaller starting price, actual percentage movement, Up/Down estimates,
+   Predict/Result/Details and a short countdown footer. Live/upcoming cards omit
+   repeated dates; historical cards retain them. At 320/390 pixels, prices and
+   controls must remain readable and all action targets at least 44 pixels high.
+   Both the main Predict action and direction shortcuts must disable on stale
+   data, disconnect, pause, or the final five seconds; result/details actions
+   remain inspectable.
+
 ## Contest and sponsor acceptance checks
 
 Run `PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest contests_test` for backend and HTTP checks. In a browser,
@@ -213,13 +298,14 @@ use two disposable accounts and confirm:
 8. Using a temporary database, reserve a future pool via the CLI and check that
    it appears as upcoming, is allocated once, and cannot skip prize review.
 
-Do not use real ad tags or send real gift cards during automated tests. No
-browser was connected during implementation; rendered desktop/mobile layout and
-these manual interface checks still require a browser-capable environment.
+Do not use real ad tags or send real gift cards during automated tests. Record
+which rendered-browser checks were performed and whether they used mocked data.
+Passing browser fixtures does not establish live order, contest, or delivery behavior.
 
 ## Signup access code
 
-New account creation requires the organizer's signup code. API tests cover
+New account creation is code-free by default. The optional gate is controlled
+by `SIGNUP_CODE_REQUIRED` in `src/backend/CONST.py`. With that gate enabled, API tests cover
 missing, incorrect, non-string, and whitespace-altered codes, ensuring rejected
 requests create neither an account nor a session. Login remains code-free.
 The signup form sends the code to the server; it does not embed the expected
@@ -232,13 +318,44 @@ passwords can still log in; login requires neither confirmation nor signup code.
 
 ## VPS resource regressions
 
+Run `node scripts/benchmark-market-model.cjs` for a repeatable synthetic chart
+measurement. An optional earlier module path compares outputs and timings:
+`node scripts/benchmark-market-model.cjs /path/to/earlier/market-model.js`.
+The fixture uses 1,440 candles and 3,600 recorded seconds across 5/15/30/60-minute
+intervals. Record medians and input equality; do not set a CI timing threshold
+or infer public HTTP latency from this CPU-only benchmark.
+
+Run `node scripts/benchmark-coin-format.cjs` for the median time to format 10,000
+prices across the default ten-coin catalog. Seven runs follow warm-up. An optional
+earlier catalog module verifies identical strings before measuring both versions:
+
+```bash
+git show 144a808:src/frontend/coins.js > /tmp/btc60-before-coins.js
+node scripts/benchmark-coin-format.cjs /tmp/btc60-before-coins.js
+```
+
+`coins.test.js` covers every supported precision, fallback and invalid values.
+`bootstrap.test.js` uses 1,000 settled orders to check zero stable-tick history
+reads and duration-attribute writes, plus start/end expiry, clock rollback and
+in-place/replaced account updates. These operation counts are regression gates;
+local timings are not production throughput measurements.
+
+`market-detail.test.js` verifies zero mutations/selectors on an identical update
+and no repeated scan of a 1,000-order history between account updates.
+`performance_test.ResourceTest` also holds an independent SQLite writer lock
+while idle settlement polling and a pending contest run: those reads must
+complete without another writer transaction. Closed empty contests must still
+finalize, and existing settlement/payout idempotence checks remain required.
+
 `PYTHONPATH=src/backend:scripts:test/backend python3 -m unittest performance_test` checks database closure/rollback, read-only
 contest polling under a writer lock, concurrent history request sharing, failed
 settlement deduplication, and HTTP overload recovery. These use temporary data
 and mocked providers; see [local performance measurements](VPS_PERFORMANCE.md).
 
-Signup tests configure `P60_SIGNUP_CODE` explicitly, verify code changes, and
-verify that missing/empty configuration disables signup without blocking login.
+Legacy gate tests explicitly enable it and configure `P60_SIGNUP_CODE`, verify
+code changes, and check that missing/empty configuration disables signup without
+blocking login. Protection tests use the default open gate and verify registration beyond the
+former account and network limits, concurrent registration, and bot traps.
 
 ## Password changes and logout
 
