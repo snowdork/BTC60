@@ -154,9 +154,8 @@ uses the VPS `compose.yaml` and `.env`, checks configuration and Docker access
 before building, and retains all database and certificate volumes. Existing
 containers continue serving during the build. If the build fails, they remain
 untouched. After a successful build, Compose recreates changed services and waits
-for readiness. Recreation is not forced by default. Use
-`sudo bash scripts/restart-docker.sh --recreate` to force replacement of the VPS
-app even when its image and configuration are unchanged. Expect a brief interruption while the single app instance is
+for readiness. The helper has no forced-recreation option; unchanged containers
+are retained. Expect a brief interruption when a changed app instance is
 replaced; this is not a zero-downtime deployment. The shared host proxy continues running. It does not restart the Docker daemon or
 stop unrelated containers. This command does not use `compose.local.yaml`.
 

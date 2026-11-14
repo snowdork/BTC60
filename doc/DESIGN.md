@@ -10,16 +10,27 @@ themes with a static mint accent, player icon, name and tabular coin balance. Pl
 code points with the full saved name in a tooltip. The saved name is not changed.
 The clock sits beside the player mini HUD on the left, with local time above UTC, both
 in the same font. Both use wall time independently of the viewed hour. The clock is digital only, with fixed-width digits and no
-clock icon, flip animations or layout shifts. Responsive layouts use two rows.
+clock icon, flip animations or layout shifts. Responsive layouts wrap across
+multiple rows. `src/frontend/hud.css` owns the pinned HUD and Interval HUD
+layouts; `responsive.css` retains the shared chart/card and selector styles.
 
 The selected coin icon, USD price, and hourly dollar/percentage change are in
-one shared graph header, outside the top HUD, for both chart views. Coin and
+a shared graph header outside the top HUD. It is visible in Hour view; Interval
+hides it and uses the selected interval’s live/closing and starting prices in
+its combined HUD, avoiding duplicate price panes. Coin and
 duration controls are inside the pinned HUD above the graph; the redundant time/cutoff legend is
 removed while its graph markers remain active. C$ denotes game credits; USD
 prices remain instrument prices. Interval is the default and
 shows one 5-, 15-, 30-, or 60-minute play. Hour shows one 60-minute card, two
 30-minute cards, four 15-minute cards, and twelve 5-minute cards. One-minute
 candles are data resolution, not a tradable duration.
+
+Interval view places its existing detail card into one HUD above the graph,
+sharing a row between coin/range identity and Up/Down prediction controls. The
+redundant lower panel and duplicate card identity are removed from the layout;
+prices, status, countdown, saved predictions and Result/Details remain in the HUD.
+The same card data fields, delegated prediction actions and double-click handling
+remain active. Full-hour card markup and hourly navigation are unchanged.
 
 The title-bar controls and card-body double-clicks change modes. Double-clicking
 an Hour card opens its exact start and duration; double-clicking an Interval card

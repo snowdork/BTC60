@@ -3,13 +3,11 @@
 set -euo pipefail
 
 local_mode=false
-recreate_args=()
 for arg in "$@"; do
   case "$arg" in
     --local) local_mode=true ;;
-    --recreate) recreate_args=(--force-recreate) ;;
     *)
-      echo 'Usage: sudo bash scripts/restart-docker.sh [--local] [--recreate]' >&2
+      echo 'Usage: sudo bash scripts/restart-docker.sh [--local]' >&2
       exit 1
       ;;
   esac
@@ -142,8 +140,8 @@ fi
 stop_host_service
 
 echo 'Starting the app behind the shared VPS proxy...'
-# Force replacement only when requested; otherwise Compose replaces changed containers.
-if ! "${compose[@]}" up -d --no-build --no-deps "${recreate_args[@]}" --wait --wait-timeout 120 app; then
+# Compose updates changed containers without forcing replacement of unchanged ones.
+if ! "${compose[@]}" up -d --no-build --no-deps --wait --wait-timeout 120 app; then
   "${compose[@]}" ps -a >&2
   echo 'Startup failed. Inspect: sudo docker compose logs --tail=100 app' >&2
   exit 1

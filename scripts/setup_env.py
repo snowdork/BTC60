@@ -189,7 +189,7 @@ def finish_setup(args, target, values):
     url = 'https://' + values['P60_DOMAIN'] if args.vps else 'http://localhost:' + values.get('P60_PORT', '8085')
     print(f'Profile: {"VPS production" if args.vps else "local testing"} → {target.name}')
     print(f'App URL: {url}; host port: {values.get("P60_PORT", "8085")}. Signup: enabled.')
-    print(f'Registration: {"organizer code required" if CONST.SIGNUP_CODE_REQUIRED else "no organizer code"}; maximum {CONST.MAX_PLAYER_ACCOUNTS} accounts.')
+    print(f'Registration: {"organizer code required" if CONST.SIGNUP_CODE_REQUIRED else "no organizer code"}; no account cap or per-network signup budgets.')
     if values.get('GOOGLE_CLIENT_ID'):
         print(f'Authorize {url} in your Google web client JavaScript origins.')
     if args.vps:
@@ -197,8 +197,6 @@ def finish_setup(args, target, values):
     command = ['bash', str(ROOT / 'scripts/restart-docker.sh')]
     if args.local:
         command.append('--local')
-    if args.recreate:
-        command.append('--recreate')
     if args.start:
         print('Starting the selected Docker deployment...', flush=True)
         environment = {key: value for key, value in os.environ.items()
@@ -220,12 +218,9 @@ def main(argv=None):
     parser.add_argument('--non-interactive', action='store_true', help='Use defaults and P60_* / GOOGLE_CLIENT_ID environment overrides')
     parser.add_argument('--check', action='store_true', help='Validate the saved profile without changing files or services')
     parser.add_argument('--start', action='store_true', help='Build and start the selected Docker deployment after setup')
-    parser.add_argument('--recreate', action='store_true', help='With --start, force VPS app container replacement')
     args = parser.parse_args(argv)
     if args.check and (args.update or args.start):
         parser.error('--check cannot be combined with --update or --start')
-    if args.recreate and (not args.start or args.local):
-        parser.error('--recreate requires --vps --start; local startup already replaces its container')
     target = ROOT / ('.env' if args.vps else '.env.local')
     try:
         if target.is_symlink():

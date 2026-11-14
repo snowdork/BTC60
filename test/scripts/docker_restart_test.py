@@ -84,20 +84,18 @@ if sys.argv[1] == 'stop' and os.environ['SERVICE_STOP_FAIL'] == '1':
         self.assertTrue(calls[up].endswith(' app'))
         self.assertFalse(any('down' in call.split() for call in calls))
 
-    def test_recreate_flag_forces_vps_replacement_through_both_entrypoints(self):
+    def test_recreate_flag_is_rejected_before_docker_through_both_entrypoints(self):
         for start in (False, True):
             with self.subTest(start=start):
                 result, calls = self.run_restart(start=start, args=('--recreate',))
-                self.assertEqual(result.returncode, 0, result.stderr)
-                up = next(call for call in calls if 'up -d' in call)
-                self.assertIn('--no-build --no-deps --force-recreate --wait', up)
-                self.assertTrue(up.endswith(' app'))
-                self.assertFalse(any('down' in call.split() for call in calls))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('Usage:', result.stderr)
+                self.assertEqual(calls, [])
 
     def test_unknown_flag_fails_before_docker_or_service_changes(self):
         result, calls = self.run_restart(args=('--unknown',))
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('[--recreate]', result.stderr)
+        self.assertIn('[--local]', result.stderr)
         self.assertEqual(calls, [])
 
     def test_local_container_has_bounded_logs_and_read_only_root(self):

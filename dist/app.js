@@ -245,6 +245,13 @@
     if(open)$('ticket-note').textContent=q?'Bets close 5s before interval end · No real money':(side===null?'Choose Up or Down to review your prediction.':'Enter 1–1,000 credits within your available balance.');
     return q;
   }
+  /** Match the prediction panel's clock badge to the selected interval. */
+  function renderIntervalClock(){
+    const clock=$('ticket-interval-clock');
+    clock.dataset.duration=String(market.minutes);
+    clock.setAttribute('aria-label',`${market.minutes}-minute interval`);
+    $('ticket-interval-minutes').textContent=String(market.minutes);
+  }
   /** Render interval details from the latest account, market, and interface state. */ function renderIntervalDetails(){
     const model=window.PredictModel,queued=market.status==='queued';
     const result=!queued&&Number.isFinite(market.strike)&&Number.isFinite(market.close)?outcome(market.strike,market.close):null;
@@ -279,6 +286,7 @@
     $('ticket-coin-icon').alt=window.PredictModel.coin.symbol;
     if(!open)renderIntervalDetails();
     $('ticket-duration').textContent=`${market.minutes} MIN`;
+    renderIntervalClock();
     $('ticket-selected-duration').textContent=`${market.minutes}-minute ${open?'prediction':queued?'interval':'settlement'}`;
     $('ticket-selected-range').textContent=`${market.start} – ${market.end} UTC`;
     $('ticket-status').textContent=open?'OPEN':queued?'UPCOMING':'SETTLED';

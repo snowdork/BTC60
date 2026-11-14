@@ -44,6 +44,7 @@ class SetupEnvironmentTest(unittest.TestCase):
         target = self.root / '.env.local'
         self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o600)
         self.assertIn('http://localhost:8085', output)
+        self.assertIn('no account cap or per-network signup budgets', output)
         self.assertFalse((self.root / '.env').exists())
 
     def test_local_chooses_separate_port_when_vps_profile_exists(self):
@@ -121,11 +122,10 @@ class SetupEnvironmentTest(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o640)
 
     def test_start_uses_selected_profile_and_propagates_deploy_failure(self):
-        for mode, extra in (('--local', ['--local']), ('--vps', ['--recreate'])):
+        for mode, extra in (('--local', ['--local']), ('--vps', [])):
             with patch.dict(os.environ, {'P60_SIGNUP_CODE': 'test-code'}), patch.object(setup_env.subprocess, 'run') as run:
                 run.return_value.returncode = 7
-                flags = ['--recreate'] if mode == '--vps' else []
-                status, output = self.run_setup(mode, '--non-interactive', '--start', *flags)
+                status, output = self.run_setup(mode, '--non-interactive', '--start')
                 self.assertEqual(status, 7, output)
                 self.assertEqual(run.call_args.args[0], ['bash', str(self.root / 'scripts/restart-docker.sh'), *extra])
                 self.assertNotIn('P60_SIGNUP_CODE', run.call_args.kwargs['env'])
@@ -157,6 +157,7 @@ class SetupEnvironmentTest(unittest.TestCase):
 
     def test_incompatible_rollout_flags_fail_before_writing_files(self):
         for flags in (('--local', '--recreate'), ('--local', '--start', '--recreate'),
+                      ('--vps', '--start', '--recreate'),
                       ('--vps', '--start', '--check'), ('--vps', '--check', '--update')):
             with self.subTest(flags=flags), self.assertRaises(SystemExit):
                 self.run_setup(*flags)

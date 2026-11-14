@@ -44,13 +44,14 @@ available contest balance and updates when predictions or settlements change it.
 The clock sits immediately beside the player mini HUD on the left. Local time, using your browser timezone,
 appears above UTC in the same font. Both follow current time even when you
 browse a historical chart. Fixed-width digital digits update without a clock
-icon, flip animations or layout shifts. The layout uses two
-rows on smaller screens.
+icon, flip animations or layout shifts. The layout wraps into multiple rows
+on smaller screens.
 
 Use **Interval / Hour** in the HUD to choose your view. Choose a coin and
 5-, 15-, 30-, or 60-minute play using the controls within the same pinned HUD.
-The selected coin's icon, USD price and hourly dollar/percentage movement are
-at the top-left of the graph area in both views. The former Current time /
+In Hour view, the selected coin's icon, USD price and hourly dollar/percentage
+movement are at the graph's top-left. Interval view uses its combined HUD for
+live/closing and starting prices, without a second price pane. The former Current time /
 Prediction cutoff legend below the coin controls has been removed; the graph's
 time and cutoff markers still work. Open **Menu** for history, contests, rules,
 account actions and navigation. The theme button switches light/dark mode.
@@ -85,7 +86,11 @@ history remains visible, while stale or incomplete data blocks new predictions.
 
 ## Interval and Hour views
 
-**Interval** is the default. It shows one selected play and its price history.
+**Interval** is the default. One HUD above the graph combines the coin icon,
+exact UTC range and duration, Up/Down percentage buttons, prediction action,
+prices, countdown and saved bets. There is no separate lower interval pane.
+The Up/Down buttons open review with that direction selected; they never place
+an order by themselves. The selected play’s price history appears below it.
 Use the graph arrows to move by one interval; **Back to live** resumes the current
 play. Changing duration or coin keeps the chosen view.
 

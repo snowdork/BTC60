@@ -468,3 +468,17 @@ test('digital title clock updates in UTC across midnight',async()=>{
  h.step();
  assert.equal(h.element('workspace-clock').textContent,'00:00:00 UTC');
 });
+
+test('local clock avoids unchanged text and tooltip writes between second ticks',async()=>{
+ const h=chartHarness();await flush();
+ const node=h.element('workspace-local-clock');
+ let text=node.textContent,title=node.title,textWrites=0,titleWrites=0;
+ Object.defineProperty(node,'textContent',{get:()=>text,set:value=>{text=value;textWrites++;}});
+ Object.defineProperty(node,'title',{get:()=>title,set:value=>{title=value;titleWrites++;}});
+ h.tick(110);
+ assert.equal(textWrites,0);
+ assert.equal(titleWrites,0);
+ h.step();
+ assert.equal(textWrites,1);
+ assert.equal(titleWrites,0);
+});

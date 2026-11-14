@@ -736,9 +736,11 @@ class AccountsTest(unittest.TestCase):
         self.assertLess(len(body),len(gzip.decompress(body)))
         conn.request('GET','/styles.css',headers={'Accept-Encoding':'gzip','If-None-Match':etag})
         response=conn.getresponse();self.assertEqual(response.status,304);self.assertEqual(response.read(),b'')
-        conn.request('HEAD','/responsive.css')
-        response=conn.getresponse();self.assertEqual(response.status,200);self.assertEqual(response.read(),b'')
-        self.assertGreater(int(response.getheader('Content-Length')),0)
+        for path in ('/responsive.css', '/hud.css'):
+            with self.subTest(path=path):
+                conn.request('HEAD', path)
+                response=conn.getresponse();self.assertEqual(response.status,200);self.assertEqual(response.read(),b'')
+                self.assertGreater(int(response.getheader('Content-Length')),0)
         conn.close()
 
     def test_weather_is_coming_soon(self):

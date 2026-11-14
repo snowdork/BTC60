@@ -338,8 +338,10 @@
     if(currentClock.textContent!==clockText){
       currentClock.textContent=clockText;
     }
-    $('workspace-local-clock').textContent=localClock.format(wallTime);
-    $('workspace-local-clock').title=`Local time · ${localTimezone}`;
+    const localNode=$('workspace-local-clock'),localText=localClock.format(wallTime);
+    if(localNode.textContent!==localText)localNode.textContent=localText;
+    const localTitle=`Local time · ${localTimezone}`;
+    if(localNode.title!==localTitle)localNode.title=localTitle;
     $('hour-window-label').textContent=`${time(hour)} — ${time(hour+3600000)}`;
     if($('chart-times').dataset.hour!==String(hour)){$('chart-times').dataset.hour=String(hour);$('chart-times').replaceChildren(...[0,15,30,45,60].map(minute=>{const span=document.createElement('span');span.textContent=time(hour+minute*60000);return span;}));}
     renderBannerPrice();

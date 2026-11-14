@@ -68,7 +68,7 @@ PUBLIC_ASSETS = {
     'assets/fonts/spacegrotesk-OFL.txt',
 }
 PUBLIC_FILES = {
-    'brand.css',
+    'brand.css', 'hud.css',
     'password.html', 'password.js',
     'contests.html', 'contests.js', 'contests.css', 'sponsor.js',
     'account.js',

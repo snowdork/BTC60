@@ -218,3 +218,17 @@ test('NO CREDITS banner follows the signed-in balance and hides on read-only int
   account.user={id:1};context.market.status='settled';assert.equal(render(),false);
   context.market.status='queued';assert.equal(render(),false);
 });
+
+test('prediction interval clock follows every supported play duration',()=>{
+ const start=source.indexOf('  function renderIntervalClock()');
+ const end=source.indexOf('  /** Render interval details',start);
+ const clock={dataset:{},setAttribute(key,value){this[key]=value;}},number={};
+ const context={market:{minutes:15},$:id=>id==='ticket-interval-clock'?clock:number};
+ vm.runInNewContext(source.slice(start,end)+';this.renderIntervalClock=renderIntervalClock;',context);
+ for(const minutes of [5,15,30,60]){
+  context.market.minutes=minutes;context.renderIntervalClock();
+  assert.equal(clock.dataset.duration,String(minutes));
+  assert.equal(clock['aria-label'],`${minutes}-minute interval`);
+  assert.equal(number.textContent,String(minutes));
+ }
+});

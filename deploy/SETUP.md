@@ -68,10 +68,10 @@ app inside Docker; they do not verify DNS, Google credentials, or public HTTPS.
 Before upgrading an existing production installation, take a database backup
 using the procedures in [Docker operation](DOCKER.md#data-and-upgrades).
 `--start` builds and updates only the app, preserving volumes and the shared
-proxy. Compose replaces changed containers; to force replacement, use:
+proxy. Compose replaces changed containers without forcing unchanged ones:
 
 ```bash
-sudo bash scripts/setup-vps.sh --start --recreate
+sudo bash scripts/setup-vps.sh --start
 ```
 
 ## Change or automate settings
