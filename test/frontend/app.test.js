@@ -212,13 +212,39 @@ test('mixed completed results style win and loss separately and clear on pending
     {settled_at:1,outcome:'up',side:'down',cost_cents:25000,payout_cents:0,cents:50}];
   const start=source.indexOf('function renderSegmentPredictions()'),end=source.indexOf('  /** Render markets',start);
   const context={markets:[{id:'15-0',status:'settled'}],marketElements:new Map([['15-0',{predictions:container,card:{querySelector:()=>stamp}}]]),
-    segmentPredictions:()=>saved,document:{createElement:element},currency:{format:value=>value.toFixed(2)},money:value=>value.toFixed(2)+' credits'};
+    segmentPredictions:()=>saved,document:{createElement:element},currency:{format:value=>value.toFixed(2)},money:value=>value.toFixed(2)+' credits',shares:value=>String(value)};
   vm.createContext(context);vm.runInContext(source.slice(start,end),context);
   const render=()=>vm.runInContext('renderSegmentPredictions()',context);
   render();assert.deepEqual(Array.from(stamp.children,child=>child.textContent),['Win +51.52','Loss −250.00']);
   assert.equal(stamp.children[0].className,'segment-win');assert.equal(stamp.children[1].className,'segment-loss');
   saved[0].settled_at=null;render();assert.equal(stamp.textContent,'Awaiting settlement');assert.equal(stamp.children.length,1);
   saved.length=0;render();assert.equal(stamp.textContent,'No wager');
+});
+
+test('Hour saved predictions use compact direction tags with full details for every duration',()=>{
+  const element=()=>({children:[],attrs:{},setAttribute(name,value){this.attrs[name]=value;},
+    replaceChildren(...children){this.children=children;}});
+  const markets=[60,15,30,5].map(minutes=>({id:`${minutes}-0`,minutes,start:'17:00',end:'17:05',startsAt:Date.UTC(2026,10,14,17)}));
+  const containers=new Map(markets.map(m=>[m.id,element()]));
+  const saved=[{coin:'BTC',side:'up',cost_cents:10000,cents:74,settled_at:null},
+    {coin:'BTC',side:'down',cost_cents:2550,cents:26,settled_at:1,outcome:'up',payout_cents:0}];
+  const start=source.indexOf('function renderSegmentPredictions()'),end=source.indexOf('  /** Render markets',start);
+  const context={markets,marketElements:new Map(markets.map(m=>[m.id,{predictions:containers.get(m.id),card:{querySelector:()=>null}}])),
+    segmentPredictions:()=>saved,document:{createElement:element},money:value=>value.toFixed(2)+' credits',
+    shares:value=>new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(value)};
+  vm.createContext(context);vm.runInContext(source.slice(start,end)+';renderSegmentPredictions();',context);
+  for(const container of containers.values()){
+    assert.equal(container.hidden,false);
+    assert.deepEqual(container.children.map(tag=>tag.textContent),['↑ 100 @ 74%','↓ 25.5 @ 26%']);
+    const [up,down]=container.children;
+    assert.match(up.className,/\bup$/);assert.match(down.className,/\bdown$/);
+    assert.match(up.title,/100\.00 credits at 74% · Pending/);
+    assert.match(up.title,/BTC · 2026-11-14 · 17:00 – 17:05 UTC/);
+    assert.match(down.title,/Lost[\s\S]*Return: 0\.00 credits/);
+    for(const tag of container.children){assert.equal(tag.tabIndex,0);assert.equal(tag.attrs['aria-label'],tag.title);}
+  }
+  saved.length=0;vm.runInContext('renderSegmentPredictions()',context);
+  for(const container of containers.values()){assert.equal(container.hidden,true);assert.equal(container.children.length,0);}
 });
 
 test('NO CREDITS banner follows the signed-in balance and hides on read-only intervals',()=>{

@@ -64,6 +64,14 @@ html[data-theme="light"] .hud-topbar .hud-player{box-shadow:inset 0 1px 0 #bdffe
 .market-workspace:has(>#market-detail:not([hidden]))>.graph-price-header{display:none}
 
 /* One selected-play display reuses the card fields and delegated actions. */
+#play-live.live-return-button,#hour-overview #current-hour.live-return-button{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;gap:7px;min-height:44px;padding:8px 12px;border:1px solid color-mix(in srgb,var(--green) 45%,var(--border));border-radius:999px;background:color-mix(in srgb,var(--green) 9%,var(--surface));color:var(--green);font:800 12px/1.2 Manrope,sans-serif;letter-spacing:.3px;white-space:nowrap;cursor:pointer}
+#play-live.live-return-button:hover,#hour-overview #current-hour.live-return-button:hover{background:color-mix(in srgb,var(--green) 18%,var(--surface));border-color:var(--green)}
+.live-return-button:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+.live-return-icon{width:20px;height:20px;flex:0 0 20px;overflow:visible}
+.live-return-icon .live-signal{animation:live-return-signal 2.4s ease-in-out infinite}
+@keyframes live-return-signal{0%,100%{opacity:.4}50%{opacity:1}}
+@media(prefers-reduced-motion:reduce){.live-return-icon .live-signal{animation:none}}
+
 #market-detail .interval-play-hud{
  display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.9fr) auto;
  align-items:stretch;gap:10px;padding:12px;background:linear-gradient(120deg,var(--surface),var(--raised));
@@ -77,8 +85,10 @@ html[data-theme="light"] .hud-topbar .hud-player{box-shadow:inset 0 1px 0 #bdffe
 #market-detail .interval-play-hud #play-coin-icon{width:48px;height:48px;filter:drop-shadow(0 2px 8px color-mix(in srgb,var(--play-color) 30%,transparent))}
 #market-detail .interval-play-hud .play-coin-fallback{min-width:48px;height:48px;font-size:16px}
 #market-detail .interval-play-hud #play-timeframe{font:700 italic clamp(19px,1.8vw,25px)/1.25 'Space Grotesk',sans-serif;letter-spacing:-.35px;font-variant-numeric:tabular-nums;white-space:normal;color:var(--text);text-shadow:0 0 18px color-mix(in srgb,var(--play-color) 25%,transparent)}
-#market-detail .interval-play-hud #play-now-label{animation:none;color:var(--muted);font-size:10px}
+#market-detail .interval-play-hud #play-now-label{animation:none;color:var(--muted);font-size:10px;align-self:flex-start}
 #market-detail[data-state="live"] .interval-play-hud #play-now-label{color:var(--green)}
+#market-detail .interval-play-hud #play-now-label.green{color:var(--green)}
+#market-detail .interval-play-hud #play-now-label.red{color:var(--red)}
 #market-detail .interval-play-hud #detail-cards,
 #market-detail .interval-play-hud #detail-cards>.play-segment,
 #market-detail .interval-play-hud .play-segment .detail-card-heading,
@@ -88,9 +98,10 @@ html[data-theme="light"] .hud-topbar .hud-player{box-shadow:inset 0 1px 0 #bdffe
 #market-detail .interval-play-hud .play-segment .segment-heading-labels{display:none}
 #market-detail .interval-play-hud .play-segment .segment-price-hud{grid-column:2;grid-row:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr)) minmax(90px,1fr);align-items:center;gap:8px 12px;min-width:0;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
 #market-detail .interval-play-hud .play-segment .detail-prices{display:contents}
+#market-detail[data-state="completed"] .interval-play-hud .play-segment .segment-price-hud{grid-template-columns:repeat(2,minmax(0,1fr)) minmax(100px,.9fr)}
 #market-detail .interval-play-hud .play-segment .detail-prices>div{grid-row:1;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:5px;min-width:0;margin:0;padding:0;border:0;background:none}
-#market-detail .interval-play-hud .play-segment .segment-live-quote{grid-column:1}
-#market-detail .interval-play-hud .play-segment .segment-start-quote{grid-column:2}
+#market-detail .interval-play-hud .play-segment .segment-live-quote{grid-column:2}
+#market-detail .interval-play-hud .play-segment .segment-start-quote{grid-column:1}
 #market-detail .interval-play-hud .play-segment .detail-prices span{font-size:10px;line-height:1.3;color:var(--muted)}
 #market-detail .interval-play-hud .play-segment :is(.segment-current-price,.segment-benchmark-price){font-size:20px;font-weight:800;line-height:1.25;letter-spacing:-.3px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 #market-detail .interval-play-hud .play-segment .segment-prediction-controls{grid-column:3;grid-row:1;display:flex;align-items:center;align-self:center;gap:8px;min-width:0}
@@ -99,6 +110,9 @@ html[data-theme="light"] .hud-topbar .hud-player{box-shadow:inset 0 1px 0 #bdffe
 #market-detail .interval-play-hud .play-segment .segment-chances button{min-width:70px;min-height:54px;padding:8px 10px;border-radius:9px;font:inherit;font-weight:800;box-shadow:inset 0 1px 0 #ffffff12}
 #market-detail .interval-play-hud .play-segment .segment-action{min-width:76px;min-height:54px;padding:10px;font-size:12px}
 #market-detail .interval-play-hud .play-segment .detail-result{grid-column:3;grid-row:1;display:flex;flex-direction:column;gap:5px;align-self:center;margin:0;font-size:11px;line-height:1.4;overflow-wrap:anywhere}
+#market-detail .interval-play-hud .play-segment .segment-movement{font-size:26px;line-height:1.2;letter-spacing:-.5px}
+#market-detail[data-state="completed"] .interval-play-hud .play-segment .detail-result{grid-column:3;grid-row:1;align-items:flex-end;text-align:right;font-size:13px;font-weight:800;line-height:1.4}
+#market-detail[data-state="completed"] .interval-play-hud .play-segment .segment-movement{font-size:28px}
 #market-detail .interval-play-hud .play-segment .play-prediction-tags{grid-column:1/-1;grid-row:2;margin:0}
 
 @media(max-width:1100px){
@@ -149,6 +163,8 @@ html[data-theme="light"] .hud-topbar .hud-player{box-shadow:inset 0 1px 0 #bdffe
  #market-detail .interval-play-hud .play-coin-fallback{min-width:40px;height:40px}
  #market-detail .interval-play-hud #play-timeframe{font-size:19px;letter-spacing:-.25px}
  #market-detail .interval-play-hud .play-segment .segment-price-hud{grid-column:1/-1;grid-row:2;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;padding:9px 10px}
+ #market-detail[data-state="completed"] .interval-play-hud .play-segment .segment-price-hud{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #market-detail[data-state="completed"] .interval-play-hud .play-segment .detail-result{grid-column:1/-1;grid-row:2;flex-direction:column;flex-wrap:nowrap;align-items:flex-end}
  #market-detail .interval-play-hud .play-segment .detail-result{grid-column:1/-1;grid-row:2;flex-direction:row;flex-wrap:wrap}
  #market-detail .interval-play-hud .play-segment .segment-prediction-controls{grid-column:1/-1;grid-row:3;justify-self:stretch;width:100%}
  #market-detail .interval-play-hud .play-segment .play-prediction-tags{grid-row:4}
@@ -157,6 +173,8 @@ html[data-theme="light"] .hud-topbar .hud-player{box-shadow:inset 0 1px 0 #bdffe
  .terminal-page .topbar.terminal-topbar.hud-topbar{padding-inline:8px;column-gap:6px!important}
  .hud-topbar .brand .p60-mark{width:48px}
  #market-detail .interval-play-hud .play-segment :is(.segment-current-price,.segment-benchmark-price){font-size:18px}
+ #market-detail[data-state="completed"] .interval-play-hud .play-segment .segment-price-hud{column-gap:8px}
+ #market-detail[data-state="completed"] .interval-play-hud .play-segment :is(.segment-current-price,.segment-benchmark-price){font-size:16px}
 }
 
 /* Hour, selected-play and prediction badges share the HUD's interval clocks. */

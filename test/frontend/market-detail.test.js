@@ -43,6 +43,8 @@ test('single play aligns chart, coin and red timer to the selected interval',()=
  assert.equal(h.get('hour-overview').hidden,true);
  assert.equal(h.get('detail-title').textContent,'Bitcoin price chart');
  assert.equal(h.get('market-detail').dataset.state,'live');
+ assert.equal(h.get('play-now-label').textContent,'LIVE · NOW');
+ assert.equal(h.get('play-now-label').className,'');
  assert.equal((h.get('detail-cards').innerHTML.match(/data-detail-index=/g)||[]).length,1);
  assert.equal(h.field(0,'coin-name').textContent,'BTC');
  assert.equal(h.field(0,'coin-name').hidden,!!h.model.coin.icon);
@@ -200,15 +202,17 @@ test('the selected segment separates colored odds from the actual percentage mov
  h.model.estimateChances=()=>({up:61,down:39});h.events.get('btc-chances-update')();
  assert.equal(h.field(0,'up-chance').textContent,'61');
  assert.equal(h.field(0,'down-chance').textContent,'39');
- assert.equal(h.field(0,'movement').textContent,'↑ Up +1.00% from start');
+ assert.equal(h.field(0,'movement').textContent,'↑ Up +1.00%');
  assert.equal(h.field(0,'movement').dataset.direction,'up');
  h.model.spot=99;h.events.get('btc-price-update')();
- assert.equal(h.field(0,'movement').textContent,'↓ Down −1.00% from start');
+ assert.equal(h.field(0,'movement').textContent,'↓ Down −1.00%');
  assert.equal(h.field(0,'movement').dataset.direction,'down');
  h.model.feedConnection='disconnected';h.events.get('btc-chances-update')();
  assert.equal(h.field(0,'movement').hidden,true);
  h.click('play-previous');
- assert.equal(h.field(0,'movement').textContent,'↑ Up +0.00% from start','completed plays use their closing price');
+ assert.equal(h.field(0,'movement').textContent,'+0.00%','completed plays use their closing price');
+ assert.equal(h.field(0,'movement').hidden,false,'completed results show one percentage beside the winning direction');
+ assert.equal(h.field(0,'summary').textContent,'↑ Up wins');
  h.click('play-next');h.click('play-next');
  assert.equal(h.field(0,'movement').hidden,true,'future plays have no price movement yet');
 });
@@ -289,11 +293,21 @@ test('completed arrows appear only with confirmed closes and follow corrected re
  h.model.candles=h.model.candles.filter(c=>c!==closing);
  h.click('play-previous');
  assert.equal(h.get('market-detail').dataset.state,'pending');
+ assert.equal(h.get('play-now-label').textContent,'PENDING');
+ assert.equal(h.get('play-now-label').className,'badge neutral');
  assert(!h.get('detail-cards').innerHTML.includes('play-settlement-arrow'));
  h.model.candles.push(closing);h.events.get('btc-market-update')();
  assert.match(h.get('detail-cards').innerHTML,/play-settlement-arrow up/);
+ assert.equal(h.get('play-now-label').textContent,'COMPLETED');
+ assert.equal(h.get('play-now-label').className,'badge green');
  closing[4]=99;h.events.get('btc-market-update')();
  assert.match(h.get('detail-cards').innerHTML,/play-settlement-arrow down/);
+ assert.equal(h.get('play-now-label').textContent,'COMPLETED');
+ assert.equal(h.get('play-now-label').className,'badge red');
+ assert.equal(h.field(0,'movement').hidden,false);
+ assert.equal(h.field(0,'movement').textContent,'−1.00%');
+ assert.equal(h.field(0,'summary').textContent,'↓ Down wins');
+ assert.equal(((h.field(0,'movement').textContent+h.field(0,'summary').textContent).match(/%/g)||[]).length,1);
 });
 
 test('missing interval history loads on navigation and late responses cannot replace the selected graph',async()=>{

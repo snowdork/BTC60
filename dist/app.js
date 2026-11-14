@@ -199,8 +199,12 @@
         const status=p.settled_at==null?'pending':p.outcome===p.side?'won':'lost';
         const badge=document.createElement('span');
         badge.className=`segment-prediction play-prediction-tag ${p.side}`;
-        badge.textContent=`${p.side==='up'?'↑ Up':'↓ Down'} · ${money(p.cost_cents/100)} @ ${p.cents}%${status==='pending'?'':status==='won'?' · Won':' · Lost'}`;
-        const label=`Your ${p.side==='up'?'Up':'Down'} bet · ${money(p.cost_cents/100)} at ${p.cents}% · ${status==='pending'?'pending':status==='won'?'Win':'Loss'}`;
+        badge.textContent=`${p.side==='up'?'↑':'↓'} ${shares(p.cost_cents/100)} @ ${p.cents}%`;
+        const date=Number.isFinite(m.startsAt)?new Date(m.startsAt).toISOString().slice(0,10):'';
+        const interval=[p.coin,date,m.start&&m.end?`${m.start} – ${m.end} UTC`:''].filter(Boolean).join(' · ');
+        const label=[`Your ${p.side==='up'?'Up':'Down'} prediction · ${money(p.cost_cents/100)} at ${p.cents}% · ${status==='pending'?'Pending':status==='won'?'Won':'Lost'}`,
+          interval,p.settled_at!=null&&Number.isFinite(p.payout_cents)?`Return: ${money(p.payout_cents/100)}`:''].filter(Boolean).join('\n');
+        badge.tabIndex=0;
         badge.title=label;badge.setAttribute('aria-label',label);
         return badge;
       }));

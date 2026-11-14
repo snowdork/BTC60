@@ -1178,6 +1178,7 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
 :is(#market-detail,#hour-overview) .play-segment .detail-countdown{
  margin:0;padding-top:7px;border-top:1px solid var(--border);font-size:11px;line-height:1.4;color:var(--muted);
 }
+#hour-overview .play-segment[data-state="completed"] .detail-countdown{display:none}
 @container(max-width:560px){
  :is(#market-detail,#hour-overview) .play-segment .segment-body{grid-template-columns:minmax(0,1fr);gap:6px}
  :is(#market-detail,#hour-overview) .play-segment .segment-prediction-controls{grid-column:1;grid-row:3;justify-content:space-between}
@@ -1220,5 +1221,10 @@ body.terminal-page{height:100vh;height:100dvh;min-height:0;display:flex;flex-dir
 #hour-overview .tier[data-duration="5"] .play-segment :is(.segment-chances button,.segment-action){min-width:44px;min-height:44px;width:100%;padding:6px;font-size:16px}
 #hour-overview .tier[data-duration="5"] .play-segment :is(.segment-current-price,.segment-benchmark-price){font-size:11px}
 #hour-overview .tier[data-duration="5"] .play-segment :is(.detail-prices span,.detail-countdown,.detail-result){font-size:10px}
+
+/* Compact saved orders fit even the narrowest Hour segment; hover reveals details. */
+#hour-overview .play-segment .play-prediction-tags{min-width:0;max-width:100%;gap:4px}
+#hour-overview .play-segment .play-prediction-tag{display:block;flex:0 1 auto;width:max-content;min-width:0;max-width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:4px;font-size:10px;line-height:1.4;border-radius:5px;cursor:help}
+#hour-overview .play-segment .play-prediction-tag:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 
 /* Integrated title and selected-interval layouts live in hud.css. */

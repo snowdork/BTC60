@@ -77,6 +77,11 @@ The live/closing price is prominent; the starting price is smaller. Up is green,
 Down is red, and Predict is highlighted. Saved prediction tags show the executed
 side, credit amount, and execution percentage. Completed cards retain their date;
 live and upcoming cards use a compact time display.
+In Hour view, saved predictions use compact green `↑ 100 @ 74%` or red
+`↓ 100 @ 74%` tags. Hover for the full amount, execution percentage, coin,
+interval and settlement result/return. Each saved prediction has its own tag.
+Completed Hour cards omit the countdown footer; their **COMPLETED** badge shows
+that the interval has ended.
 
 **Outcome estimates and purchase quotes are different values.** The Up/Down
 percentages estimate outcomes from price, time and volatility. The order review
@@ -95,9 +100,14 @@ prices, countdown and saved bets. There is no separate lower interval pane.
 Live/closing price, starting price and actual percentage movement share one
 price block. The countdown is beside the UTC range, wrapping beneath it on
 smaller screens.
+Finished intervals show **COMPLETED** in green for an Up result or red for Down,
+matching Hour view. Missing settlement candles show a neutral **PENDING** badge.
+The completed result shows the winning direction and percentage change in green
+or red. The starting price appears before the closing price, with a large
+percentage and winning direction on the right (wrapping below on narrow screens).
 The Up/Down buttons open review with that direction selected; they never place
 an order by themselves. The selected play’s price history appears below it.
-Use the graph arrows to move by one interval; **Back to live** resumes the current
+Use the graph arrows to move by one interval; **Live** resumes the current
 play. Changing duration or coin keeps the chosen view.
 
 **Hour** shows one 60-minute, two 30-minute, four 15-minute, and twelve 5-minute
@@ -108,7 +118,7 @@ time without changing views. Select Interval to
 inspect it, or double-click the card body to open it directly. Double-click the
 Interval card body to return to Hour. Buttons retain their normal actions.
 
-In Hour, the graph arrows move by UTC hour and **Back to now** returns to the
+In Hour, the graph arrows move by UTC hour and **Live** returns to the
 current hour. The rows appear in 60, 15, 30, and 5-minute order, all aligned to the
 same hour. On narrow screens, the chart and all rows scroll together, with duration
 labels pinned at the left; **Now**
@@ -203,7 +213,7 @@ rotation are available without changing your selected coin or prediction.
 ## History and display controls
 
 Historical cards include dates to distinguish hours across midnight. Switching
-coins retains the viewed hour. Use Back to live/Back to now before making a new
+coins retains the viewed hour. Use Live before making a new
 prediction. A completed card's Result action remains available when the live
 feed disconnects; an open play requires fresh data before Predict is enabled.
 

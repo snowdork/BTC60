@@ -11,6 +11,7 @@
   function attribute(node,name,value){const text=String(value);if(node.getAttribute(name)!==text)node.setAttribute(name,text);}
   const /** Format an available instrument price or a missing-data placeholder. */ price=value=>Number.isFinite(value)?window.PredictCoins.formatPrice(value,model.coin.symbol):'—';
   const creditFormatter=new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const movementFormatter=new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:4});
   let minutes=15,visible=true,durationSelected=true,lastSignature='',intervals=[],selectedStart=null;
   const historyCache=new Map();
   let sourceCandles=null,extraCandles=null,mergedCandles=[];
@@ -170,7 +171,9 @@
     set($('play-cursor'),'hidden',selected.status!=='open');
     set($('play-cursor').style,'left',`${cursor/10}%`);
     set($('play-cutoff').style,'left',`${100-5/(minutes*60)*100}%`);
-    set($('play-now-label'),'textContent',intervals[0].status==='open'?'LIVE · NOW':intervals[0].status==='queued'?'UPCOMING':'PAST PLAY');
+    const completedResult=completed?model.outcome(selected.strike,selected.close):null;
+    set($('play-now-label'),'textContent',completed?'COMPLETED':state==='pending'?'PENDING':state==='live'?'LIVE · NOW':'UPCOMING');
+    set($('play-now-label'),'className',completed?`badge ${completedResult==='up'?'green':'red'}`:state==='pending'?'badge neutral':'');
     set($('play-live'),'hidden',selectedStart===null&&!model.isHistorical);
     set($('play-previous'),'disabled',selected.startsAt-minutes*60000-60000<Date.now()-30*86400000);
     set($('play-next'),'disabled',intervals[0].startsAt>now);
@@ -197,11 +200,12 @@
       set(get('chances'),'hidden',!chance);
       window.PredictSegmentCard.updateOdds(get('up-chance'),chance?.up,'Up');
       window.PredictSegmentCard.updateOdds(get('down-chance'),chance?.down,'Down');
-      set(get('summary'),'hidden',!!chance);
-      set(get('summary'),'textContent',queued?'Benchmark is set when this interval opens.':result?`${result==='up'?'↑ Up':'↓ Down'} wins · ${price(m.strike)} → ${price(m.close)}`:closed?'Awaiting exact settlement candles':'Waiting for fresh price and benchmark data');
       const movement=queued?null:window.PredictSegmentCard.priceMovement(m.strike,displayedPrice);
+      const percent=movement?`${movement.percent<0?'−':'+'}${movementFormatter.format(Math.abs(movement.percent))}%`:'';
+      set(get('summary'),'hidden',!!chance);
+      set(get('summary'),'textContent',queued?'Benchmark is set when this interval opens.':result?`${result==='up'?'↑ Up':'↓ Down'} wins`:closed?'Awaiting exact settlement candles':'Waiting for fresh price and benchmark data');
       set(get('movement'),'hidden',!movement);
-      set(get('movement'),'textContent',movement?movement.label:'');
+      set(get('movement'),'textContent',movement?(result?percent:`${movement.direction==='up'?'↑ Up':'↓ Down'} ${percent}`):'');
       set(get('movement').dataset,'direction',movement?movement.direction:'');
       set(get('result').style,'color',result==='up'?'var(--green)':result==='down'?'var(--red)':'var(--muted)');
       const action=get('action');set(action,'hidden',false);

@@ -45,8 +45,8 @@ returns to Hour. A past interval returns to its containing UTC hour. Interactive
 buttons/links/form fields do not trigger the shortcut. Entering Hour clears
 duration and segment selection highlights. Choosing a duration or segment while in Hour keeps it visible and
 prepares the selected interval; selecting Interval then opens it. In Interval,
-left/right arrows move by one play and Back to live resumes following. In Hour,
-left/right arrows move by one UTC hour and Back to now restores the live hour.
+left/right arrows move by one play and Live resumes following. In Hour,
+left/right arrows move by one UTC hour and Live restores the live hour.
 
 Both graph backgrounds stay black in either theme and across live, completed,
 and upcoming states. Hour has a white price line and green/red candles.
@@ -101,6 +101,13 @@ probabilities. Completed results have an outcome-colored heading arrow only
 when both exact settlement benchmarks are available. Missing values remain
 placeholders. Live cards use a duration tint, completed cards use a light gray
 surface, and upcoming cards use light yellow.
+
+Hour saved-order tags show only the direction arrow, credit amount and executed
+percentage (for example, `↑ 100 @ 74%`). They share compact sizing across all
+durations, wrap as separate tags and truncate within a card when necessary.
+Native hover tooltips and accessible labels retain the full amount, percentage,
+coin, UTC interval, settlement state and settled return. Tags are keyboard
+focusable; green/red denotes the saved Up/Down direction independently of outcome.
 
 `renderMarkets` rebuilds structural state on market/view changes and preserves
 horizontal scroll. `renderChances` reuses indexed nodes and avoids rewriting
