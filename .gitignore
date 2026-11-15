@@ -13,3 +13,7 @@ doc/test-results/
 
 .venv/
 .docker-restart.lock
+node_modules/
+playwright-report/
+test-results/
+playwright/.auth/

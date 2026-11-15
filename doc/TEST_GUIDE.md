@@ -59,15 +59,79 @@ git diff --check
 The help output should show `--bind` with default `127.0.0.1`. Docker overrides
 that address with `0.0.0.0`; this does not publish the port on the VPS.
 
+## Playwright account browser tests
+
+The root npm package contains Playwright Test; `doc/package.json` remains the
+separate documentation dependency set. Install Python dependencies as above,
+then run:
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:e2e:accounts
+```
+
+On a Linux CI image without browser libraries, use
+`npx playwright install --with-deps chromium` during image setup. Node.js 20+
+is required. Browser binaries must match the locked Playwright version.
+
+The account suite runs on desktop Chromium and emulated Pixel 7 Chromium.
+To run one project, inspect a browser, or open the retained HTML report:
+
+```bash
+npm run test:e2e:accounts -- --project=chromium
+npm run test:e2e:accounts -- --project=mobile-chromium
+npm run test:e2e:accounts -- --project=chromium --headed
+npm run test:e2e:ui
+npm run test:e2e:report
+```
+
+Each test starts its own real Python HTTP server on an OS-assigned loopback
+port, initializes a temporary SQLite database, checks `/healthz`, and removes
+its database and server at teardown. No existing server is required. The fixture
+uses `.venv/bin/python` when present, otherwise `python3`; set `P60_E2E_PYTHON`
+to select another interpreter. Loopback sockets and browser subprocesses must be
+allowed by the execution environment.
+
+The test launcher pins the default no-code signup policy and excludes inherited
+deployment settings, provider credentials and database paths. Backend provider
+requests are blocked; the external Google widget script is replaced with an
+empty script. Account, password, cookie, CSRF and SQLite session handling all use
+the real application. These tests do not verify Google authentication, real
+market feeds, predictions or settlement.
+
+Coverage includes UI signup, initial hourly credits, password mismatch and
+correction, duplicate-email protection, incorrect/unknown login credentials,
+password visibility, session restoration on reload, protected navigation,
+welcome-page redirects, logout cookie removal and server-side revocation,
+missing sessions, password-change validation, the login-page password shortcut,
+and password changes that retain the current session while revoking another
+browser session and replacing the old credentials.
+
+The suite uses two workers, with no local retries and one retry in CI. Review
+retry-only passes as flaky. Failed tests retain screenshots, traces and a
+`backend.log` attachment under the ignored `test-results/` and
+`playwright-report/` directories. Reports and traces contain disposable test
+credentials/session data; keep them in restricted CI artifacts. Uncaught browser
+JavaScript errors fail the test. The existing Python/JavaScript runner remains
+separate; run both commands for account changes:
+
+```bash
+.venv/bin/python scripts/run_tests.py
+npm run test:e2e:accounts
+```
+
 ## Automated coverage map
 
-The JavaScript suites execute browser logic with mocked DOM/network state; they
-are not rendered browser or end-to-end tests. Python HTTP tests start a loopback
-server against temporary SQLite databases. Provider calls are mocked unless a
-manual procedure explicitly says to use a live feed.
+The JavaScript unit suites execute browser logic with mocked DOM/network state;
+Playwright account tests render the real pages against the real API. Python
+HTTP tests start a loopback server against temporary SQLite databases. Provider
+calls are mocked or blocked unless a manual procedure explicitly says to use a
+live feed.
 
 | Suite files | Coverage |
 | --- | --- |
+| `test/e2e/accounts.spec.ts` | Rendered desktop/mobile Chromium account journeys, real SQLite sessions, signup/login/logout, protected navigation and password changes across two browser contexts. Run separately with `npm run test:e2e:accounts`. |
 | `test/frontend/account.test.js`, `test/frontend/auth.test.js`, `test/frontend/password.test.js` | Restored/expired sessions, ten-character HUD names with full-name tooltips, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery, bounded retries, and request/body timeouts without automatic order replay. |
 | `test/frontend/bootstrap.test.js`, `test/frontend/coins.test.js`, `test/frontend/categories.test.js` | Catalog-first startup, offline/static-server failures, larger icon buttons/ticker fallback, category availability, reused price formatters across all precisions, and displayed-hour prediction markers with account/time-boundary invalidation and no stable-tick history scans. |
 | `test/frontend/btc-chart.test.js` | Minute history, candle geometry and summary arrows, current/historical-hour navigation, one-second price/UTC clock updates, digital clock midnight rollover, hourly signed dollar/percentage changes, moving time-axis geometry, stale response rejection, and quote/benchmark freshness. |

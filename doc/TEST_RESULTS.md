@@ -1,5 +1,41 @@
 # Latest regression test results
 
+**November 15, 2026 — 34 Playwright browser checks and 403 existing regression
+cases passed; zero failures or skips in the final runs.**
+
+Playwright Test 1.65.1 is installed in the root npm package with locked
+dependencies. Chromium 159 runs 17 account scenarios on desktop and emulated
+Pixel 7, against the real Python API and a fresh SQLite database/server per test.
+Node.js 24.22.1, Python 3.12.3 in `.venv`, Linux; timestamps use America/Denver.
+
+| Command | Result | Duration |
+| --- | --- | ---: |
+| `npm run test:e2e:accounts` | 34 passed, no retries | 23.3 s |
+| `.venv/bin/python scripts/run_tests.py` | 198 JavaScript + 126 Python application + 79 Python scripts passed | 36.32 s |
+| `git diff --check` | PASS | — |
+
+Browser coverage includes signup, initial hourly allowance, duplicate-email
+protection, login errors and recovery, password visibility, restored sessions,
+guest portfolio/login behavior, protected-page redirects, logout and revoked
+sessions, password validation, and a password change across two browser sessions.
+The current session survives the change, the other session is revoked, and only
+the new password works afterward. Failure traces, screenshots and backend-log
+attachments are configured; the final HTML report is in `playwright-report/`.
+The first browser run exposed an incorrect test expectation for the public
+portfolio login prompt; the corrected test checks hidden guest data and the
+authenticated portfolio after login. No application behavior was changed.
+
+The sandbox initially blocked loopback sockets; the final suites ran with
+loopback access. Provider calls are blocked and the external Google widget is
+stubbed. These account tests do not establish Google OAuth, live provider,
+prediction or settlement behavior. Production data and deployments were not used.
+Regression log: `/tmp/test_results/test_result_2026-11-15_16-36-29_899192.log`.
+See [browser test setup](TEST_GUIDE.md#playwright-account-browser-tests).
+
+---
+
+## Earlier regression report: November 14, 2026
+
 **November 14, 2026 — 400 assertion cases passed; zero failures or skips.**
 
 ## Current scope and environment

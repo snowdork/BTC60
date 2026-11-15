@@ -291,8 +291,21 @@ node --check src/frontend/app.js
 node --check src/frontend/btc-chart.js
 ```
 
-The runner executes the JavaScript, application Python, and scripts Python
-suites. Every run prints a colored summary and saves the complete colored log
+For rendered account journeys on desktop and mobile Chromium, install the
+separate browser-test dependencies and run:
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:e2e:accounts
+```
+
+Each browser test uses a temporary SQLite database and its own loopback server.
+See [Playwright setup and coverage](doc/TEST_GUIDE.md#playwright-account-browser-tests)
+for interpreter selection, reports and debugging commands.
+
+The Python regression runner executes the JavaScript, application Python, and
+scripts Python suites. Every run prints a colored summary and saves the complete colored log
 as `/tmp/test_results/test_result_<date_time>.log`. Use `less -R` to retain the
 PASS/FAIL colors while reading a saved log.
 
