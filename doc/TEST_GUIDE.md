@@ -121,6 +121,39 @@ separate; run both commands for account changes:
 npm run test:e2e:accounts
 ```
 
+## Python Playwright browser tests
+
+`test/e2e_python/` contains equivalent Python tests for every TypeScript account
+scenario, plus terminal navigation coverage: 17 account and 13 navigation
+scenarios on desktop and emulated Pixel 7 Chromium, totaling 60 checks. It uses
+pytest-playwright and the synchronous Python API. Install and run it
+independently of npm:
+
+```bash
+.venv/bin/python -m pip install -r test/e2e_python/requirements.txt
+.venv/bin/python -m playwright install chromium
+.venv/bin/python -m pytest test/e2e_python
+```
+
+The Python suite reuses `test/e2e/server.py`, with the same real account API,
+temporary database/server per test, blocked providers and stubbed Google widget.
+It runs sequentially without automatic retries. Failure screenshots, traces and
+server logs are retained under `test-results/e2e_python/`. Use `-k desktop` or
+`-k mobile` to select a profile, and `--headed` to inspect the browser. The
+second device in password-change tests inherits the same profile, network
+restrictions and failure-artifact collection. See the
+[Python suite README](../test/e2e_python/README.md) for setup and report commands.
+The existing regression runner and TypeScript browser suite remain separate.
+
+Run `.venv/bin/python -m pytest test/e2e_python/test_accounts.py` for accounts
+only, or select `test_terminal.py` for navigation. The navigation suite covers
+category availability, catalog bootstrap/retry, player HUD, coin and theme
+preferences, all duration choices, Interval/Hour cards and shortcuts, previous
+and upcoming plays, and historical-hour/live navigation. Its browser-only
+provider fixtures intercept ticker, candle, pricing-history and WebSocket data
+at a fixed time. They leave accounts and the catalog on the real API; they do
+not verify order execution, settlement or live Coinbase connectivity.
+
 ## Automated coverage map
 
 The JavaScript unit suites execute browser logic with mocked DOM/network state;
@@ -132,6 +165,8 @@ live feed.
 | Suite files | Coverage |
 | --- | --- |
 | `test/e2e/accounts.spec.ts` | Rendered desktop/mobile Chromium account journeys, real SQLite sessions, signup/login/logout, protected navigation and password changes across two browser contexts. Run separately with `npm run test:e2e:accounts`. |
+| `test/e2e_python/test_accounts.py` | Python equivalents of all 17 TypeScript account scenarios on desktop/mobile Chromium. Run separately with `.venv/bin/python -m pytest test/e2e_python/test_accounts.py`. |
+| `test/e2e_python/test_terminal.py` | Crypto/category navigation, real catalog bootstrap and retry, coin/duration/view selection, card shortcuts, historical and upcoming intervals, HUD/menu and persistent preferences with fixed browser time and provider fixtures. |
 | `test/frontend/account.test.js`, `test/frontend/auth.test.js`, `test/frontend/password.test.js` | Restored/expired sessions, ten-character HUD names with full-name tooltips, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery, bounded retries, and request/body timeouts without automatic order replay. |
 | `test/frontend/bootstrap.test.js`, `test/frontend/coins.test.js`, `test/frontend/categories.test.js` | Catalog-first startup, offline/static-server failures, larger icon buttons/ticker fallback, category availability, reused price formatters across all precisions, and displayed-hour prediction markers with account/time-boundary invalidation and no stable-tick history scans. |
 | `test/frontend/btc-chart.test.js` | Minute history, candle geometry and summary arrows, current/historical-hour navigation, one-second price/UTC clock updates, digital clock midnight rollover, hourly signed dollar/percentage changes, moving time-axis geometry, stale response rejection, and quote/benchmark freshness. |

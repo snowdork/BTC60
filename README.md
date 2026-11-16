@@ -304,6 +304,18 @@ Each browser test uses a temporary SQLite database and its own loopback server.
 See [Playwright setup and coverage](doc/TEST_GUIDE.md#playwright-account-browser-tests)
 for interpreter selection, reports and debugging commands.
 
+The same 17 account scenarios are also available in Python:
+
+```bash
+.venv/bin/python -m pip install -r test/e2e_python/requirements.txt
+.venv/bin/python -m playwright install chromium
+.venv/bin/python -m pytest test/e2e_python
+```
+
+The Python suite also covers terminal navigation with fixed market data.
+See the [Python browser tests](test/e2e_python/README.md) for profile selection,
+account/navigation commands and failure artifacts.
+
 The Python regression runner executes the JavaScript, application Python, and
 scripts Python suites. Every run prints a colored summary and saves the complete colored log
 as `/tmp/test_results/test_result_<date_time>.log`. Use `less -R` to retain the

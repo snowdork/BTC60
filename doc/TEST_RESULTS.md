@@ -1,5 +1,59 @@
 # Latest regression test results
 
+**November 15, 2026 — Python account and terminal coverage: 60 checks passed in
+91.70 seconds, with no failures, skips, retries or warnings.**
+
+Command: `.venv/bin/python -m pytest test/e2e_python -q --junitxml=test-results/e2e_python/results.xml`.
+The combined run includes 34 account checks and 26 new navigation checks on
+desktop Chromium and emulated Pixel 7. Navigation covers Crypto/category entry,
+player HUD and clocks, catalog loading and retry, remembered coin/theme choices,
+all durations, Interval/Hour layouts and card shortcuts, completed/upcoming
+intervals, historical hours and return to Live, and menu navigation.
+
+The navigation tests found the desktop account menu's Categories link covered
+by the selector row. The menu now paints above that row in `src/frontend/hud.css`;
+the regression clicks the link normally on desktop and mobile. The generated
+`dist/hud.css` was refreshed and matches the source. The focused menu checks
+passed on both profiles before the final combined run.
+
+Accounts and the catalog use the real local API with a disposable SQLite
+database/server per test. Navigation uses fixed browser time and intercepted
+Coinbase-style ticker, candles, pricing history and WebSockets, without live
+provider access. Backend time is unchanged; prediction submission and settlement
+are outside this coverage. The three documentation checks, static build,
+source/export comparison and `git diff --check` also passed.
+
+JUnit report: `test-results/e2e_python/results.xml`. See the
+[Python suite README](../test/e2e_python/README.md) for focused commands.
+
+---
+
+## Earlier Python account parity: November 15, 2026
+
+**November 15, 2026 — Python Playwright parity: 34 checks passed in 45.63 seconds,
+with no failures, skips, retries or warnings.**
+
+Command: `.venv/bin/python -m pytest test/e2e_python -q --junitxml=test-results/e2e_python/results.xml`.
+The suite mirrors all 17 TypeScript account scenarios on desktop Chromium and
+emulated Pixel 7, using a fresh real API server and temporary SQLite database
+for each test. Python Playwright 1.65.2, pytest 9.2.0, pytest-playwright 0.10.0,
+Chromium 159, Python 3.12.3, Linux. Loopback access was enabled for the browser
+run. Provider calls are blocked and the Google widget is stubbed.
+
+The documentation checks (`PYTHONPATH=src/backend:scripts:test/backend
+.venv/bin/python -m unittest docs_test`) also passed all three cases, and
+`git diff --check` passed. This change adds Python tests and documentation;
+application sources, the shared Python server launcher and the TypeScript suite
+were unchanged. The existing 403-case regression run below is from the earlier
+TypeScript setup, rather than a new run for this Python-only addition.
+
+JUnit report: `test-results/e2e_python/results.xml`. Setup and profile commands:
+[Python suite README](../test/e2e_python/README.md).
+
+---
+
+## Earlier browser setup: November 15, 2026
+
 **November 15, 2026 — 34 Playwright browser checks and 403 existing regression
 cases passed; zero failures or skips in the final runs.**
 

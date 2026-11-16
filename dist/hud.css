@@ -10,6 +10,8 @@
 .terminal-page .terminal-topbar.hud-topbar>.hud-status{grid-area:status;display:flex;align-items:center;justify-content:flex-start;gap:10px;min-width:0;max-width:100%;justify-self:start}
 .terminal-page .terminal-topbar.hud-topbar>.market-view-switch{grid-area:views;justify-self:end;width:auto;margin:0}
 .terminal-page .terminal-topbar.hud-topbar>.topbar-right{grid-area:tools;justify-self:end;width:auto;margin:0;flex-wrap:nowrap}
+/* The selector row has z-index 19; keep the account menu above it. */
+.terminal-page .terminal-topbar.hud-topbar .terminal-menu{z-index:20}
 .hud-topbar .market-view-switch button{color:var(--text)}
 .hud-topbar .market-view-switch svg{stroke-width:2}
 
