@@ -9,6 +9,19 @@ defines visible behavior; [design notes](DESIGN.md) define implementation
 invariants. Keep measurements and execution evidence in
 [test results](TEST_RESULTS.md), rather than marking unperformed checks complete.
 
+Python Playwright is the primary browser test suite. Routine validation runs
+the unit-test runner and Python browser suite:
+
+```bash
+.venv/bin/python scripts/run_tests.py
+.venv/bin/python -m pytest test/e2e_python
+```
+
+Install the dependencies described below before the first run. The
+[TypeScript account suite](#typescript-playwright-backup) is retained as an
+optional backup for troubleshooting and comparison. Add new browser coverage
+to the Python suite.
+
 ## Automated regression tests
 
 Install Python 3.10+ and Node.js. The documentation coverage tests also need the
@@ -24,6 +37,7 @@ npm ci --prefix doc
 The runner executes JavaScript tests, root Python application tests, and Python
 script tests. It prints suite totals and saves a colored log under
 `/tmp/test_results/test_result_<date_time>.log`; inspect it with `less -R`.
+It does not run browser tests; invoke the primary Python suite separately.
 A missing `acorn` module means the documentation dependency must be installed.
 Tests mock provider calls and do not prove live Coinbase or paid-feed access.
 Use the project virtual environment so Google verification dependencies are
@@ -59,30 +73,108 @@ git diff --check
 The help output should show `--bind` with default `127.0.0.1`. Docker overrides
 that address with `0.0.0.0`; this does not publish the port on the VPS.
 
-## Playwright account browser tests
+For Python unit tests only, run:
 
+```bash
+PYTHONPATH=src/backend:scripts .venv/bin/python -m unittest discover -s test/backend -p '*_test.py'
+PYTHONPATH=src/backend:scripts .venv/bin/python -m unittest discover -s test/scripts -p '*_test.py'
+```
+
+These select Python test files. Documentation and browser/server parity tests
+within the backend suite still invoke Node.js. The Python Playwright suite
+below can run without Node.js.
+
+## Python Playwright browser tests
+
+`test/e2e_python/` is the primary browser suite for development and release
+validation. It covers 17 account and 13 terminal-navigation scenarios on desktop
+Chromium and emulated Pixel 7, totaling 60 checks. It uses pytest-playwright and
+the synchronous Python API. Install and run it without npm:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r test/e2e_python/requirements.txt
+.venv/bin/python -m playwright install chromium
+.venv/bin/python -m pytest test/e2e_python
+```
+
+The requirements include the application runtime dependencies. On a Linux CI
+image without browser libraries, use
+`.venv/bin/python -m playwright install --with-deps chromium` during image setup.
+Loopback sockets and browser subprocesses must be allowed by the execution
+environment.
+
+Every test starts `test/e2e/server.py` with a fresh temporary SQLite database
+and an OS-assigned loopback port, checks `/healthz`, and removes the server and
+temporary data at teardown. No existing server is required. The child server
+uses the running Python interpreter; `P60_E2E_PYTHON` can select another.
+The launcher sanitizes deployment settings, provider credentials and database
+paths, and pins the default no-code signup policy. Provider calls are blocked
+and the Google Identity widget is stubbed. Account API, cookies, CSRF and SQLite
+sessions use the real application. Uncaught browser JavaScript errors and
+unexpected external requests fail the test.
+
+The suite runs sequentially without automatic retries. Failure screenshots,
+traces and server logs are retained under `test-results/e2e_python/`. The
+second device in password-change tests inherits the same profile, network
+restrictions and failure-artifact collection. Run a subset, inspect a browser,
+or save a JUnit report:
+
+```bash
+.venv/bin/python -m pytest test/e2e_python -k desktop
+.venv/bin/python -m pytest test/e2e_python -k mobile
+.venv/bin/python -m pytest test/e2e_python/test_accounts.py
+.venv/bin/python -m pytest test/e2e_python/test_terminal.py
+.venv/bin/python -m pytest test/e2e_python -k password --headed
+.venv/bin/python -m pytest test/e2e_python --junitxml=test-results/e2e_python/results.xml
+.venv/bin/python -m playwright show-trace path/to/trace.zip
+```
+
+Account coverage includes signup, initial hourly credits, duplicate-email
+protection, login errors and recovery, password visibility, session restoration,
+protected navigation, welcome redirects, logout and revoked sessions, and
+password changes across two browser contexts.
+
+Terminal coverage includes category availability, catalog bootstrap/retry,
+player HUD, coin/theme preferences, all durations, Interval/Hour cards and
+shortcuts, previous/upcoming plays, historical-hour/live navigation and menu
+navigation. Browser fixtures intercept ticker, candle, pricing-history and
+WebSocket data at a fixed time; accounts and the catalog use the real API.
+These tests do not verify Google authentication, order execution, settlement
+or live Coinbase connectivity. See the
+[Python suite README](../test/e2e_python/README.md) for fixture details.
+
+<a id="playwright-account-browser-tests"></a>
+
+## TypeScript Playwright backup
+
+The TypeScript account suite is retained as an optional backup for troubleshooting
+and comparison. It covers the same 17 account scenarios on desktop and mobile,
+for 34 checks; terminal navigation is covered by the primary Python suite.
 The root npm package contains Playwright Test; `doc/package.json` remains the
-separate documentation dependency set. Install Python dependencies as above,
-then run:
+separate documentation dependency set. Install the application Python dependencies
+as above, then run the backup explicitly:
 
 ```bash
 npm ci
 npx playwright install chromium
-npm run test:e2e:accounts
+npm run test:e2e:accounts -- --retries=0 --output=test-results/e2e_typescript
 ```
 
 On a Linux CI image without browser libraries, use
 `npx playwright install --with-deps chromium` during image setup. Node.js 20+
 is required. Browser binaries must match the locked Playwright version.
+The explicit output directory preserves primary Python artifacts when both
+suites are run; the default TypeScript output directory is `test-results/`.
 
 The account suite runs on desktop Chromium and emulated Pixel 7 Chromium.
 To run one project, inspect a browser, or open the retained HTML report:
 
 ```bash
-npm run test:e2e:accounts -- --project=chromium
-npm run test:e2e:accounts -- --project=mobile-chromium
-npm run test:e2e:accounts -- --project=chromium --headed
-npm run test:e2e:ui
+npm run test:e2e:accounts -- --project=chromium --output=test-results/e2e_typescript
+npm run test:e2e:accounts -- --project=mobile-chromium --output=test-results/e2e_typescript
+npm run test:e2e:accounts -- --project=chromium --headed --output=test-results/e2e_typescript
+npm run test:e2e:ui -- --output=test-results/e2e_typescript
 npm run test:e2e:report
 ```
 
@@ -110,49 +202,12 @@ browser session and replacing the old credentials.
 
 The suite uses two workers, with no local retries and one retry in CI. Review
 retry-only passes as flaky. Failed tests retain screenshots, traces and a
-`backend.log` attachment under the ignored `test-results/` and
+`backend.log` attachment under the ignored `test-results/e2e_typescript/` and
 `playwright-report/` directories. Reports and traces contain disposable test
 credentials/session data; keep them in restricted CI artifacts. Uncaught browser
-JavaScript errors fail the test. The existing Python/JavaScript runner remains
-separate; run both commands for account changes:
-
-```bash
-.venv/bin/python scripts/run_tests.py
-npm run test:e2e:accounts
-```
-
-## Python Playwright browser tests
-
-`test/e2e_python/` contains equivalent Python tests for every TypeScript account
-scenario, plus terminal navigation coverage: 17 account and 13 navigation
-scenarios on desktop and emulated Pixel 7 Chromium, totaling 60 checks. It uses
-pytest-playwright and the synchronous Python API. Install and run it
-independently of npm:
-
-```bash
-.venv/bin/python -m pip install -r test/e2e_python/requirements.txt
-.venv/bin/python -m playwright install chromium
-.venv/bin/python -m pytest test/e2e_python
-```
-
-The Python suite reuses `test/e2e/server.py`, with the same real account API,
-temporary database/server per test, blocked providers and stubbed Google widget.
-It runs sequentially without automatic retries. Failure screenshots, traces and
-server logs are retained under `test-results/e2e_python/`. Use `-k desktop` or
-`-k mobile` to select a profile, and `--headed` to inspect the browser. The
-second device in password-change tests inherits the same profile, network
-restrictions and failure-artifact collection. See the
-[Python suite README](../test/e2e_python/README.md) for setup and report commands.
-The existing regression runner and TypeScript browser suite remain separate.
-
-Run `.venv/bin/python -m pytest test/e2e_python/test_accounts.py` for accounts
-only, or select `test_terminal.py` for navigation. The navigation suite covers
-category availability, catalog bootstrap/retry, player HUD, coin and theme
-preferences, all duration choices, Interval/Hour cards and shortcuts, previous
-and upcoming plays, and historical-hour/live navigation. Its browser-only
-provider fixtures intercept ticker, candle, pricing-history and WebSocket data
-at a fixed time. They leave accounts and the catalog on the real API; they do
-not verify order execution, settlement or live Coinbase connectivity.
+JavaScript errors fail the test. Routine validation uses the unit-test runner
+and primary Python browser suite; this backup is run separately when needed.
+See the [backup suite README](../test/e2e/README.md).
 
 ## Automated coverage map
 
@@ -164,9 +219,9 @@ live feed.
 
 | Suite files | Coverage |
 | --- | --- |
-| `test/e2e/accounts.spec.ts` | Rendered desktop/mobile Chromium account journeys, real SQLite sessions, signup/login/logout, protected navigation and password changes across two browser contexts. Run separately with `npm run test:e2e:accounts`. |
-| `test/e2e_python/test_accounts.py` | Python equivalents of all 17 TypeScript account scenarios on desktop/mobile Chromium. Run separately with `.venv/bin/python -m pytest test/e2e_python/test_accounts.py`. |
-| `test/e2e_python/test_terminal.py` | Crypto/category navigation, real catalog bootstrap and retry, coin/duration/view selection, card shortcuts, historical and upcoming intervals, HUD/menu and persistent preferences with fixed browser time and provider fixtures. |
+| `test/e2e_python/test_accounts.py` | Primary account browser coverage: 17 scenarios on desktop/mobile Chromium, including real SQLite sessions, signup/login/logout, protected navigation and password changes across two browser contexts. Run with `.venv/bin/python -m pytest test/e2e_python/test_accounts.py`. |
+| `test/e2e_python/test_terminal.py` | Primary terminal browser coverage: Crypto/category navigation, real catalog bootstrap and retry, coin/duration/view selection, card shortcuts, historical and upcoming intervals, HUD/menu and persistent preferences with fixed browser time and provider fixtures. |
+| `test/e2e/accounts.spec.ts` | Optional TypeScript backup for the same 17 account scenarios on desktop/mobile Chromium. Run separately with `npm run test:e2e:accounts -- --retries=0 --output=test-results/e2e_typescript`. Terminal navigation is covered by the primary Python suite. |
 | `test/frontend/account.test.js`, `test/frontend/auth.test.js`, `test/frontend/password.test.js` | Restored/expired sessions, ten-character HUD names with full-name tooltips, protected navigation, signup and login validation, password visibility, password changes, logout races, CSRF recovery, bounded retries, and request/body timeouts without automatic order replay. |
 | `test/frontend/bootstrap.test.js`, `test/frontend/coins.test.js`, `test/frontend/categories.test.js` | Catalog-first startup, offline/static-server failures, larger icon buttons/ticker fallback, category availability, reused price formatters across all precisions, and displayed-hour prediction markers with account/time-boundary invalidation and no stable-tick history scans. |
 | `test/frontend/btc-chart.test.js` | Minute history, candle geometry and summary arrows, current/historical-hour navigation, one-second price/UTC clock updates, digital clock midnight rollover, hourly signed dollar/percentage changes, moving time-axis geometry, stale response rejection, and quote/benchmark freshness. |

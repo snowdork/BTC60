@@ -286,35 +286,43 @@ and rendered docs are ignored by Git and excluded from the static app build.
 Application sources live under `src/backend`, `src/frontend`, and `src/seeds`. `bootstrap.js` loads the database coin catalog before loading the model, trading controller, and chart. `src/backend/server.py` serves the interface and account API with SQLite persistence. Keep development on the `Phase1` branch.
 
 ```bash
-python3 scripts/run_tests.py
+.venv/bin/python scripts/run_tests.py
+.venv/bin/python -m pytest test/e2e_python
 node --check src/frontend/app.js
 node --check src/frontend/btc-chart.js
 ```
 
-For rendered account journeys on desktop and mobile Chromium, install the
-separate browser-test dependencies and run:
+Python Playwright is the primary browser test suite. It covers 17 account and
+13 terminal-navigation scenarios on desktop Chromium and emulated Pixel 7,
+for 60 checks. Install its dependencies and browser before the first run:
 
 ```bash
-npm ci
-npx playwright install chromium
-npm run test:e2e:accounts
-```
-
-Each browser test uses a temporary SQLite database and its own loopback server.
-See [Playwright setup and coverage](doc/TEST_GUIDE.md#playwright-account-browser-tests)
-for interpreter selection, reports and debugging commands.
-
-The same 17 account scenarios are also available in Python:
-
-```bash
+python3 -m venv .venv
 .venv/bin/python -m pip install -r test/e2e_python/requirements.txt
 .venv/bin/python -m playwright install chromium
 .venv/bin/python -m pytest test/e2e_python
 ```
 
-The Python suite also covers terminal navigation with fixed market data.
-See the [Python browser tests](test/e2e_python/README.md) for profile selection,
-account/navigation commands and failure artifacts.
+Each browser test uses a temporary SQLite database and its own loopback server.
+Navigation tests use fixed market data. See the
+[primary browser test guide](doc/TEST_GUIDE.md#python-playwright-browser-tests)
+and [Python suite README](test/e2e_python/README.md) for profile selection,
+account/navigation commands, reports and failure artifacts. The Python browser
+suite does not require Node.js; JavaScript unit and documentation checks do.
+
+The TypeScript Playwright account suite is retained as a backup for
+troubleshooting and comparison. It covers 34 account checks and does not include
+terminal navigation. Run it explicitly when needed:
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:e2e:accounts -- --retries=0 --output=test-results/e2e_typescript
+```
+
+See the [TypeScript backup guide](doc/TEST_GUIDE.md#typescript-playwright-backup)
+for debugging commands. Routine validation uses the unit-test runner and primary
+Python browser suite; the backup is optional.
 
 The Python regression runner executes the JavaScript, application Python, and
 scripts Python suites. Every run prints a colored summary and saves the complete colored log
@@ -463,12 +471,15 @@ existing prediction source snapshots and account data.
 - `src/frontend/`: browser JavaScript, styles, pages, and assets.
 - `src/seeds/`: initial market catalogs and weather configuration.
 - `test/backend/`, `test/frontend/`, `test/scripts/`: application and tooling tests.
+- `test/e2e_python/`: primary Playwright browser tests for accounts and terminal navigation.
+- `test/e2e/`: backup TypeScript account tests and the shared Python server launcher.
 - `scripts/`: development, build, and maintenance commands.
 - `deploy/` and `doc/`: deployment configuration and documentation.
 - `data/` and `dist/`: local runtime data and generated static output.
 
-Run all tests with `python3 scripts/run_tests.py`. Start the application with
-`python3 src/backend/server.py`.
+Run unit tests with `.venv/bin/python scripts/run_tests.py` and primary browser
+tests with `.venv/bin/python -m pytest test/e2e_python`. The TypeScript browser
+suite is an optional backup. Start the application with `python3 src/backend/server.py`.
 
 ### Google sign-in
 

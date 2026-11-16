@@ -1,9 +1,14 @@
 # Python Playwright browser tests
 
-The account tests mirror all 17 scenarios in `../e2e/accounts.spec.ts`.
-Another 13 scenarios cover terminal navigation. Each scenario runs on desktop
-Chromium and emulated Pixel 7, for 60 checks in total. The suite uses pytest and
-Playwright's synchronous Python API; Node.js is not required.
+This is the primary browser test suite for routine development and release
+validation. It covers 17 account scenarios and 13 terminal-navigation scenarios.
+Each scenario runs on desktop Chromium and emulated Pixel 7, for 60 checks in
+total. The suite uses pytest and Playwright's synchronous Python API; Node.js is
+not required.
+
+Maintain new browser coverage here. The [TypeScript account suite](../e2e/README.md)
+is retained as an optional backup for troubleshooting and comparison; it covers
+the same account scenarios but does not include terminal navigation.
 
 From the repository root, install the Python test dependencies and browser:
 
@@ -50,8 +55,17 @@ restrictions. The real account API, cookies, CSRF and SQLite session handling
 remain in use. Provider calls are blocked and the external Google Identity
 widget is stubbed. The account tests cover password accounts. Google
 authentication, live prices, prediction submission and settlement are outside
-this suite. The existing TypeScript suite and `scripts/run_tests.py` remain
-separate commands.
+this suite. For routine validation, run the unit-test runner as well as this suite:
+
+```bash
+.venv/bin/python scripts/run_tests.py
+.venv/bin/python -m pytest test/e2e_python
+```
+
+The unit-test runner includes JavaScript tests and needs Node.js and the
+documentation dependencies described in the [test guide](../../doc/TEST_GUIDE.md).
+It does not invoke either browser suite. The TypeScript backup is run separately
+when needed.
 
 `test_terminal.py` covers entry through Crypto, dormant Oil/Weather categories,
 the player HUD and clocks, coin preference persistence, all four play durations,

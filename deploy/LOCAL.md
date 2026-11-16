@@ -173,8 +173,13 @@ not read `.env` files, and does not reset a Docker volume's database. Run
 ```bash
 curl --fail http://127.0.0.1:8000/healthz  # Python
 curl --fail http://localhost:8085/healthz # Docker
-python3 scripts/run_tests.py
+.venv/bin/python scripts/run_tests.py
+.venv/bin/python -m pytest test/e2e_python
 ```
+
+The unit-test runner and primary Python Playwright browser suite use disposable
+fixtures. Install their dependencies using the [test guide](../doc/TEST_GUIDE.md).
+The TypeScript account browser suite is retained as an optional backup.
 
 - Signup unavailable: if invite codes are enabled, set a nonempty
   `P60_SIGNUP_CODE` and restart/recreate. No code is needed with the default policy.

@@ -25,10 +25,12 @@ environment files, signup codes, Google tokens, or database backups to a report.
 
 ## 2. Run automated regressions
 
-Use the project virtual environment and installed documentation dependencies:
+Use the project virtual environment, installed documentation dependencies, and
+[primary Python Playwright setup](TEST_GUIDE.md#python-playwright-browser-tests):
 
 ```bash
 .venv/bin/python scripts/run_tests.py
+.venv/bin/python -m pytest test/e2e_python --junitxml=test-results/e2e_python/results.xml
 node scripts/benchmark-market-model.cjs
 node scripts/benchmark-coin-format.cjs
 python3 scripts/build-static.py
@@ -39,6 +41,13 @@ Expected: all executed suites pass; any skip has a recorded reason. If the
 Google verifier suite skips, install the project requirements and repeat it.
 If loopback sockets are restricted, distinguish that environment error from an
 assertion failure; repeat the affected temporary fixtures where sockets work.
+
+Python Playwright is the primary browser suite: expect 60 checks across desktop
+and mobile, with no automatic retries. Preserve its JUnit report and any failure
+artifacts under `test-results/e2e_python/`. The
+[TypeScript account suite](TEST_GUIDE.md#typescript-playwright-backup) is an
+optional backup for troubleshooting or comparison; it does not cover terminal
+navigation. Run it separately when needed and record its result separately.
 
 For an assertion-level Node report, use a separate process for each test file:
 `node --test --test-isolation=none --test-reporter=tap FILE`. Count assertions

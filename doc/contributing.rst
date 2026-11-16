@@ -47,13 +47,21 @@ interval navigation, and rollover. Common arrow geometry belongs in
 layout and moving marker alignment with the acceptance steps in ``TEST_GUIDE.md``.
 
 The generated branch/iteration reference records conditions rather than claiming
-they are exercised. Run the regression suites separately::
+they are exercised. Run the unit tests and primary Python Playwright browser
+suite separately::
 
-   python3 scripts/run_tests.py
+   .venv/bin/python scripts/run_tests.py
+   .venv/bin/python -m pytest test/e2e_python
 
 The runner executes all three unit-test suites and writes a colored result log
 to ``/tmp/test_results/test_result_<date_time>.log``. Read saved logs with
 ``less -R`` to display their PASS/FAIL colors.
+
+Install browser dependencies using ``test/e2e_python/requirements.txt`` and
+``.venv/bin/python -m playwright install chromium`` before the first browser run.
+Maintain new browser coverage in ``test/e2e_python/``. The TypeScript account
+suite in ``test/e2e/`` is retained as an optional backup for troubleshooting and
+comparison. See ``TEST_GUIDE.md`` for primary and backup setup commands.
 
 Use the project virtual environment for verification dependencies. When an
 installed Node reporter counts test files instead of assertions, run each file
